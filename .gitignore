@@ -1,0 +1,4 @@
+SFML/
+.vscode
+fluidsym
+*.o
