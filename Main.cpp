@@ -5,12 +5,11 @@
 
 // inspired by Sebastian Lague
 
-constexpr int framerateCap{60};
-constexpr int sleepDelay {1000/framerateCap};
 
 int main(int argc, char** argv)
 {
     std::cout << "fluid sim\n";
+    assert((timestepRatio > 0) && "timestep-ratio is zero!");
 
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");
     Fluid fluid (&mainwindow);
@@ -23,6 +22,19 @@ int main(int argc, char** argv)
         {
             if (event.type == sf::Event::Closed)
                 mainwindow.close();
+            
+            else if (event.type == sf::Event::KeyPressed)
+            {
+                switch (event.key.code) 
+                {
+                    case sf::Keyboard::Q:
+                        mainwindow.close();
+                        break;
+                    //case sf::Keyboard::
+                    default:
+                        break;
+                }
+            }
         }
 
         mainwindow.clear();
