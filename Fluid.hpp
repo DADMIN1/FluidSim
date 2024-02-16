@@ -53,14 +53,15 @@ class Fluid
         assert((DEFAULTRADIUS > 0.0) && "Radius must be greater than 0");
         assert((NUMCOLUMNS > 0) && (NUMROWS > 0) && "Columns and Rows must be greater than 0");
         assert((bounceDampening >= 0.0) && (bounceDampening <= 1.0) && "collision-damping must be between 0 and 1");
+        // TODO: does this reserve actually work? or do I need to reserve each nested vector as well?
         particles.reserve(NUMCOLUMNS*NUMROWS);
         particles.resize(NUMCOLUMNS);
-        for (int r{0}; r < NUMCOLUMNS; ++r) { 
-            particles[r].resize(NUMROWS);
-            for (int c{0}; c < NUMROWS; ++c) {
-                Particle& currentref = particles[r][c];
+        for (int c{0}; c < NUMCOLUMNS; ++c) { 
+            particles[c].resize(NUMROWS);
+            for (int r{0}; r < NUMROWS; ++r) {
+                Particle& currentref = particles[c][r];
                 currentref = Particle();
-                currentref.setPosition(r*DEFAULTRADIUS*2, c*DEFAULTRADIUS*2);
+                currentref.setPosition(c*DEFAULTRADIUS*2, r*DEFAULTRADIUS*2);
             }
         }
     }
@@ -68,9 +69,9 @@ class Fluid
     public:
     void Draw()
     {    
-        for (int r{0}; r < NUMCOLUMNS; ++r){ 
-            for (int c{0}; c < NUMROWS; ++c) {
-                drawtarget->draw(particles[r][c]);
+        for (int c{0}; c < NUMCOLUMNS; ++c){ 
+            for (int r{0}; r < NUMROWS; ++r) {
+                drawtarget->draw(particles[c][r]);
             }
         }
     }
@@ -82,9 +83,9 @@ class Fluid
 
     void Update()
     {
-        for (int r{0}; r < NUMCOLUMNS; ++r){ 
-            for (int c{0}; c < NUMROWS; ++c) {
-                Particle& currentref = particles[r][c];
+        for (int c{0}; c < NUMCOLUMNS; ++c){ 
+            for (int r{0}; r < NUMROWS; ++r) {
+                Particle& currentref = particles[c][r];
                 currentref.velocity.y += gravity * timestepRatio;
                 
                 sf::Vector2f nextPosition = currentref.getPosition();
