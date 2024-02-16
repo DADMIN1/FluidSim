@@ -4,14 +4,25 @@
 // vscode can't find /usr/include/SFML/ for some reason
 #include "SFML/Graphics.hpp"
 
+
+#define DYNAMICFRAMEDELAY false
+// if false, tries to compensate with a hardcoded ratio instead
+
 constexpr int NUMCOLUMNS {50}, NUMROWS {25};
 constexpr int BOXWIDTH {1000}, BOXHEIGHT {1000};
-constexpr float DEFAULTRADIUS {(BOXWIDTH/NUMCOLUMNS)/2};
+constexpr float DEFAULTRADIUS {float(BOXWIDTH/NUMCOLUMNS)/2.0};
 constexpr int DEFAULTPOINTCOUNT {30};
 
+
 constexpr int framerateCap{300};
-constexpr int sleepDelay {1000/framerateCap};
-constexpr float timestepRatio {1/float(framerateCap/60)};  // normalizing timesteps to make physics independent of frame-rate
+#if DYNAMICFRAMEDELAY
+constexpr int delaycompN{1}, delaycompD{1};
+#else
+constexpr int delaycompN{13}, delaycompD{15}; // the sleepdelay is multiplied by 13/15 to compensate for the calculation-time per frame
+// (with framerateCap=300): 298fps actual [delay=2888us] (with compensation) vs 262fps actual [delay=3333us] (without)
+#endif
+const sf::Time sleepDelay {sf::microseconds((1000000*delaycompN)/(framerateCap*delaycompD))};
+constexpr float timestepRatio {1.0/float(framerateCap/60)};  // normalizing timesteps to make physics independent of frame-rate
 
 
 class Particle : public sf::CircleShape
@@ -38,6 +49,8 @@ class Fluid
 
     void Initialize()
     {
+        assert((DEFAULTPOINTCOUNT > 0) && "Pointcount must be greater than 0");
+        assert((DEFAULTRADIUS > 0.0) && "Radius must be greater than 0");
         assert((NUMCOLUMNS > 0) && (NUMROWS > 0) && "Columns and Rows must be greater than 0");
         assert((bounceDampening >= 0.0) && (bounceDampening <= 1.0) && "collision-damping must be between 0 and 1");
         particles.reserve(NUMCOLUMNS*NUMROWS);

@@ -9,18 +9,28 @@
 int main(int argc, char** argv)
 {
     std::cout << "fluid sim\n";
+    //assert(false && "asserts are active!");
     assert((timestepRatio > 0) && "timestep-ratio is zero!");
+    assert(sleepDelay.asMicroseconds() > 0 && "sleepDelay is zero or negative!");
+    std::cout << "sleepdelay = " << sleepDelay.asMilliseconds() << "ms\n"; 
+    std::cout << "(" << sleepDelay.asMicroseconds() << ") us\n";
 
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");
     Fluid fluid (&mainwindow);
 
+    #if DYNAMICFRAMEDELAY
+    sf::Clock frametimer{};
+    #endif
     // frameloop
     while (mainwindow.isOpen())
     {
+        #if DYNAMICFRAMEDELAY
+        frametimer.restart();
+        #endif
         sf::Event event;
         while (mainwindow.pollEvent(event))
         {
-            if (event.type == sf::Event::Closed)
+            if (event.type == sf::Event::Closed) [[unlikely]]
                 mainwindow.close();
             
             else if (event.type == sf::Event::KeyPressed)
@@ -43,10 +53,19 @@ int main(int argc, char** argv)
         mainwindow.display();
 
         // framerate cap
-        const sf::Time framedelay (sf::milliseconds(sleepDelay));
-        sf::sleep(framedelay);
+        #if DYNAMICFRAMEDELAY
+        const sf::Time adjustedDelay = sleepDelay - frametimer.getElapsedTime();
+        if (adjustedDelay == sf::Time::Zero) [[unlikely]] {
+            //std::cout << "adjusted-delay is negative!: " << adjustedDelay.asMicroseconds() << "us" << '\n';
+            std::cout << "adjusted-delay is negative!: " << adjustedDelay.asMilliseconds() << "ms" << '\n';
+            continue;
+        }
+        sf::sleep(adjustedDelay);
+        #else // using hardcoded delay-compensation
+        sf::sleep(sleepDelay);
+        #endif
+        
     }
-
     
     return 0;
 }
