@@ -1,7 +1,11 @@
-#include <iostream>
-#include <vector>
-
 #include "Fluid.hpp"
+
+#include <iostream>
+#include <cassert>
+
+//#include "SFML/Graphics.hpp"
+#include "SFML/Window.hpp"  // defines sf::Event
+
 
 // inspired by Sebastian Lague
 
