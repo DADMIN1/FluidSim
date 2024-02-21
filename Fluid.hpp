@@ -1,10 +1,9 @@
 #include <vector>
 
-// vscode can't find /usr/include/SFML/ for some reason
-//#include "SFML/Graphics.hpp"
-#include "SFML/Graphics/CircleShape.hpp"
-#include "SFML/Graphics/RenderWindow.hpp"
-#include "SFML/System/Time.hpp"
+//#include <SFML/Graphics.hpp>
+#include <SFML/Graphics/CircleShape.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/System/Time.hpp>
 
 
 #define DYNAMICFRAMEDELAY false

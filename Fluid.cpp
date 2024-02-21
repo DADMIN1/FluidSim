@@ -3,11 +3,9 @@
 //#include <vector>
 #include <cassert>
 
-// vscode can't find /usr/include/SFML/ for some reason
-//#include "SFML/Graphics.hpp"
-#include "SFML/Graphics/CircleShape.hpp"
-#include "SFML/Graphics/RenderWindow.hpp"
-#include "SFML/System/Time.hpp"
+#include <SFML/Graphics/CircleShape.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/System/Time.hpp>
 
 
 void Fluid::Initialize()
@@ -32,7 +30,7 @@ void Fluid::Initialize()
 
 void Fluid::Update()
 {
-    for (int c{0}; c < NUMCOLUMNS; ++c){ 
+    for (int c{0}; c < NUMCOLUMNS; ++c) { 
         for (int r{0}; r < NUMROWS; ++r) {
             Particle& currentref = particles[c][r];
             currentref.velocity.y += gravity * timestepRatio;
