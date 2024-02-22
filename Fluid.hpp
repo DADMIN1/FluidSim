@@ -1,3 +1,6 @@
+#ifndef FLUIDSIM_FLUID_HPP_INCLUDED
+#define FLUIDSIM_FLUID_HPP_INCLUDED
+
 #include <vector>
 
 //#include <SFML/Graphics.hpp>
@@ -71,3 +74,4 @@ class Fluid
 };
 
 
+#endif
