@@ -1,14 +1,14 @@
-#include "Fluid.hpp"
-
 #include <iostream>
 #include <cassert>
 
 //#include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>  // defines sf::Event
 
+#include "Fluid.hpp"
+#include "ValarrayTest.hpp"
+
 
 // inspired by Sebastian Lague
-
 
 int main(int argc, char** argv)
 {
@@ -18,6 +18,10 @@ int main(int argc, char** argv)
     assert(sleepDelay.asMicroseconds() > 0 && "sleepDelay is zero or negative!");
     std::cout << "sleepdelay = " << sleepDelay.asMilliseconds() << "ms\n"; 
     std::cout << "(" << sleepDelay.asMicroseconds() << ") us\n";
+    
+    ValarrayTest();
+    ValarrayExample();
+    return 0;
 
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");
     Fluid fluid (&mainwindow);
