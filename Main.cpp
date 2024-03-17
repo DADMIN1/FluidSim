@@ -6,6 +6,7 @@
 
 #include "Fluid.hpp"
 #include "ValarrayTest.hpp"
+#include "Diffusion.hpp"
 
 
 // inspired by Sebastian Lague
@@ -19,8 +20,21 @@ int main(int argc, char** argv)
     std::cout << "sleepdelay = " << sleepDelay.asMilliseconds() << "ms\n"; 
     std::cout << "(" << sleepDelay.asMicroseconds() << ") us\n";
     
-    ValarrayTest();
-    ValarrayExample();
+    for (int C{0}; C < argc; ++C) {
+        std::string arg {argv[C]};
+        std::cout << "C: " << C << " \t arg: " << arg << '\n';
+    }
+    
+    /* ValarrayTest();
+    ValarrayExample(); */
+    
+    int targetCount = 5;
+    for (int s{1}; s <= targetCount; ++s) {
+        std::cout << "\n\n\n BaseNCount(" << s << "):\n";
+        int total = CalcBaseNCount(s);
+        std::cout << "\ntotal = " << total << "\n";
+    }
+    
     return 0;
 
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");

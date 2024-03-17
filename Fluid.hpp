@@ -2,22 +2,18 @@
 #define FLUIDSIM_FLUID_HPP_INCLUDED
 
 #include <vector>
+//#include <array>
 
 //#include <SFML/Graphics.hpp>
 #include <SFML/Graphics/CircleShape.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/System/Time.hpp>
 
+#include "Globals.hpp"
 
+
+// disable dynamic frame-delay to compensate with a hardcoded ratio instead
 #define DYNAMICFRAMEDELAY false
-// if false, tries to compensate with a hardcoded ratio instead
-
-constexpr int NUMCOLUMNS {50}, NUMROWS {25};
-constexpr int BOXWIDTH {1000}, BOXHEIGHT {1000};
-constexpr float DEFAULTRADIUS {float(BOXWIDTH/NUMCOLUMNS)/2.0};
-constexpr int DEFAULTPOINTCOUNT {30};
-
-
 constexpr int framerateCap{300};
 #if DYNAMICFRAMEDELAY
 constexpr int delaycompN{1}, delaycompD{1};
