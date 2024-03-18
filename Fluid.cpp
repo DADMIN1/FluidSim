@@ -25,6 +25,10 @@ void Fluid::Initialize()
             currentref.setPosition(c*DEFAULTRADIUS*2, r*DEFAULTRADIUS*2);
         }
     }
+    
+    /* for (auto& F: DiffusionFields) {
+        F.Initialize();
+    } */
 }
 
 

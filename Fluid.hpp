@@ -4,12 +4,13 @@
 #include <vector>
 //#include <array>
 
-//#include <SFML/Graphics.hpp>
-#include <SFML/Graphics/CircleShape.hpp>
-#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Graphics.hpp>
+//#include <SFML/Graphics/CircleShape.hpp>
+//#include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/System/Time.hpp>
 
 #include "Globals.hpp"
+//#include "Diffusion.hpp"
 
 
 // disable dynamic frame-delay to compensate with a hardcoded ratio instead
@@ -47,23 +48,38 @@ class Fluid
     float viscosity {1.0};
     float density {1.0};  // controls 'force' of diffusion
     sf::RenderWindow* drawtarget;
+    sf::RenderTexture particle_texture;
     std::vector<std::vector<Particle>> particles;
+
+    //std::array<DiffusionField_T, 2> DiffusionFields;
+    //bool buffer_index{0}; // which diffusion field is being used as the 'current' (not working) buffer
+    // why even bother swapping them? A copy to the other buffer will need to be made regardless
+    //inline void SwapStateBuffers() { buffer_index = !buffer_index; }
 
     void Initialize();
 
     public:
+    //const DiffusionField_T* state;
+    
     void Draw()
-    {    
+    {
+        particle_texture.clear(sf::Color::Transparent);
         for (int c{0}; c < NUMCOLUMNS; ++c){ 
             for (int r{0}; r < NUMROWS; ++r) {
-                drawtarget->draw(particles[c][r]);
+                //particles[c][r].UpdateColor();
+                particle_texture.draw(particles[c][r]);
             }
         }
+        particle_texture.display();
+        sf::Sprite fluidsprite (particle_texture.getTexture());
+        //DiffusionFields[0].Draw(drawtarget);
+        drawtarget->draw(fluidsprite);
     }
 
     Fluid(sf::RenderWindow* window) : drawtarget{window}
     {
         Initialize();
+        particle_texture.create(BOXWIDTH, BOXHEIGHT);
     }
 
     void Update();

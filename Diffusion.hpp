@@ -4,6 +4,9 @@
 #include <array>
 #include <cassert>
 
+#include <SFML/Graphics.hpp>  // rendertexture
+//#include <SFML/Graphics/RectangleShape.hpp>
+
 #include "Globals.hpp"
 
 
@@ -32,6 +35,8 @@ inline const float* CellLookup(const float positionX, const float positionY)
 /* consteval int CalcBaseNCount(int radial_distance) {
     return radial_distance;
 } */
+// std::size_t so they can be used for array sizing
+constexpr std::size_t NeighborCountsAtDist[] = {0, 4, 8, 16, 20};  // number of neighbors at a given radial distance
 constexpr int BaseNeighborCounts[] = {0, 4, 12, 28, 48};  // number of neighbors (cumulative) for a given radial distance
 int CalcBaseNCount(int radial_distance);  // returns the relative coords of neighbors at radial_distance
 
@@ -44,6 +49,93 @@ template <int RD, int X, int Y>  // radial_distance, X/Y index into DensityGrid
 class NeighborCells {
     static constexpr int Ncount = GetNeighborCount<RD, X, Y>();
     constexpr std::array<float*, Ncount> GetNeighborCells();
+};
+
+
+class DiffusionField_T
+{
+    sf::RenderTexture cellgrid_texture;
+    public:
+    //friend class Cell;
+    friend class Fluid;
+    // TODO: make a version with const(expr) indecies and IDs
+    class Cell: public sf::RectangleShape {
+        static constexpr float colorscaling {5.0}; // density required for all-white color;
+        public:
+        //static int counterX, counterY;
+        //const int IX, IY;
+        unsigned int IX, IY, UUID;  // UUID is the array index of Cell
+        float density{0.0};
+        
+        Cell()
+        : sf::RectangleShape(sf::Vector2f{1/SPATIAL_RESOLUTION, 1/SPATIAL_RESOLUTION}),
+        IX{0}, IY{0}, UUID{0} 
+        { }
+        
+        Cell(const unsigned int X, const unsigned int Y, const unsigned int UUID) 
+        : sf::RectangleShape(sf::Vector2f{1/SPATIAL_RESOLUTION, 1/SPATIAL_RESOLUTION}),
+        IX{X}, IY{Y}, UUID{UUID}
+        {
+            this->setFillColor(sf::Color::Transparent);
+            this->setOutlineColor(sf::Color::White);
+            this->setPosition(sf::Vector2f{float(X*SPATIAL_RESOLUTION), float(Y*SPATIAL_RESOLUTION)});
+        }
+        
+        void UpdateColor() {
+            this->setFillColor(sf::Color((density*colorscaling), 0, 0, (colorscaling*density/2.0)));
+        }
+    };
+    
+    using CellColumn = std::array<const Cell*, SPATIAL_RESOLUTION*BOXHEIGHT>;
+    using CellMatrix = std::array<CellColumn, SPATIAL_RESOLUTION*BOXWIDTH>;
+    // crashes
+    //using CellArray = std::array<Cell, ((SPATIAL_RESOLUTION*BOXHEIGHT)*(SPATIAL_RESOLUTION*BOXWIDTH))>;
+    using CellArray = std::vector<Cell>; // doesn't crash
+    //CellMatrix cellmatrix;
+    CellArray cells;
+    
+    //std::array<Cells, 2> cells;  // two buffers; a read-only 'current' state, and a working buffer
+    //Cells* const state {&cells[0]};
+    //Cells* state_working {&cells[1]};
+    
+    bool Initialize()  // returns success/fail
+    {
+        if (!cellgrid_texture.create(BOXWIDTH, BOXHEIGHT))
+            return false;
+        
+        cells.reserve((SPATIAL_RESOLUTION*BOXHEIGHT)*(SPATIAL_RESOLUTION*BOXWIDTH));
+        
+        unsigned int ID = 0;
+        for (unsigned int c{0}; c < (SPATIAL_RESOLUTION*BOXHEIGHT); ++c) {
+            for (unsigned int r{0}; r < (SPATIAL_RESOLUTION*BOXWIDTH); ++r) {
+                cells.emplace_back(c, r, ID);
+                /* cells[ID] = Cell{c, r, ID};
+                cellmatrix[c][r] = &cells[ID]; */
+                ++ID;
+            }
+        }
+        return true;
+    }
+    
+    /* DiffusionField_T()
+    {
+        Initialize();
+        cellgrid_texture.create(BOXWIDTH, BOXHEIGHT);
+    } */
+    
+    void Draw(sf::RenderWindow* drawtarget) 
+    {
+        return;
+        cellgrid_texture.clear(sf::Color::Transparent);
+        for (auto& cell : cells) {
+            cell.density = 2.5;
+            cell.UpdateColor();
+            cellgrid_texture.draw(cell);
+        }
+        cellgrid_texture.display();
+        sf::Sprite gridsprite (cellgrid_texture.getTexture());
+        drawtarget->draw(gridsprite);
+    }
 };
 
 //template <std::size_t RD, std::size_t X, std::size_t Y>  // radial_distance, X/Y index into DensityGrid

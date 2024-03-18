@@ -28,13 +28,30 @@ int main(int argc, char** argv)
     /* ValarrayTest();
     ValarrayExample(); */
     
-    int targetCount = 5;
+    /* int targetCount = 5;
     for (int s{1}; s <= targetCount; ++s) {
         std::cout << "\n\n\n BaseNCount(" << s << "):\n";
         int total = CalcBaseNCount(s);
         std::cout << "\ntotal = " << total << "\n";
+    } */
+
+    std::cout << "init complete\n";
+    std::array<DiffusionField_T, 2> DiffusionFields;
+    auto& field = DiffusionFields[0];
+    //DiffusionField_T field{};
+    std::cout << "field created\n";
+    if (!field.Initialize()) {
+        std::cout << "initialization failed\n";
     }
-    
+    else 
+        std::cout << "field initialized\n";
+        
+    std::cout << field.cells[0].UUID << '\n';
+    std::cout << field.cells[33].UUID << '\n';
+    std::cout << field.cells[6969].UUID << '\n';
+    std::cout << field.cells[6969].IX << ' ' << field.cells[6969].IY << '\n';
+    std::cout << field.cells[7001].UUID << '\n';
+    std::cout << field.cells[7001].IX << ' ' << field.cells[7001].IY << '\n';
     return 0;
 
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");
