@@ -3,3 +3,6 @@ SFML/
 fluidsym
 fluidsym_dbg
 *.o
+build/
+*.d
+

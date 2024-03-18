@@ -1,27 +1,35 @@
 MAKEFLAGS += -j8
-#CODEFILES=${./*.cpp}
-CXX = g++-12
-# DNDEBUG flag disables assert statements
-#SHAREDARGS = --std=c++20 -O3 -DNDEBUG
-SHAREDARGS = --std=c++20 -O3 -Wall -Wextra
-DEBUGARGS = --std=c++20 -Og -g -Wall -Wextra
+CXX := g++-12
+LDFLAGS := -lsfml-system -lsfml-graphics -lsfml-window
 
-# TODO: implement 'debug' and 'assert' flags
 # If the command-line args contained 'debug' as a target;
 ifeq (debug, $(filter debug, $(MAKECMDGOALS)))
 DEBUGFLAG = true
 target_executable = fluidsym_dbg
+OBJECTFILE_DIR = build/objects_dbg
+CXXFLAGS := -std=c++20 -ggdb -Og -g -march=native -pipe -Wall -Wextra
 else
 DEBUGFLAG = false
 target_executable = fluidsym
+OBJECTFILE_DIR = build/objects
+CXXFLAGS := -std=c++20 -O1 -march=native -pipe -Wall -Wextra
 endif
 
-#ifdef DEBUGFLAG
+# TODO: add a 'release' build with more optimization and '-DNDEBUG'
+# DNDEBUG flag disables assert statements
+
+CODEFILES := $(wildcard *.cpp)
+OBJFILES := $(patsubst %.cpp,$(OBJECTFILE_DIR)/%.o, $(CODEFILES))
+#DEPFILES = $(patsubst %.cpp, build/deps/%.d, $(CODEFILES))
+DEPFILES := $(OBJFILES:.o=.d)
 
 # cmdline-args passed to the program (space/comma seperated)
 DEFAULT_RUNARGS := hello world three
 # using quotes (either) here causes the whole line to be passed as a single argument
 # on the command-line, you can put the whole thing in quotes(either), even the 'runargs=' part! (and it's still split correctly)
+
+# if not defined ('runargs=...' wasn't specified on cmdline)
+runargs ?= $(strip ${DEFAULT_RUNARGS})
 
 # TODO: implement lenient argument formatting (strip and split-on: commas, spaces-only, both, commas-only)
 # TODO: implement super-lenient command-line arguments (also look for '--args/arg/runargs/=' in MAKECMDGOALS; parse arglist from cmdline)
@@ -45,23 +53,31 @@ DEFAULT_RUNARGS := hello world three
 #
 
 
-# if not defined ('runargs=...' wasn't specified on cmdline)
-runargs ?= $(strip ${DEFAULT_RUNARGS})
-
-# TODO: implement header/include dependency feature (-d)
-# TODO: macro linker-flags
-fluidsym: *.cpp *.hpp Makefile
-	${CXX} ${SHAREDARGS} -c ./*.cpp
-	${CXX} ${SHAREDARGS} -o fluidsym ./*.o -lsfml-system -lsfml-graphics -lsfml-window
-#	./fluidsym
+.PHONY: default
+default: ${target_executable}
 
 
-# TODO: stick 'dbg' on the object files compiled with debug files
-fluidsym_dbg: *.cpp *.hpp Makefile
-	${CXX} ${DEBUGARGS} -c ./*.cpp
-	${CXX} ${DEBUGARGS} -o fluidsym_dbg ./*.o -lsfml-system -lsfml-graphics -lsfml-window
-#	./fluidsym_dbg
+# build directories
+SUBDIRS := build/objects build/objects_dbg
+.PHONY: subdirs $(SUBDIRS)
+subdirs: $(SUBDIRS)
+$(SUBDIRS):
+	@mkdir --verbose --parents $@
+# '--parents' also prevents errors if it already exists
 
+
+${target_executable}: $(OBJFILES) | ${SUBDIRS}
+	${CXX} ${CXXFLAGS} -o $@ ${OBJFILES} ${LDFLAGS}
+
+# the subdirs are added as an 'order-only' prerequisite; it doesn't trigger rebuilding
+# that's important because the builddir's MTIME is updated every time a file is compiled;
+# which would then trigger rebuilds for every file every time.
+
+
+$(OBJECTFILE_DIR)/%.o: %.cpp | ${SUBDIRS}
+	$(CXX) $(CXXFLAGS) -MMD -c $< -o $@
+# The -MMD and -MP flags together create dependency-files (.d)
+# actually don't use '-MP'; it creates fake empty dependency rules for the '.hpp' files
 
 
 .PHONY: runargs
@@ -77,21 +93,6 @@ PARSE_ARGS:
 #	newargs = ./PARSE_ARGS.bash 
 
 
-#
-# subdir example
-# TODO: implement this
-SUBDIRS = foo bar baz
-.PHONY: subdirs $(SUBDIRS)
-subdirs: $(SUBDIRS)
-$(SUBDIRS):
-	@mkdir --verbose --parents $@
-
-# foo depends on baz
-foo: baz
-#
-#
-
-
 # the formatting/output options for 'time' are: '--portability' and '--verbose'; either is fine ('portability' preferred)
 # not specifying either causes 'time' to print some garbage when running from a makefile (but not from normal terminal?!)
 # '--append' does nothing without specifying an output file; I've included it by default in case a stray '-o' makes it onto the cmdline somehow
@@ -103,18 +104,18 @@ run: ${target_executable}
 # example of garbage output: "0.00user 0.00system 0:00.00elapsed 91%CPU (0avgtext+0avgdata 2560maxresident)k0inputs+0outputs (0major+113minor)pagefaults 0swaps"
 
 
-# basically an alias for fluidsym_dbg
+# this is required to allow 'debug' on the command line;
+# otherwise, it complains: "make: *** No rule to make target 'debug'.  Stop."
 .PHONY: debug
 debug: fluidsym_dbg
-# otherwise, the debug-build will be rebuilt every time because it's '.PHONY'
-# (even if it's not, it will still rebuild every time; it'll think it needs to create a file called 'debug')
 
 
 .PHONY: clean
 clean:
 	@-rm --verbose fluidsym 2> /dev/null || true
 	@-rm --verbose fluidsym_dbg 2> /dev/null || true
-	@-rm --verbose ./*.o 2> /dev/null || true
+	@-rm --verbose ./build/*/* 2> /dev/null || true
+#	@-rm --verbose ./*.o 2> /dev/null || true
 # prefixed '@' prevents make from echoing the command
 # prefixed '-' causes make to ignore nonzero exit-codes (instead of aborting), but it still reports these errors:
 # 		'make: [Makefile:24: clean] Error 1 (ignored)'
@@ -123,3 +124,9 @@ clean:
 # 'rm' (even without verbose) will also print it's own additional error-messages: 
 # 		'rm: cannot remove 'fluidsym_dbg': No such file or directory'
 # so we pipe to '/dev/null' to suppress that as well
+
+
+# this has to be at the end of the file?
+-include $(DEPFILES)
+# Include the .d makefiles. The '-' at the front suppresses the errors of missing depfiles.
+# Initially, all the '.d' files will be missing, and we don't want those errors to show up.
