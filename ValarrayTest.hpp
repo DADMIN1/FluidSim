@@ -24,7 +24,7 @@ void PrintValarray(std::string_view rem, auto const& v, bool nl = false)
             undofinalspacing = "\b\b\b\b\n ";
         }
         std::cout << spacing;
-        for (int itercount=0; auto const e : v) {
+        for (std::size_t itercount=0; auto const e : v) {
             std::cout << e << ", ";
             if ((++itercount < v.size()) && (itercount % linebreakthreshold) == 0) { std::cout << spacing; } 
             /* the additional length-check is required to prevent an extra newline 
