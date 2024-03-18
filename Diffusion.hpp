@@ -13,7 +13,7 @@
 constexpr unsigned int DIFFUSION_RADIUS {1};  // number of neighboring grid-cells affected during density calculations (0 = only current cell is affected)
 constexpr float DIFFUSION_SCALING {1.0/float(DIFFUSION_RADIUS+1)};  // diffusion-strength needs to decrease with distance, and must be scaled with radius
 
-constexpr unsigned int SPATIAL_RESOLUTION {100};  // units/pixels per grid-cell for calculating diffusion/collision
+constexpr unsigned int SPATIAL_RESOLUTION {50};  // units/pixels per grid-cell for calculating diffusion/collision
 constexpr std::array<std::array<float, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION> DensityGrid{};  // holds 'densities' for each cell
 // TODO: move global definitions to another file
 // TODO: replace DensityGrid with DiffusionField_T
@@ -61,7 +61,7 @@ class DiffusionField_T
     friend class Fluid;
     // TODO: make a version with const(expr) indecies and IDs
     class Cell: public sf::RectangleShape {
-        static constexpr float colorscaling {50.0}; // density required for all-white color;
+        static constexpr float colorscaling {16.0}; // density required for all-white color;
         public:
         //static int counterX, counterY;
         //const int IX, IY;
@@ -79,23 +79,23 @@ class DiffusionField_T
         IX{X}, IY{Y}, UUID{UUID}
         {
             this->setFillColor(sf::Color::Transparent);
-            this->setOutlineColor(sf::Color::White);
+            this->setOutlineColor(sf::Color(0xFFFFFF80));  // half-transparent white
             this->setOutlineThickness(1);
             this->setPosition(sf::Vector2f{float(X*SPATIAL_RESOLUTION), float(Y*SPATIAL_RESOLUTION)});
         }
         
         void UpdateColor() {
-            sf::Uint8 alpha = colorscaling*density + 127;
-            this->setFillColor(sf::Color((density*colorscaling), 0, 0, alpha));
+            sf::Uint8 alpha = (density >= 127/colorscaling ? 255 : colorscaling*density + 127); // avoiding overflows
+            sf::Uint8 red = (density >= 255/colorscaling ? 255 : colorscaling*density); // avoiding overflows
+            this->setFillColor(sf::Color(red, 0, 0, alpha));
         }
     };
     
     using CellMatrix = std::array<std::array<Cell*, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION>;
-    // crashes
-    //using CellArray = std::array<Cell, ((BOXHEIGHT/SPATIAL_RESOLUTION)*(BOXWIDTH/SPATIAL_RESOLUTION))>;
+    //using CellArray = std::array<Cell, ((BOXHEIGHT/SPATIAL_RESOLUTION)*(BOXWIDTH/SPATIAL_RESOLUTION))>; // crashes
     using CellArray = std::vector<Cell>; // doesn't crash
-    //CellMatrix cellmatrix;
     CellArray cells; // TODO: figure out how to do this with an array without crashing
+    CellMatrix cellmatrix;
     
     //std::array<Cells, 2> cells;  // two buffers; a read-only 'current' state, and a working buffer
     //Cells* const state {&cells[0]};
@@ -111,9 +111,9 @@ class DiffusionField_T
         unsigned int ID = 0;
         for (unsigned int c{0}; c < (BOXHEIGHT/SPATIAL_RESOLUTION); ++c) {
             for (unsigned int r{0}; r < (BOXWIDTH/SPATIAL_RESOLUTION); ++r) {
+                //cells[ID] = Cell{c, r, ID};
                 Cell& newcell = cells.emplace_back(c, r, ID);
-                /* cells[ID] = Cell{c, r, ID};
-                cellmatrix[c][r] = &cells[ID]; */
+                cellmatrix[c][r] = &newcell;
                 ++ID;
             }
         }
@@ -126,17 +126,15 @@ class DiffusionField_T
         cellgrid_texture.create(BOXWIDTH, BOXHEIGHT);
     } */
     
-    void Draw(sf::RenderWindow* drawtarget) 
+    sf::Sprite Draw() 
     {
         cellgrid_texture.clear(sf::Color::Transparent);
         for (auto& cell : cells) {
-            cell.density = 2.5;
             cell.UpdateColor();
             cellgrid_texture.draw(cell);
         }
         cellgrid_texture.display();
-        sf::Sprite gridsprite (cellgrid_texture.getTexture());
-        drawtarget->draw(gridsprite);
+        return sf::Sprite(cellgrid_texture.getTexture());
     }
 };
 

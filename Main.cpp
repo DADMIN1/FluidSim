@@ -35,20 +35,13 @@ int main(int argc, char** argv)
         std::cout << "\ntotal = " << total << "\n";
     } */
 
-    std::cout << "init complete\n";
-    std::array<DiffusionField_T, 2> DiffusionFields;
-    auto& field = DiffusionFields[0];
-    //DiffusionField_T field{};
-    std::cout << "field created\n";
-    if (!field.Initialize()) {
-        std::cout << "initialization failed\n";
-    }
-    else 
-        std::cout << "field initialized\n";
-
-
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");
-    Fluid fluid (&mainwindow);
+    Fluid fluid;
+    if (!fluid.Initialize())
+    {
+        std::cout << "fluid initialization failed!!";
+        return 1;
+    }
 
     #if DYNAMICFRAMEDELAY
     sf::Clock frametimer{};
@@ -80,9 +73,10 @@ int main(int argc, char** argv)
         }
 
         mainwindow.clear();
-        field.Draw(&mainwindow);
         fluid.Update();
-        fluid.Draw();
+        fluid.UpdateDensities();
+        mainwindow.draw(fluid.DrawGrid());
+        mainwindow.draw(fluid.Draw());
         mainwindow.display();
 
         // framerate cap

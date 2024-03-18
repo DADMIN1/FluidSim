@@ -4,13 +4,13 @@
 #include <vector>
 //#include <array>
 
-#include <SFML/Graphics.hpp>
+#include <SFML/Graphics.hpp>  // rendertexture
 //#include <SFML/Graphics/CircleShape.hpp>
 //#include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/System/Time.hpp>
 
 #include "Globals.hpp"
-//#include "Diffusion.hpp"
+#include "Diffusion.hpp"
 
 
 // disable dynamic frame-delay to compensate with a hardcoded ratio instead
@@ -29,6 +29,7 @@ constexpr float timestepRatio {1.0/float(framerateCap/60)};  // normalizing time
 class Particle : public sf::CircleShape
 {
     sf::Vector2f velocity {0.0, 0.0};
+    unsigned int prevcellID {0};
     public:
     friend class Fluid;
     
@@ -47,21 +48,22 @@ class Fluid
     float bounceDampening {0.15};
     float viscosity {1.0};
     float density {1.0};  // controls 'force' of diffusion
-    sf::RenderWindow* drawtarget;
     sf::RenderTexture particle_texture;
     std::vector<std::vector<Particle>> particles;
 
-    //std::array<DiffusionField_T, 2> DiffusionFields;
+    std::array<DiffusionField_T, 2> DiffusionFields;
     //bool buffer_index{0}; // which diffusion field is being used as the 'current' (not working) buffer
     // why even bother swapping them? A copy to the other buffer will need to be made regardless
     //inline void SwapStateBuffers() { buffer_index = !buffer_index; }
 
-    void Initialize();
-
     public:
     //const DiffusionField_T* state;
+    bool Initialize();
+    void Update();
+    void UpdateDensities();
+    //void ModifyVelocities();  // TODO: implement this
     
-    void Draw()
+    sf::Sprite Draw()
     {
         particle_texture.clear(sf::Color::Transparent);
         for (int c{0}; c < NUMCOLUMNS; ++c){ 
@@ -71,18 +73,14 @@ class Fluid
             }
         }
         particle_texture.display();
-        sf::Sprite fluidsprite (particle_texture.getTexture());
-        //DiffusionFields[0].Draw(drawtarget);
-        drawtarget->draw(fluidsprite);
+        return sf::Sprite(particle_texture.getTexture());
     }
-
-    Fluid(sf::RenderWindow* window) : drawtarget{window}
+    
+    sf::Sprite DrawGrid()
     {
-        Initialize();
-        particle_texture.create(BOXWIDTH, BOXHEIGHT);
+        // DiffusionFields[0]  // update densities here
+        return DiffusionFields[0].Draw();
     }
-
-    void Update();
 };
 
 
