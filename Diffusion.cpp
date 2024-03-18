@@ -3,11 +3,7 @@
 #include <vector>
 #include <iostream>
 
-// Doesn't this fail at the max height/width? Need to modify Fluid.Update
-/* const float* CellLookup(const float positionX, const float positionY)
-{
-    return &DensityGrid[int(positionX)*SPATIAL_RESOLUTION][int(positionY)*SPATIAL_RESOLUTION];
-} */
+
 
 // returns the relative coords of neighbors at radial_distance
 int CalcBaseNCount(int radial_distance) {
@@ -118,26 +114,3 @@ const auto GetNeighborsAll(const int radial_distance, const int IX, const int IY
     return absoluteCoords;
 };
 
-
-/* void DiffusionField_T::Initialize() 
-{
-    int ID = 0;
-    for (int c{0}; c < SPATIAL_RESOLUTION*BOXHEIGHT; ++c) {
-        for (int r{0}; r < SPATIAL_RESOLUTION*BOXWIDTH; ++r) {
-            cells[ID] = Cell{c, r, ID};
-            cellmatrix[c][r] = &cells[ID];
-            ++ID;
-        }
-    }
-} */
-
-/* void DiffusionField_T::Draw() 
-{
-    cellgrid_texture.clear(sf::Color::Transparent);
-    for (auto& cell : cells) {
-        cell.density = 2.5;
-        cell.UpdateColor();
-        cellgrid_texture.draw(cell);
-    }
-    cellgrid_texture.display();
-} */

@@ -13,10 +13,10 @@
 constexpr unsigned int DIFFUSION_RADIUS {1};  // number of neighboring grid-cells affected during density calculations (0 = only current cell is affected)
 constexpr float DIFFUSION_SCALING {1.0/float(DIFFUSION_RADIUS+1)};  // diffusion-strength needs to decrease with distance, and must be scaled with radius
 
-constexpr unsigned int SPATIAL_RESOLUTION {2};  // subdivisions per unit for calculating diffusion/collision
-constexpr std::array<std::array<float, SPATIAL_RESOLUTION*BOXHEIGHT>, SPATIAL_RESOLUTION*BOXWIDTH> DensityGrid{};  // holds 'densities' for each cell
+constexpr unsigned int SPATIAL_RESOLUTION {100};  // units/pixels per grid-cell for calculating diffusion/collision
+constexpr std::array<std::array<float, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION> DensityGrid{};  // holds 'densities' for each cell
 // TODO: move global definitions to another file
-
+// TODO: replace DensityGrid with DiffusionField_T
 
 consteval float DiffusionStrength(const unsigned int radial_distance) // radial-distance is number of cells away from particle
 {
@@ -30,7 +30,8 @@ consteval float DiffusionStrength(const unsigned int radial_distance) // radial-
 // TODO: implement as a template function (wouldn't that result in a million instantiations?)
 //const float* CellLookup(const float positionX, const float positionY);  // pointer into DensityGrid at the correct cell for a given (particle) position
 inline const float* CellLookup(const float positionX, const float positionY)
-{ return &DensityGrid[int(positionX)*SPATIAL_RESOLUTION][int(positionY)*SPATIAL_RESOLUTION]; }
+{ return &DensityGrid[int(positionX/SPATIAL_RESOLUTION)][int(positionY/SPATIAL_RESOLUTION)]; }
+// Doesn't this fail at the max height/width? Need to modify Fluid.Update
 
 /* consteval int CalcBaseNCount(int radial_distance) {
     return radial_distance;
@@ -60,39 +61,41 @@ class DiffusionField_T
     friend class Fluid;
     // TODO: make a version with const(expr) indecies and IDs
     class Cell: public sf::RectangleShape {
-        static constexpr float colorscaling {5.0}; // density required for all-white color;
+        static constexpr float colorscaling {50.0}; // density required for all-white color;
         public:
         //static int counterX, counterY;
         //const int IX, IY;
         unsigned int IX, IY, UUID;  // UUID is the array index of Cell
         float density{0.0};
         
+        // TODO: Cells should be larger than 1 pixel??
         Cell()
-        : sf::RectangleShape(sf::Vector2f{1/SPATIAL_RESOLUTION, 1/SPATIAL_RESOLUTION}),
+        : sf::RectangleShape(sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}),
         IX{0}, IY{0}, UUID{0} 
         { }
         
         Cell(const unsigned int X, const unsigned int Y, const unsigned int UUID) 
-        : sf::RectangleShape(sf::Vector2f{1/SPATIAL_RESOLUTION, 1/SPATIAL_RESOLUTION}),
+        : sf::RectangleShape(sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}),
         IX{X}, IY{Y}, UUID{UUID}
         {
             this->setFillColor(sf::Color::Transparent);
             this->setOutlineColor(sf::Color::White);
+            this->setOutlineThickness(1);
             this->setPosition(sf::Vector2f{float(X*SPATIAL_RESOLUTION), float(Y*SPATIAL_RESOLUTION)});
         }
         
         void UpdateColor() {
-            this->setFillColor(sf::Color((density*colorscaling), 0, 0, (colorscaling*density/2.0)));
+            sf::Uint8 alpha = colorscaling*density + 127;
+            this->setFillColor(sf::Color((density*colorscaling), 0, 0, alpha));
         }
     };
     
-    using CellColumn = std::array<const Cell*, SPATIAL_RESOLUTION*BOXHEIGHT>;
-    using CellMatrix = std::array<CellColumn, SPATIAL_RESOLUTION*BOXWIDTH>;
+    using CellMatrix = std::array<std::array<Cell*, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION>;
     // crashes
-    //using CellArray = std::array<Cell, ((SPATIAL_RESOLUTION*BOXHEIGHT)*(SPATIAL_RESOLUTION*BOXWIDTH))>;
+    //using CellArray = std::array<Cell, ((BOXHEIGHT/SPATIAL_RESOLUTION)*(BOXWIDTH/SPATIAL_RESOLUTION))>;
     using CellArray = std::vector<Cell>; // doesn't crash
     //CellMatrix cellmatrix;
-    CellArray cells;
+    CellArray cells; // TODO: figure out how to do this with an array without crashing
     
     //std::array<Cells, 2> cells;  // two buffers; a read-only 'current' state, and a working buffer
     //Cells* const state {&cells[0]};
@@ -103,12 +106,12 @@ class DiffusionField_T
         if (!cellgrid_texture.create(BOXWIDTH, BOXHEIGHT))
             return false;
         
-        cells.reserve((SPATIAL_RESOLUTION*BOXHEIGHT)*(SPATIAL_RESOLUTION*BOXWIDTH));
+        cells.reserve((BOXHEIGHT/SPATIAL_RESOLUTION)*(BOXWIDTH/SPATIAL_RESOLUTION));
         
         unsigned int ID = 0;
-        for (unsigned int c{0}; c < (SPATIAL_RESOLUTION*BOXHEIGHT); ++c) {
-            for (unsigned int r{0}; r < (SPATIAL_RESOLUTION*BOXWIDTH); ++r) {
-                cells.emplace_back(c, r, ID);
+        for (unsigned int c{0}; c < (BOXHEIGHT/SPATIAL_RESOLUTION); ++c) {
+            for (unsigned int r{0}; r < (BOXWIDTH/SPATIAL_RESOLUTION); ++r) {
+                Cell& newcell = cells.emplace_back(c, r, ID);
                 /* cells[ID] = Cell{c, r, ID};
                 cellmatrix[c][r] = &cells[ID]; */
                 ++ID;
@@ -125,7 +128,6 @@ class DiffusionField_T
     
     void Draw(sf::RenderWindow* drawtarget) 
     {
-        return;
         cellgrid_texture.clear(sf::Color::Transparent);
         for (auto& cell : cells) {
             cell.density = 2.5;

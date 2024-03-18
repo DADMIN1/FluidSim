@@ -45,14 +45,7 @@ int main(int argc, char** argv)
     }
     else 
         std::cout << "field initialized\n";
-        
-    std::cout << field.cells[0].UUID << '\n';
-    std::cout << field.cells[33].UUID << '\n';
-    std::cout << field.cells[6969].UUID << '\n';
-    std::cout << field.cells[6969].IX << ' ' << field.cells[6969].IY << '\n';
-    std::cout << field.cells[7001].UUID << '\n';
-    std::cout << field.cells[7001].IX << ' ' << field.cells[7001].IY << '\n';
-    return 0;
+
 
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");
     Fluid fluid (&mainwindow);
@@ -87,6 +80,7 @@ int main(int argc, char** argv)
         }
 
         mainwindow.clear();
+        field.Draw(&mainwindow);
         fluid.Update();
         fluid.Draw();
         mainwindow.display();
