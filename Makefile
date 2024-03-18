@@ -1,9 +1,10 @@
+MAKEFLAGS += -j8
 #CODEFILES=${./*.cpp}
 CXX = g++-12
 # DNDEBUG flag disables assert statements
 #SHAREDARGS = --std=c++20 -O3 -DNDEBUG
-SHAREDARGS = --std=c++20 -O3
-DEBUGARGS = --std=c++20 -Og -g
+SHAREDARGS = --std=c++20 -O3 -Wall -Wextra
+DEBUGARGS = --std=c++20 -Og -g -Wall -Wextra
 
 # TODO: implement 'debug' and 'assert' flags
 # If the command-line args contained 'debug' as a target;
@@ -47,17 +48,17 @@ DEFAULT_RUNARGS := hello world three
 # if not defined ('runargs=...' wasn't specified on cmdline)
 runargs ?= $(strip ${DEFAULT_RUNARGS})
 
-
+# TODO: implement header/include dependency feature (-d)
 # TODO: macro linker-flags
-fluidsym: *.cpp *.hpp #Makefile
-	${CXX} ${SHAREDARGS} -c ./*.cpp -lsfml-system -lsfml-graphics -lsfml-window
+fluidsym: *.cpp *.hpp Makefile
+	${CXX} ${SHAREDARGS} -c ./*.cpp
 	${CXX} ${SHAREDARGS} -o fluidsym ./*.o -lsfml-system -lsfml-graphics -lsfml-window
 #	./fluidsym
 
 
 # TODO: stick 'dbg' on the object files compiled with debug files
 fluidsym_dbg: *.cpp *.hpp Makefile
-	${CXX} ${DEBUGARGS} -c ./*.cpp -lsfml-system -lsfml-graphics -lsfml-window
+	${CXX} ${DEBUGARGS} -c ./*.cpp
 	${CXX} ${DEBUGARGS} -o fluidsym_dbg ./*.o -lsfml-system -lsfml-graphics -lsfml-window
 #	./fluidsym_dbg
 
