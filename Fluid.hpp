@@ -29,7 +29,7 @@ constexpr float timestepRatio {1.0/float(framerateCap/60)};  // normalizing time
 class Particle : public sf::CircleShape
 {
     sf::Vector2f velocity {0.0, 0.0};
-    unsigned int prevcellID {0};
+    unsigned int cellID {0}, prevCellID {0};
     bool reldirections[2] {true, true};  // tracks position relative to cell's center (X, Y axes)
     // 'true' indicates a positive direction on that axis
     public:
@@ -61,6 +61,9 @@ class Fluid
     //inline void SwapStateBuffers() { buffer_index = !buffer_index; }
 
     public:
+    // mouse needs to access this pointer to lookup cell (given an X/Y coord)
+    DiffusionField_T::CellMatrix* GetCellMatrixPtr() { return &DiffusionFields[0].cellmatrix; }
+    
     bool ToggleGravity(bool noArg=true) // if you pass false, it always disables
     { 
         if (noArg) hasGravity = !hasGravity;

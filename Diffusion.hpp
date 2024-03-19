@@ -10,9 +10,8 @@
 #include "Globals.hpp"
 
 
-constexpr unsigned int DIFFUSION_RADIUS {1};  // number of neighboring grid-cells affected during density calculations (0 = only current cell is affected)
+constexpr unsigned int DIFFUSION_RADIUS {3};  // number of neighboring grid-cells affected during density calculations (0 = only current cell is affected)
 constexpr float DIFFUSION_SCALING {1.0/float(DIFFUSION_RADIUS+1)};  // diffusion-strength needs to decrease with distance, and must be scaled with radius
-
 
 constexpr std::array<std::array<float, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION> DensityGrid{};  // holds 'densities' for each cell
 // TODO: move global definitions to another file
@@ -63,6 +62,7 @@ class DiffusionField_T
     public:
     //friend class Cell;
     friend class Fluid;
+    friend struct Mouse_T;
     // TODO: make a version with const(expr) indecies and IDs
     class Cell: public sf::RectangleShape {
         static constexpr float colorscaling {16.0}; // density required for all-white color;
@@ -96,6 +96,9 @@ class DiffusionField_T
     };
     static constexpr unsigned int maxIX = (BOXWIDTH/SPATIAL_RESOLUTION - 1);
     static constexpr unsigned int maxIY = (BOXHEIGHT/SPATIAL_RESOLUTION - 1);
+    // these are added with signed-ints in GetCellNeighbors (because the result might be negative); hence the assertion.
+    static_assert((maxIX < __INT_MAX__) && (maxIY < __INT_MAX__) && "max-indecies will overflow");
+    
     using CellMatrix = std::array<std::array<Cell*, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION>;
     //using CellArray = std::array<Cell, ((BOXHEIGHT/SPATIAL_RESOLUTION)*(BOXWIDTH/SPATIAL_RESOLUTION))>; // crashes
     using CellArray = std::vector<Cell>; // doesn't crash
@@ -146,6 +149,8 @@ class DiffusionField_T
         return sf::Sprite(cellgrid_texture.getTexture());
     }
 };
+
+using CellRef_T = std::vector<DiffusionField_T::Cell*>;
 
 //template <std::size_t RD, std::size_t X, std::size_t Y>  // radial_distance, X/Y index into DensityGrid
 //constexpr void UpdateDiffusion(RD, X, Y);  // updates the counts for cells in diffusion delta-map (for neighbors of radial_distance RD)

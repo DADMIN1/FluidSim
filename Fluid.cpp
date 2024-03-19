@@ -34,7 +34,8 @@ bool Fluid::Initialize()
             unsigned int xi = x/SPATIAL_RESOLUTION;
             unsigned int yi = y/SPATIAL_RESOLUTION;
             DiffusionField_T::Cell* cell = DiffusionFields[0].cellmatrix.at(xi).at(yi);
-            particle.prevcellID = cell->UUID;
+            particle.cellID = cell->UUID;
+            particle.prevCellID = cell->UUID;
             cell->density += 1.0;
         }
     }
@@ -79,26 +80,29 @@ void Fluid::Update()
             if (nextPosition.y >= BOXHEIGHT) {
                 nextPosition.y = BOXHEIGHT-DEFAULTRADIUS;
                 particle.velocity.y *= -1.0 + bounceDampening;
+                particle.velocity.y -= 0.1f;  // forcing particles with 0 velocity away from the edge
                 assert(particle.velocity.y <= 0 && "y-velocity should be negative");
             }
             else if (nextPosition.y <= 0) {
                 nextPosition.y = -1*nextPosition.y;
                 particle.velocity.y *= -1.0 + bounceDampening;
-                particle.velocity.y += 1.0f;  // forcing particles with 0 velocity away from the edge
+                particle.velocity.y += 0.1f;  // forcing particles with 0 velocity away from the edge
                 assert(particle.velocity.y >= 0 && "y-velocity should be positive");
             }
 
             if (nextPosition.x >= BOXWIDTH) {
                 nextPosition.x = BOXWIDTH-DEFAULTRADIUS;
                 particle.velocity.x *= -1.0 + bounceDampening;
+                particle.velocity.x -= 0.1f;   // forcing particles with 0 velocity away from the edge
                 assert(particle.velocity.x <= 0 && "x-velocity should be negative");
             }
             else if (nextPosition.x <= 0) {
                 nextPosition.x = -1*nextPosition.x;
                 particle.velocity.x *= -1.0 + bounceDampening;
-                particle.velocity.x += 1.0f;   // forcing particles with 0 velocity away from the edge
+                particle.velocity.x += 0.1f;   // forcing particles with 0 velocity away from the edge
                 assert(particle.velocity.x >= 0 && "x-velocity should be positive");
             }
+            
             particle.setPosition(nextPosition);
         }
     }
@@ -107,22 +111,27 @@ void Fluid::Update()
 void Fluid::UpdateDensities()
 {
     for (auto& innervec: particles) {
-        for (Particle& p: innervec) {
-            auto& [x, y] = p.getPosition();
+        for (Particle& particle: innervec) {
+            auto& [x, y] = particle.getPosition();
             unsigned int xi = x/SPATIAL_RESOLUTION;
             unsigned int yi = y/SPATIAL_RESOLUTION;
             DiffusionField_T::Cell* cell = DiffusionFields[0].cellmatrix.at(xi).at(yi);
-            if (cell->UUID != p.prevcellID)
+            if (cell->UUID != particle.cellID)
             {
-                DiffusionFields[0].cells[p.prevcellID].density -= 1.0;
-                p.prevcellID = cell->UUID;
+                DiffusionField_T::Cell& oldcell = DiffusionFields[0].cells[particle.cellID];
+                /* float densityRatio = (oldcell.density+1.0) / (cell->density+1.0);
+                particle.velocity *= densityRatio; */
+                // can't do that calculation here because not every cell has it's density updated yet (it blows up)
+                oldcell.density -= 1.0;
                 cell->density += 1.0;
+                particle.prevCellID = particle.cellID;
+                particle.cellID = cell->UUID;
             }
             
             // finding position relative to center of the cell
             sf::Vector2f halfway = cell->getPosition() + sf::Vector2f{float(SPATIAL_RESOLUTION/2), float(SPATIAL_RESOLUTION/2)};
-            p.reldirections[0] = (x >= halfway.x);
-            p.reldirections[1] = (y >= halfway.y);
+            particle.reldirections[0] = (x >= halfway.x);
+            particle.reldirections[1] = (y >= halfway.y);
         }
     }
 }
@@ -132,8 +141,20 @@ void Fluid::ApplyDiffusion()
 {
     for (auto& innervec: particles) {
         for (Particle& particle: innervec) {
-            const DiffusionField_T::Cell& cell = DiffusionFields[0].cells[particle.prevcellID];
-            particle.velocity -= DiffusionFields[0].CalcDiffusionVec(particle.prevcellID) * timestepRatio * fdensity;
+            const DiffusionField_T::Cell& cell = DiffusionFields[0].cells[particle.cellID];
+            // TODO: implement this better
+            if (particle.prevCellID != particle.cellID) // taking care of velocity scaling after cell transition
+            {
+                DiffusionField_T::Cell& oldcell = DiffusionFields[0].cells[particle.prevCellID];
+                float densityRatio = (cell.density)/(oldcell.density+1.0); // accounting for the density added/subtracted by this particle
+                assert (densityRatio > 0.0f && "incoming division by zero");
+                particle.velocity += particle.velocity*fdensity*(1.0f-densityRatio);
+                //particle.velocity += particle.velocity*fdensity*densityRatio;
+                //if (std::abs(particle.velocity.x) > 10.0f) { particle.velocity.x = 0.0f; }
+                //if (std::abs(particle.velocity.y) > 10.0f) { particle.velocity.y = 0.0f; }
+                particle.prevCellID = particle.cellID;  // only perform this calculation once
+            }
+            particle.velocity += DiffusionFields[0].CalcDiffusionVec(particle.cellID) * timestepRatio * fdensity;
             // Applying current cell's diffusion
             const float diffusionForce = (cell.density-1.0)*fdensity;
             const sf::Vector2f diffvec { diffusionForce*(particle.reldirections[0] ? 1.0f : -1.0f ), 

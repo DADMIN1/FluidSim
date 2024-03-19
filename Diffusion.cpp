@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <iostream>
-
+#include <cmath>
 
 
 // returns the relative coords of neighbors at radial_distance
@@ -38,7 +38,7 @@ int CalcBaseNCount(int radial_distance) {
 
 
 // TODO: write constexpr (template) version of this
-const auto GetNeighbors(const int radial_distance) // relative verison
+const Coordlist GetNeighbors(const int radial_distance) // relative verison
 {
     switch (radial_distance) {
         case 0: return Coordlist {};
@@ -78,7 +78,7 @@ const Coordlist GetNeighbors(const int radial_distance, const int IX, const int 
         const int resultX = IX+dx;
         const int resultY = IY+dy;
         if((resultX < 0) || (resultY < 0)) continue;
-        else if((resultX > DiffusionField_T::maxIX) || (resultY > DiffusionField_T::maxIY)) continue;
+        else if((resultX > int(DiffusionField_T::maxIX)) || (resultY > int(DiffusionField_T::maxIY))) continue;
         else {
             absoluteCoords.push_back({resultX, resultY});
         }
@@ -86,25 +86,6 @@ const Coordlist GetNeighbors(const int radial_distance, const int IX, const int 
     return absoluteCoords;
 }
 
-// the pairs within DoubleCoords are ordered: Absolute, Relative
-const std::vector<DoubleCoord> DiffusionField_T::GetAdjacentPlus(const std::size_t UUID)
-{
-    const Cell& baseCell = cells.at(UUID);
-    const int IX = baseCell.IX;
-    const int IY = baseCell.IY;
-    
-    std::vector<DoubleCoord> coords{};
-    for (const auto& [dx, dy] : GetNeighbors(1)) {
-        const int resultX = IX+dx;
-        const int resultY = IY+dy;
-        if((resultX < 0) || (resultY < 0)) continue;
-        else if((resultX > DiffusionField_T::maxIX) || (resultY > DiffusionField_T::maxIY)) continue;
-        else {
-            coords.push_back({{resultX, resultY}, {dx, dy}});
-        }
-    }
-    return coords;
-}
 
 // TODO: write constexpr (template) version of this
 const auto GetNeighborsAll(const int radial_distance) // relative verison
@@ -127,7 +108,7 @@ const auto GetNeighborsAll(const int radial_distance, const int IX, const int IY
 {
     std::vector<Coordlist> absoluteCoords{};
     absoluteCoords.reserve(radial_distance-1);
-    for (int d{1}; d < radial_distance; ++d) {
+    for (int d{1}; d <= radial_distance; ++d) {
         // absolute overload of GetNeighbors already does a bounds-check on results
         absoluteCoords.push_back(GetNeighbors(d, IX, IY));
     }
@@ -135,19 +116,41 @@ const auto GetNeighborsAll(const int radial_distance, const int IX, const int IY
 };
 
 
-using CellRef_T = std::vector<DiffusionField_T::Cell*>;
-
 const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID)
 {
     const Cell& cell = cells.at(UUID);
-    const Coordlist coords = GetNeighbors(1, cell.IX, cell.IY);
     std::vector<Cell*> reflist;
-    for (const auto& [ix, iy]: coords) {
-        reflist.push_back(cellmatrix.at(ix).at(iy));
+    for (unsigned int radius{1}; radius<=DIFFUSION_RADIUS; ++radius) {
+        const Coordlist coords = GetNeighbors(radius, cell.IX, cell.IY);
+        for (const auto& [ix, iy]: coords) {
+            reflist.push_back(cellmatrix.at(ix).at(iy));
+        }
     }
     return reflist;
 }
 //const std::vector<Cell*> reflist{GetCellNeighbors(UUID)};
+
+// the pairs within DoubleCoords are ordered: Absolute, Relative
+const std::vector<DoubleCoord> DiffusionField_T::GetAdjacentPlus(const std::size_t UUID)
+{
+    const Cell& baseCell = cells.at(UUID);
+    const int IX = baseCell.IX;
+    const int IY = baseCell.IY;
+    
+    std::vector<DoubleCoord> coords{};
+    for (unsigned int radius{DIFFUSION_RADIUS}; radius>0; --radius) {
+        for (const auto& [dx, dy] : GetNeighbors(radius)) {
+            const int resultX = IX+dx;
+            const int resultY = IY+dy;
+            if ((resultX < 0) || (resultY < 0)) continue;
+            else if ((resultX > int(DiffusionField_T::maxIX)) || (resultY > int(DiffusionField_T::maxIY))) continue;
+            else {
+                coords.push_back({{resultX, resultY}, {dx, dy}});
+            }
+        }
+    }
+    return coords;
+}
 
 const sf::Vector2f DiffusionField_T::CalcDiffusionVec(const std::size_t UUID)
 {
@@ -160,10 +163,21 @@ const sf::Vector2f DiffusionField_T::CalcDiffusionVec(const std::size_t UUID)
         const auto& [ix, iy] = abs;
         //reflist.push_back(cellmatrix.at(ix).at(iy));
         Cell* neighbor = cellmatrix.at(ix).at(iy);
-        const float relativeDensity = cell.density - neighbor->density;
+        // scaling neighbor's density by distance
+        const int orthodist = std::max(std::abs(rel.first), std::abs(rel.second));
+        // taking max of either axis so that diagonals are considered a distance of 1, instead of 2
+        const float magnitude = cell.density - (neighbor->density * float(orthodist*DIFFUSION_SCALING));
+        
+        // we need to find the directional components of the vector (angle);
+        int orthodist_sum {std::abs(rel.first) + std::abs(rel.second)};
+        std::pair<float, float> angleComponents { 
+            float(rel.first /orthodist_sum), 
+            float(rel.second/orthodist_sum), 
+        };
+        
         forcevector += sf::Vector2f { 
-            float(-1.0*relativeDensity*rel.first),
-            float(-1.0*relativeDensity*rel.second),
+            float(magnitude*angleComponents.first),
+            float(magnitude*angleComponents.second),
         };
     }
     return forcevector;
