@@ -13,7 +13,7 @@
 constexpr unsigned int DIFFUSION_RADIUS {1};  // number of neighboring grid-cells affected during density calculations (0 = only current cell is affected)
 constexpr float DIFFUSION_SCALING {1.0/float(DIFFUSION_RADIUS+1)};  // diffusion-strength needs to decrease with distance, and must be scaled with radius
 
-constexpr unsigned int SPATIAL_RESOLUTION {50};  // units/pixels per grid-cell for calculating diffusion/collision
+
 constexpr std::array<std::array<float, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION> DensityGrid{};  // holds 'densities' for each cell
 // TODO: move global definitions to another file
 // TODO: replace DensityGrid with DiffusionField_T
@@ -53,6 +53,10 @@ class NeighborCells {
 };
 
 
+using Coordlist = std::vector<std::pair<int, int>>;
+using DoubleCoord = std::pair<std::pair<int, int>, std::pair<int, int>>;
+
+
 class DiffusionField_T
 {
     sf::RenderTexture cellgrid_texture;
@@ -90,7 +94,8 @@ class DiffusionField_T
             this->setFillColor(sf::Color(red, 0, 0, alpha));
         }
     };
-    
+    static constexpr unsigned int maxIX = (BOXWIDTH/SPATIAL_RESOLUTION - 1);
+    static constexpr unsigned int maxIY = (BOXHEIGHT/SPATIAL_RESOLUTION - 1);
     using CellMatrix = std::array<std::array<Cell*, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION>;
     //using CellArray = std::array<Cell, ((BOXHEIGHT/SPATIAL_RESOLUTION)*(BOXWIDTH/SPATIAL_RESOLUTION))>; // crashes
     using CellArray = std::vector<Cell>; // doesn't crash
@@ -100,6 +105,10 @@ class DiffusionField_T
     //std::array<Cells, 2> cells;  // two buffers; a read-only 'current' state, and a working buffer
     //Cells* const state {&cells[0]};
     //Cells* state_working {&cells[1]};
+    
+    const sf::Vector2f CalcDiffusionVec(std::size_t UUID);
+    const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID);
+    const std::vector<DoubleCoord> GetAdjacentPlus(const std::size_t UUID); // returns pairs of absolute and relative coords
     
     bool Initialize()  // returns success/fail
     {

@@ -10,9 +10,6 @@
 
 bool Fluid::Initialize()
 {
-    assert((DEFAULTPOINTCOUNT > 0) && "Pointcount must be greater than 0");
-    assert((DEFAULTRADIUS > 0.0) && "Radius must be greater than 0");
-    assert((NUMCOLUMNS > 0) && (NUMROWS > 0) && "Columns and Rows must be greater than 0");
     assert((bounceDampening >= 0.0) && (bounceDampening <= 1.0) && "collision-damping must be between 0 and 1");
     
     if (!particle_texture.create(BOXWIDTH, BOXHEIGHT))
@@ -30,7 +27,8 @@ bool Fluid::Initialize()
         particles[c].resize(NUMROWS);
         for (int r{0}; r < NUMROWS; ++r) {
             Particle& particle = particles[c][r];
-            particle.setPosition(c*DEFAULTRADIUS*2, r*DEFAULTRADIUS*2);
+            particle.setPosition((c*INITIALSPACINGX)+INITIALOFFSETX, (r*INITIALSPACINGY)+INITIALOFFSETY);
+            
             // finding/setting initial cell
             auto& [x, y] = particle.getPosition();
             unsigned int xi = x/SPATIAL_RESOLUTION;
@@ -51,7 +49,27 @@ void Fluid::Update()
     for (int c{0}; c < NUMCOLUMNS; ++c) { 
         for (int r{0}; r < NUMROWS; ++r) {
             Particle& particle = particles[c][r];
-            particle.velocity.y += gravity * timestepRatio;
+            
+            if (hasGravity)
+                particle.velocity.y += gravity;
+            
+            /* particle.velocity -= { 
+                (particle.velocity.x>0.0? 1.0f : -1.0f) * viscosity, 
+                (particle.velocity.y>0.0? 1.0f : -1.0f) * viscosity,
+            }; */
+            
+            if (particle.velocity.x > vcap) {
+                particle.velocity.x -= viscosity;
+            }
+            else if (particle.velocity.x < -vcap) {
+                particle.velocity.x += viscosity;
+            }
+            if (particle.velocity.y > vcap) {
+                particle.velocity.y -= viscosity;
+            }
+            else if (particle.velocity.y < -vcap) {
+                particle.velocity.y += viscosity;
+            }
             
             sf::Vector2f nextPosition = particle.getPosition();
             nextPosition.x += particle.velocity.x * timestepRatio;
@@ -64,8 +82,9 @@ void Fluid::Update()
                 assert(particle.velocity.y <= 0 && "y-velocity should be negative");
             }
             else if (nextPosition.y <= 0) {
-                nextPosition.y = 0+DEFAULTRADIUS;
+                nextPosition.y = -1*nextPosition.y;
                 particle.velocity.y *= -1.0 + bounceDampening;
+                particle.velocity.y += 1.0f;  // forcing particles with 0 velocity away from the edge
                 assert(particle.velocity.y >= 0 && "y-velocity should be positive");
             }
 
@@ -75,8 +94,9 @@ void Fluid::Update()
                 assert(particle.velocity.x <= 0 && "x-velocity should be negative");
             }
             else if (nextPosition.x <= 0) {
-                nextPosition.x = 0+DEFAULTRADIUS;
+                nextPosition.x = -1*nextPosition.x;
                 particle.velocity.x *= -1.0 + bounceDampening;
+                particle.velocity.x += 1.0f;   // forcing particles with 0 velocity away from the edge
                 assert(particle.velocity.x >= 0 && "x-velocity should be positive");
             }
             particle.setPosition(nextPosition);
@@ -98,6 +118,32 @@ void Fluid::UpdateDensities()
                 p.prevcellID = cell->UUID;
                 cell->density += 1.0;
             }
+            
+            // finding position relative to center of the cell
+            sf::Vector2f halfway = cell->getPosition() + sf::Vector2f{float(SPATIAL_RESOLUTION/2), float(SPATIAL_RESOLUTION/2)};
+            p.reldirections[0] = (x >= halfway.x);
+            p.reldirections[1] = (y >= halfway.y);
         }
     }
 }
+
+// expects that UpdateDensities has already been called for the frame
+void Fluid::ApplyDiffusion()
+{
+    for (auto& innervec: particles) {
+        for (Particle& particle: innervec) {
+            const DiffusionField_T::Cell& cell = DiffusionFields[0].cells[particle.prevcellID];
+            particle.velocity -= DiffusionFields[0].CalcDiffusionVec(particle.prevcellID) * timestepRatio * fdensity;
+            // Applying current cell's diffusion
+            const float diffusionForce = (cell.density-1.0)*fdensity;
+            const sf::Vector2f diffvec { diffusionForce*(particle.reldirections[0] ? 1.0f : -1.0f ), 
+                                         diffusionForce*(particle.reldirections[1] ? 1.0f : -1.0f ), };
+            particle.velocity += diffvec*timestepRatio;
+            
+            /* if (particle.velocity.x < 1.0) {
+                particle.velocity.x += diffusionForce*(particle.reldirections[0] ? float(-1.0) : float(1.0));
+            } */
+        }
+    }
+}
+

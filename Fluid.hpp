@@ -30,6 +30,8 @@ class Particle : public sf::CircleShape
 {
     sf::Vector2f velocity {0.0, 0.0};
     unsigned int prevcellID {0};
+    bool reldirections[2] {true, true};  // tracks position relative to cell's center (X, Y axes)
+    // 'true' indicates a positive direction on that axis
     public:
     friend class Fluid;
     
@@ -44,10 +46,12 @@ class Particle : public sf::CircleShape
 
 class Fluid 
 {
-    float gravity {0.5};
+    bool hasGravity {false};
+    float gravity {0.15};
     float bounceDampening {0.15};
-    float viscosity {1.0};
-    float density {1.0};  // controls 'force' of diffusion
+    float viscosity {0.075};
+    float fdensity {0.0025};  // controls 'force' of diffusion
+    float vcap {3.0};
     sf::RenderTexture particle_texture;
     std::vector<std::vector<Particle>> particles;
 
@@ -57,11 +61,27 @@ class Fluid
     //inline void SwapStateBuffers() { buffer_index = !buffer_index; }
 
     public:
+    bool ToggleGravity(bool noArg=true) // if you pass false, it always disables
+    { 
+        if (noArg) hasGravity = !hasGravity;
+        else hasGravity = false;
+        return hasGravity; 
+    }
     //const DiffusionField_T* state;
     bool Initialize();
     void Update();
     void UpdateDensities();
-    //void ModifyVelocities();  // TODO: implement this
+    void ApplyDiffusion();
+    void Freeze() // sets all velocities to 0
+    {
+        for (auto& column: particles) {
+            for (Particle& particle: column) {
+                particle.velocity = {0, 0};
+            }
+        }
+        hasGravity = false;
+    }
+    void Reset(); // TODO: implement reset
     
     sf::Sprite Draw()
     {
