@@ -51,7 +51,7 @@ class Fluid
     float bounceDampening {0.15};
     float viscosity {0.075};
     float fdensity {0.0025};  // controls 'force' of diffusion
-    float vcap {3.0};
+    float vcap {7.5};
     sf::RenderTexture particle_texture;
     std::vector<std::vector<Particle>> particles;
 
@@ -63,6 +63,7 @@ class Fluid
     public:
     // mouse needs to access this pointer to lookup cell (given an X/Y coord)
     DiffusionField_T::CellMatrix* GetCellMatrixPtr() { return &DiffusionFields[0].cellmatrix; }
+    void PrintAllCells() {DiffusionFields[0].PrintAllCells();}
     
     bool ToggleGravity(bool noArg=true) // if you pass false, it always disables
     { 

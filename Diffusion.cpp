@@ -5,6 +5,18 @@
 #include <cmath>
 
 
+void DiffusionField_T::PrintAllCells()
+{
+    std::cout << "maxIX, maxIY = " << maxIX << ", " << maxIY << '\n';
+    for (Cell& cell: cells) {
+        std::cout << "UUID: " << cell.UUID << " ";
+        std::cout << "ix: " << cell.IX << " ";
+        std::cout << "iy: " << cell.IY << " ";
+        const auto& [x, y] = cell.getPosition();
+        std::cout << "\n\tposition: " << x << ", " << y << '\n';
+    }
+}
+
 // returns the relative coords of neighbors at radial_distance
 int CalcBaseNCount(int radial_distance) {
     if (radial_distance == 0) { return 0; }
@@ -166,7 +178,7 @@ const sf::Vector2f DiffusionField_T::CalcDiffusionVec(const std::size_t UUID)
         // scaling neighbor's density by distance
         const int orthodist = std::max(std::abs(rel.first), std::abs(rel.second));
         // taking max of either axis so that diagonals are considered a distance of 1, instead of 2
-        const float magnitude = cell.density - (neighbor->density * float(orthodist*DIFFUSION_SCALING));
+        const float magnitude = (cell.density - neighbor->density) * (1.0f - float(orthodist*DIFFUSION_SCALING));
         
         // we need to find the directional components of the vector (angle);
         int orthodist_sum {std::abs(rel.first) + std::abs(rel.second)};

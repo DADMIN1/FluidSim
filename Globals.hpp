@@ -8,6 +8,11 @@ constexpr float DEFAULTRADIUS {4.f};
 constexpr int DEFAULTPOINTCOUNT {10}; // number of points used to draw each circle
 constexpr unsigned int SPATIAL_RESOLUTION {25};  // units/pixels per grid-cell for calculating diffusion/collision
 
+// if the field's dimensions are not evenly divisible by cell-size, we need an extra cell to cover the remainder
+constexpr unsigned int maxindexAdjX = ((BOXWIDTH  % SPATIAL_RESOLUTION) == 0? 1 : 0);
+constexpr unsigned int maxindexAdjY = ((BOXHEIGHT % SPATIAL_RESOLUTION) == 0? 1 : 0);
+// the order is correct; it's subtracted from the max-index (because normally: maxIndex = size-1)
+
 constexpr float INITIALSPACINGX {BOXWIDTH/NUMCOLUMNS};
 constexpr float INITIALSPACINGY {BOXHEIGHT/NUMROWS};
 constexpr float INITIALOFFSETX {(INITIALSPACINGX/2.0f) - DEFAULTRADIUS};

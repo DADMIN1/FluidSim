@@ -94,13 +94,17 @@ class DiffusionField_T
             this->setFillColor(sf::Color(red, 0, 0, alpha));
         }
     };
-    static constexpr unsigned int maxIX = (BOXWIDTH/SPATIAL_RESOLUTION - 1);
-    static constexpr unsigned int maxIY = (BOXHEIGHT/SPATIAL_RESOLUTION - 1);
+    
+    static constexpr unsigned int maxIX = (BOXWIDTH/SPATIAL_RESOLUTION - maxindexAdjX);
+    static constexpr unsigned int maxIY = (BOXHEIGHT/SPATIAL_RESOLUTION - maxindexAdjY);
+    static constexpr unsigned int maxSizeX = maxIX+1;
+    static constexpr unsigned int maxSizeY = maxIY+1;
+
     // these are added with signed-ints in GetCellNeighbors (because the result might be negative); hence the assertion.
     static_assert((maxIX < __INT_MAX__) && (maxIY < __INT_MAX__) && "max-indecies will overflow");
     
-    using CellMatrix = std::array<std::array<Cell*, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION>;
-    //using CellArray = std::array<Cell, ((BOXHEIGHT/SPATIAL_RESOLUTION)*(BOXWIDTH/SPATIAL_RESOLUTION))>; // crashes
+    using CellMatrix = std::array<std::array<Cell*, maxSizeY>, maxSizeX>;
+    //using CellArray = std::array<Cell, ((maxSizeY)*(maxSizeX))>; // crashes
     using CellArray = std::vector<Cell>; // doesn't crash
     CellArray cells; // TODO: figure out how to do this with an array without crashing
     CellMatrix cellmatrix;
@@ -118,11 +122,11 @@ class DiffusionField_T
         if (!cellgrid_texture.create(BOXWIDTH, BOXHEIGHT))
             return false;
         
-        cells.reserve((BOXHEIGHT/SPATIAL_RESOLUTION)*(BOXWIDTH/SPATIAL_RESOLUTION));
+        cells.reserve((maxSizeY)*(maxSizeX));
         
         unsigned int ID = 0;
-        for (unsigned int c{0}; c < (BOXHEIGHT/SPATIAL_RESOLUTION); ++c) {
-            for (unsigned int r{0}; r < (BOXWIDTH/SPATIAL_RESOLUTION); ++r) {
+        for (unsigned int c{0}; c < (maxSizeX); ++c) {
+            for (unsigned int r{0}; r < (maxSizeY); ++r) {
                 //cells[ID] = Cell{c, r, ID};
                 Cell& newcell = cells.emplace_back(c, r, ID);
                 cellmatrix[c][r] = &newcell;
@@ -137,6 +141,7 @@ class DiffusionField_T
         Initialize();
         cellgrid_texture.create(BOXWIDTH, BOXHEIGHT);
     } */
+    void PrintAllCells();
     
     sf::Sprite Draw() 
     {
