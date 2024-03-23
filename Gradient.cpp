@@ -69,6 +69,7 @@ void GradientWindow_T::Create()
     constexpr auto m_style = sf::Style::Close;  // Title-bar is implied (for Style::Close)
     // sf::Style::Default = Titlebar | Resize | Close
     sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "Gradient", m_style);
+    setPosition({getPosition().x+360, 360});
 }
 
 
@@ -93,6 +94,7 @@ void GradientWindow_T::FrameLoop()
                     switch (gw_event.key.code) {
                         case sf::Keyboard::Key::Q:
                         case sf::Keyboard::Key::Escape:
+                        case sf::Keyboard::F1:
                             close(); return;
                         default: break;
                     }

@@ -93,12 +93,8 @@ int main(int argc, char** argv)
         << DiffusionField_T::maxIY << '\n';
     
     
-    EmbedMacroTest();
-    
+    //EmbedMacroTest();
     GradientWindow_T gradientWindow{};
-    gradientWindow.Create();
-    gradientWindow.FrameLoop();
-    return 0;
     
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");
     Fluid fluid;
@@ -147,6 +143,14 @@ int main(int argc, char** argv)
                             if (!isPaused) TogglePause();
                             fluid.Freeze();
                             std::cout << "Velocities have been zeroed (and gravity disabled)\n";
+                            break;
+                        case sf::Keyboard::F1:
+                            if (gradientWindow.isOpen()) { gradientWindow.close(); }
+                            else
+                            {
+                                gradientWindow.Create();
+                                gradientWindow.FrameLoop();
+                            }
                             break;
                         
                         //case sf::Keyboard::
