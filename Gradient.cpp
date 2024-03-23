@@ -13,7 +13,7 @@
         #undef EMBED_GRADIENT
   };
   
-  const sf::Color Gradient_T::Lookup(const int index) 
+  const sf::Color Gradient_T::Lookup(const unsigned int index) 
   {return sf::Color(GradientRaw[index][0], GradientRaw[index][1], GradientRaw[index][2]);}
 
   #else // FWDDECLARE_STATIC
@@ -27,7 +27,7 @@
         #undef EMBED_GRADIENT
       };
       
-      static const sf::Color Lookup(const int index) 
+      static const sf::Color Lookup(const unsigned int index) 
       {return sf::Color(GradientRaw[index][0], GradientRaw[index][1], GradientRaw[index][2]);}
   };
 

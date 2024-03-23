@@ -20,7 +20,7 @@ class Mouse_T: public sf::Mouse, public sf::CircleShape
         Erase, // erase particles
     } mode {None};
     
-    static constexpr float defaultRadius {SPATIAL_RESOLUTION*2};
+    static constexpr float defaultRadius {SPATIAL_RESOLUTION*1.5};
     float radius {defaultRadius};
     DiffusionField_T::CellMatrix* matrixptr {nullptr}; // &fluid.DiffusionFields[0]
     DiffusionField_T::Cell* hoveredCell {nullptr};
@@ -40,7 +40,7 @@ class Mouse_T: public sf::Mouse, public sf::CircleShape
     // Do not call the constructor for sf::Mouse (it's virtual)?
     Mouse_T(DiffusionField_T::CellMatrix* const mptr): sf::CircleShape(defaultRadius)
     {
-        setOutlineThickness(3.f);
+        setOutlineThickness(1.f);
         setOutlineColor(sf::Color::White);
         setFillColor(sf::Color::Transparent);
         setOrigin(defaultRadius, defaultRadius);

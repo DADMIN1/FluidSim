@@ -7,12 +7,13 @@ ifeq (debug, $(filter debug, $(MAKECMDGOALS)))
 DEBUGFLAG = true
 target_executable = fluidsym_dbg
 OBJECTFILE_DIR = build/objects_dbg
-CXXFLAGS := -std=c++20 -ggdb -Og -g -march=native -pipe -Wall -Wextra -Wpedantic
+CXXFLAGS := -std=c++23 -ggdb -Og -g -march=native -pipe -Wall -Wextra -Wpedantic
+# c++23 standard isn't required for anything; 20 works fine
 else
 DEBUGFLAG = false
 target_executable = fluidsym
 OBJECTFILE_DIR = build/objects
-CXXFLAGS := -std=c++20 -O1 -march=native -pipe -Wall -Wextra -Wpedantic
+CXXFLAGS := -std=c++23 -O3 -march=native -pipe -Wall -Wextra -Wpedantic -DNDEBUG
 endif
 
 # TODO: add a 'release' build with more optimization and '-DNDEBUG'

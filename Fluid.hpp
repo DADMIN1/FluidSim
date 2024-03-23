@@ -34,6 +34,7 @@ class Particle : public sf::CircleShape
     // 'true' indicates a positive direction on that axis
     public:
     friend class Fluid;
+    void UpdateColor(bool useTransparency);
     
     Particle(float radius=DEFAULTRADIUS, std::size_t pointcount=DEFAULTPOINTCOUNT) 
     : Particle::CircleShape(radius, pointcount)
@@ -47,11 +48,12 @@ class Particle : public sf::CircleShape
 class Fluid 
 {
     bool hasGravity {false};
-    float gravity {0.15};
+    float gravity {0.175};
     float bounceDampening {0.15};
-    float viscosity {0.075};
-    float fdensity {0.0025};  // controls 'force' of diffusion
+    float viscosity {0.005};
+    float fdensity {0.0125};  // controls 'force' of diffusion
     float vcap {7.5};
+    bool useTransparency {false};  // slow-moving particles are more transparent
     sf::RenderTexture particle_texture;
     std::vector<std::vector<Particle>> particles;
 
@@ -71,6 +73,7 @@ class Fluid
         else hasGravity = false;
         return hasGravity; 
     }
+    bool ToggleTransparency() { useTransparency = !useTransparency; return useTransparency; }
     //const DiffusionField_T* state;
     bool Initialize();
     void Update();
@@ -81,6 +84,7 @@ class Fluid
         for (auto& column: particles) {
             for (Particle& particle: column) {
                 particle.velocity = {0, 0};
+                particle.UpdateColor(useTransparency);
             }
         }
         hasGravity = false;

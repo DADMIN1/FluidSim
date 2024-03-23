@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <iostream>
-#include <cmath>
+#include <numeric>
 
 
 void DiffusionField_T::PrintAllCells()
@@ -77,7 +77,9 @@ const Coordlist GetNeighbors(const int radial_distance) // relative verison
             {2, 3}, {2, -3}, {-2, 3}, {-2, -3}, 
             {1, 4}, {1, -4}, {-1, 4}, {-1, -4},
         };
-        default: assert(false && "Neighbor-coords not defined for radial distance: " && radial_distance);
+        default: 
+            assert(false && "Neighbor-coords not defined for radial distance: " && radial_distance);
+            return Coordlist {};
     }
 };
 

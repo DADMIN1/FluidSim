@@ -22,7 +22,7 @@ struct Gradient_T;
   struct Gradient_T
   {
       static const unsigned char GradientRaw[1024][3];
-      static const sf::Color Lookup(const int index);
+      static const sf::Color Lookup(const unsigned int index);
   };
   #endif // FWDDECLARE_STATIC
 
@@ -36,7 +36,7 @@ struct Gradient_T
       #undef EMBED_GRADIENT
     };
     
-    inline static const sf::Color Lookup(const int index) 
+    inline static const sf::Color Lookup(const unsigned int index) 
     {return sf::Color(GradientRaw[index][0], GradientRaw[index][1], GradientRaw[index][2]);}
 };
 

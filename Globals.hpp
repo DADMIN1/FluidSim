@@ -4,9 +4,9 @@
 constexpr int NUMCOLUMNS {50}, NUMROWS {50};
 constexpr int BOXWIDTH {1000}, BOXHEIGHT {1000};
 //constexpr float DEFAULTRADIUS {float(BOXWIDTH/NUMCOLUMNS) / 2.0f};
-constexpr float DEFAULTRADIUS {4.f};
-constexpr int DEFAULTPOINTCOUNT {10}; // number of points used to draw each circle
-constexpr unsigned int SPATIAL_RESOLUTION {25};  // units/pixels per grid-cell for calculating diffusion/collision
+constexpr float DEFAULTRADIUS {8.0f};
+constexpr int DEFAULTPOINTCOUNT {20}; // number of points used to draw each circle
+constexpr unsigned int SPATIAL_RESOLUTION {30};  // units/pixels per grid-cell for calculating diffusion/collision
 
 // if the field's dimensions are not evenly divisible by cell-size, we need an extra cell to cover the remainder
 constexpr unsigned int maxindexAdjX = ((BOXWIDTH  % SPATIAL_RESOLUTION) == 0? 1 : 0);

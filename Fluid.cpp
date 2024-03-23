@@ -1,11 +1,42 @@
 #include "Fluid.hpp"
+#include "Gradient.hpp"
 
 //#include <vector>
+#include <numeric>
 #include <cassert>
 
 #include <SFML/Graphics/CircleShape.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/System/Time.hpp>
+
+
+
+void Particle::UpdateColor(bool useTransparency)
+{
+    float speed = std::abs(velocity.x) + std::abs(velocity.y);
+    constexpr float thresholdLow{0.5f};  // speed at which gradient begins to apply
+    constexpr float thresholdHigh{32.5f};  // caps out the gradient
+    constexpr float inputRange = thresholdHigh-thresholdLow;
+    unsigned int speedindex;
+    const unsigned int baseAlpha = (useTransparency? 0xC0 : 0xFF);
+    unsigned char alpha = baseAlpha;  // eventually converted to sf::Uint8 - which is unsigned char (not int)
+    if (speed <= thresholdLow) { speedindex = 0; setScale({1.1f, 1.1f}); }
+    else if (speed >= thresholdHigh) { speedindex = 1023; }  // size of gradient
+    else {
+        speedindex = (speed - thresholdLow) * (1023.f/inputRange);
+        assert(speedindex <= 1023);
+        if (useTransparency) {
+            alpha = baseAlpha + ((speed - thresholdLow) * ((0xFF-baseAlpha)/inputRange));
+            assert(alpha < 256);
+        }
+        // faster particles shrink
+        float scale = 1.1f - ((speed - thresholdLow)/inputRange);
+        setScale({scale, scale});
+    }
+    auto&&[r, g, b, a] = Gradient_T::Lookup(speedindex);
+    setFillColor({r,g,b,alpha});
+    return;
+}
 
 
 bool Fluid::Initialize()
@@ -105,6 +136,7 @@ void Fluid::Update()
             }
             
             particle.setPosition(nextPosition);
+            particle.UpdateColor(useTransparency);
         }
     }
 }
@@ -147,12 +179,9 @@ void Fluid::ApplyDiffusion()
             if (particle.prevCellID != particle.cellID) // taking care of velocity scaling after cell transition
             {
                 DiffusionField_T::Cell& oldcell = DiffusionFields[0].cells[particle.prevCellID];
-                float densityRatio = (cell.density*8.0)/(oldcell.density+1.0); // accounting for the density added/subtracted by this particle
-                //assert (densityRatio > 0.0f && "incoming division by zero");
-                //particle.velocity += particle.velocity*fdensity*(1.0f-densityRatio);
+                float densityRatio = (cell.density+1.0)/(oldcell.density+1.0); // accounting for the density added/subtracted by this particle
+                // particle.velocity += particle.velocity*fdensity*(1.0f-densityRatio);
                 particle.velocity -= particle.velocity*fdensity*densityRatio;
-                //if (std::abs(particle.velocity.x) > 10.0f) { particle.velocity.x = 0.0f; }
-                //if (std::abs(particle.velocity.y) > 10.0f) { particle.velocity.y = 0.0f; }
                 particle.prevCellID = particle.cellID;  // only perform this calculation once
             }
             particle.velocity += DiffusionFields[0].CalcDiffusionVec(particle.cellID) * timestepRatio * fdensity;

@@ -143,6 +143,7 @@ int main(int argc, char** argv)
                             if (!isPaused) TogglePause();
                             fluid.Freeze();
                             std::cout << "Velocities have been zeroed (and gravity disabled)\n";
+                            goto frameAdvance;
                             break;
                         case sf::Keyboard::F1:
                             if (gradientWindow.isOpen()) { gradientWindow.close(); }
@@ -152,6 +153,11 @@ int main(int argc, char** argv)
                                 gradientWindow.FrameLoop();
                             }
                             break;
+                        case sf::Keyboard::T:
+                        {
+                            bool t = fluid.ToggleTransparency();
+                            std::cout << "transparency " << (t?"enabled":"disabled") << '\n';
+                        }
                         
                         //case sf::Keyboard::
                         default:
@@ -202,9 +208,11 @@ int main(int argc, char** argv)
             }
         }
         
-        // marked unlikely because to optimize for the unpaused state
+        // marked unlikely to (hopefully) optimize for the unpaused state
         if (isPaused) [[unlikely]] { continue; }
-
+    
+// This jump exists to redraw the screen BEFORE pausing (pause-statement will be hit following frame)
+frameAdvance:
         mainwindow.clear();
 
         fluid.Update();

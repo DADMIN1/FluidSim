@@ -90,8 +90,8 @@ class DiffusionField_T
         
         void UpdateColor() {
             sf::Uint8 alpha = (density >= 127/colorscaling ? 255 : colorscaling*density + 127); // avoiding overflows
-            sf::Uint8 red = (density >= 255/colorscaling ? 255 : colorscaling*density); // avoiding overflows
-            this->setFillColor(sf::Color(red, 0, 0, alpha));
+            sf::Uint8 colorchannel = (density >= 255/colorscaling ? 255 : colorscaling*density); // avoiding overflows
+            this->setFillColor(sf::Color(colorchannel, colorchannel, colorchannel, alpha));  // white
         }
     };
     
