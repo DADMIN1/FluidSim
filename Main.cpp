@@ -8,9 +8,54 @@
 #include "ValarrayTest.hpp"
 #include "Diffusion.hpp"
 #include "Mouse.hpp"
-
+#include "Gradient.hpp"
 
 // inspired by Sebastian Lague
+
+
+// TODO: handle window resizing
+// TODO: imgui
+
+
+void EmbedMacroTest() 
+{
+    std::cout << "\n\n";
+    // Normal include (defines GradientRaw)
+    #include "GradientRaw.cpp"
+    const auto& rawNormal = GradientRaw;
+    std::cout << int(GradientRaw[1][2]) << '\n';  // defined by include
+    std::cout << int(rawNormal[1][2]) << '\n';
+    // Note that you have to (explicitly) convert to int if you want to print the numbers
+    std::cout << "\n\n";
+    
+    // Embed include
+    constexpr unsigned char rawEmbed[1024][3] = {
+        #define EMBED_GRADIENT
+        #include "GradientRaw.cpp"
+    };
+    std::cout << int(rawEmbed[1][2]) << '\n';
+    std::cout << "\n\n";
+    
+    // unfortunately, range-for-loops refuse to deduce the types, 
+    // so we have to macro the 'triplet' definition onto every line.
+    // if you use unsigned char for triplet instead, you'll have to explicity convert to int later
+    using triplet = std::array<unsigned int, 3>;
+    using gradientArrT = std::array<triplet, 1024>;
+    constexpr gradientArrT epic {
+        #define EMBED_TYPECAST triplet  // required for conversion to std::arrays
+        #define EMBED_GRADIENT
+        #include "GradientRaw.cpp"
+    };
+    for (auto [r,g,b]: epic)
+    {
+        std::cout << r << ' ' << g << ' ' << b << '\n';
+        // explicit conversion required if unsigned char
+        // std::cout << int(r) << ' ' << int(g) << ' ' << int(b) << '\n';
+    }
+    std::cout << "\n\n";
+    return;
+}
+
 
 bool isPaused{false};
 bool TogglePause()
@@ -18,10 +63,6 @@ bool TogglePause()
     isPaused = !isPaused;
     return isPaused;
 }
-
-
-// TODO: handle window resizing
-// TODO: imgui
 
 int main(int argc, char** argv)
 {
@@ -51,6 +92,14 @@ int main(int argc, char** argv)
         << DiffusionField_T::maxIX << ", " 
         << DiffusionField_T::maxIY << '\n';
     
+    
+    EmbedMacroTest();
+    
+    GradientWindow_T gradientWindow{};
+    gradientWindow.Create();
+    gradientWindow.FrameLoop();
+    return 0;
+    
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");
     Fluid fluid;
     if (!fluid.Initialize())
@@ -75,10 +124,10 @@ int main(int argc, char** argv)
         {
             switch(event.type) 
             {
-                case (sf::Event::Closed):
+                case sf::Event::Closed:
                     mainwindow.close();
                     break;
-                case (sf::Event::KeyPressed):
+                case sf::Event::KeyPressed:
                 {
                     switch (event.key.code) 
                     {
@@ -107,7 +156,7 @@ int main(int argc, char** argv)
                     break;
                 }
                 // TODO: refactor into Mouse_T member function
-                case (sf::Event::MouseMoved):
+                case sf::Event::MouseMoved:
                 {
                     const auto [winsizeX, winsizeY] = mainwindow.getSize();
                     const auto [mouseX, mouseY] = event.mouseMove;
@@ -129,11 +178,11 @@ int main(int argc, char** argv)
                     else mouse.insideWindow = false;
                     break;
                 }
-                /* case (sf::Event::MouseButtonPressed): 
+                /* case sf::Event::MouseButtonPressed: 
                 {
                     switch (event.mouseButton.button)
                     {
-                        case (0): //Left-click
+                        case 0: //Left-click
                         {
                             
                         }

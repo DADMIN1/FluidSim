@@ -2,13 +2,14 @@
 #define FLUIDSIM_MOUSE_HPP_INCLUDED
 
 #include <SFML/Graphics/CircleShape.hpp>
+#include <SFML/Window.hpp>  // defines mouse and window
 
 #include "Globals.hpp"
 #include "Diffusion.hpp"
 
 
 // Provides mouse-related interactions for the simulation
-class Mouse_T: public sf::CircleShape 
+class Mouse_T: public sf::Mouse, public sf::CircleShape
 {
     enum Mode {
         None,
@@ -26,10 +27,17 @@ class Mouse_T: public sf::CircleShape
     float originalDensity{0.0f};  // needs to restore the cell's density after moving or releasing-button
     //CellRef_T adjacent
     
+    //static void sf::Mouse::setPosition(const sf::Vector2i& position);
+    //static void sf::Mouse::setPosition(const Vector2i& position, const Window& relativeTo);
+    using sf::CircleShape::setPosition;  // disambiguates the call, preventing (unqualified) calls to sf::Mouse::setPosition()
+    // is it actually necessary to even inherit from sf::Mouse?
+    
     
     public:
     bool insideWindow{false};
     
+    
+    // Do not call the constructor for sf::Mouse (it's virtual)?
     Mouse_T(DiffusionField_T::CellMatrix* const mptr): sf::CircleShape(defaultRadius)
     {
         setOutlineThickness(3.f);
