@@ -5,10 +5,11 @@
 #include <SFML/Window.hpp>  // defines sf::Event
 
 #include "Fluid.hpp"
-#include "ValarrayTest.hpp"
+//#include "ValarrayTest.hpp"
 #include "Diffusion.hpp"
 #include "Mouse.hpp"
 #include "Gradient.hpp"
+
 
 // inspired by Sebastian Lague
 
@@ -17,45 +18,7 @@
 // TODO: imgui
 
 
-void EmbedMacroTest() 
-{
-    std::cout << "\n\n";
-    // Normal include (defines GradientRaw)
-    #include "GradientRaw.cpp"
-    const auto& rawNormal = GradientRaw;
-    std::cout << int(GradientRaw[1][2]) << '\n';  // defined by include
-    std::cout << int(rawNormal[1][2]) << '\n';
-    // Note that you have to (explicitly) convert to int if you want to print the numbers
-    std::cout << "\n\n";
-    
-    // Embed include
-    constexpr unsigned char rawEmbed[1024][3] = {
-        #define EMBED_GRADIENT
-        #include "GradientRaw.cpp"
-    };
-    std::cout << int(rawEmbed[1][2]) << '\n';
-    std::cout << "\n\n";
-    
-    // unfortunately, range-for-loops refuse to deduce the types, 
-    // so we have to macro the 'triplet' definition onto every line.
-    // if you use unsigned char for triplet instead, you'll have to explicity convert to int later
-    using triplet = std::array<unsigned int, 3>;
-    using gradientArrT = std::array<triplet, 1024>;
-    constexpr gradientArrT epic {
-        #define EMBED_TYPECAST triplet  // required for conversion to std::arrays
-        #define EMBED_GRADIENT
-        #include "GradientRaw.cpp"
-    };
-    for (auto [r,g,b]: epic)
-    {
-        std::cout << r << ' ' << g << ' ' << b << '\n';
-        // explicit conversion required if unsigned char
-        // std::cout << int(r) << ' ' << int(g) << ' ' << int(b) << '\n';
-    }
-    std::cout << "\n\n";
-    return;
-}
-
+extern void EmbedMacroTest();  // MacroTest.cpp
 
 bool isPaused{false};
 bool TogglePause()
@@ -63,6 +26,7 @@ bool TogglePause()
     isPaused = !isPaused;
     return isPaused;
 }
+
 
 int main(int argc, char** argv)
 {
@@ -103,8 +67,7 @@ int main(int argc, char** argv)
         std::cout << "fluid initialization failed!!";
         return 1;
     }
-    Mouse_T mouse(fluid.GetCellMatrixPtr());
-    
+    Mouse_T mouse(mainwindow, fluid.GetCellMatrixPtr());
 
     #if DYNAMICFRAMEDELAY
     sf::Clock frametimer{};
@@ -118,11 +81,12 @@ int main(int argc, char** argv)
         sf::Event event;
         while (mainwindow.pollEvent(event))
         {
-            switch(event.type) 
+            switch(event.type)
             {
                 case sf::Event::Closed:
                     mainwindow.close();
                     break;
+                
                 case sf::Event::KeyPressed:
                 {
                     switch (event.key.code) 
@@ -165,44 +129,12 @@ int main(int argc, char** argv)
                     }
                     break;
                 }
-                // TODO: refactor into Mouse_T member function
+                
                 case sf::Event::MouseMoved:
-                {
-                    const auto [winsizeX, winsizeY] = mainwindow.getSize();
-                    const auto [mouseX, mouseY] = event.mouseMove;
-                    if ((mouseX < 0) || (mouseY < 0)) {
-                        mouse.insideWindow = false;
-                        //mouse.hoveredCell = nullptr;
-                        break;
-                    }
-                    else if ((u_int(mouseX) < winsizeX) && (u_int(mouseY) < winsizeY)) {
-                        if ((mouseX >= BOXWIDTH) || (mouseY >= BOXHEIGHT)) { // TODO: handle window resizes so we don't crash
-                            mouse.insideWindow = false;
-                            //mouse.hoveredCell = nullptr;
-                            break;
-                        }
-                        mouse.insideWindow = true;
-                        mouse.UpdatePosition(mouseX, mouseY);
-                        break;
-                    }
-                    else mouse.insideWindow = false;
+                case sf::Event::MouseButtonPressed:
+                case sf::Event::MouseButtonReleased:
+                    mouse.HandleEvent(event);
                     break;
-                }
-                /* case sf::Event::MouseButtonPressed: 
-                {
-                    switch (event.mouseButton.button)
-                    {
-                        case 0: //Left-click
-                        {
-                            
-                        }
-                        
-                        default:
-                            std::cout << "mousebutton: " << event.mouseButton.button << '\n';
-                            break;
-                    }
-                    break;
-                } */
                 
                 default: break;
             }

@@ -20,12 +20,12 @@ class Mouse_T: public sf::Mouse, public sf::CircleShape
         Erase, // erase particles
     } mode {None};
     
+    const sf::Window& window;
     static constexpr float defaultRadius {SPATIAL_RESOLUTION*1.5};
     float radius {defaultRadius};
     DiffusionField_T::CellMatrix* matrixptr {nullptr}; // &fluid.DiffusionFields[0]
     DiffusionField_T::Cell* hoveredCell {nullptr};
-    float originalDensity{0.0f};  // needs to restore the cell's density after moving or releasing-button
-    //CellRef_T adjacent
+    DiffusionField_T::Cell savedState {}; // needed to restore the cell's density () after moving or releasing-button
     
     //static void sf::Mouse::setPosition(const sf::Vector2i& position);
     //static void sf::Mouse::setPosition(const Vector2i& position, const Window& relativeTo);
@@ -38,7 +38,8 @@ class Mouse_T: public sf::Mouse, public sf::CircleShape
     
     
     // Do not call the constructor for sf::Mouse (it's virtual)?
-    Mouse_T(DiffusionField_T::CellMatrix* const mptr): sf::CircleShape(defaultRadius)
+    Mouse_T(sf::Window& theWindow, DiffusionField_T::CellMatrix* const mptr)
+    : sf::CircleShape(defaultRadius), window{theWindow}
     {
         setOutlineThickness(1.f);
         setOutlineColor(sf::Color::White);
@@ -47,7 +48,8 @@ class Mouse_T: public sf::Mouse, public sf::CircleShape
         matrixptr = mptr;
     }
     
-    void UpdatePosition(const int x, const int y);
+    void UpdateHovered(const int x, const int y);
+    void HandleEvent(sf::Event);
     
     // modifies the properties like color/outline, and density?
     /* void ModifyCell(DiffusionField_T::Cell* cell) {
