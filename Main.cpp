@@ -90,7 +90,7 @@ int main(int argc, char** argv)
             {
                 case sf::Event::Closed:
                     mainwindow.close();
-                    break;
+                break;
                 
                 case sf::Event::KeyPressed:
                 {
@@ -98,26 +98,34 @@ int main(int argc, char** argv)
                     {
                         case sf::Keyboard::Q:
                             mainwindow.close();
-                            break;
+                        break;
                         
                         case sf::Keyboard::G:
                             std::cout << "gravity " << (fluid.ToggleGravity()? "enabled":"disabled") << '\n';
-                            break;
+                        break;
                         
                         case sf::Keyboard::Space:
                             std::cout << (TogglePause()?"paused":"unpaused") << '\n';
-                            break;
+                        break;
                         
                         case sf::Keyboard::BackSpace:
                             if (!isPaused) TogglePause();
                             fluid.Freeze();
                             std::cout << "Velocities have been zeroed (and gravity disabled)\n";
                             goto frameAdvance;
-                            break;
+                        break;
+                        
+                        case sf::Keyboard::Tab:
+                        {
+                            const bool isActive = mouse.ToggleActive();
+                            std::cout << "Mouse is " << (isActive? "enabled":"disabled") << '\n';
+                            mainwindow.setMouseCursorVisible(!isActive);  // hide cursor when Mouse_T is displayed
+                        }
+                        break;
                         
                         case sf::Keyboard::F1:
                             PrintKeybinds();
-                            break;
+                        break;
                         
                         case sf::Keyboard::F2:
                             if (gradientWindow.isOpen()) { gradientWindow.close(); }
@@ -126,33 +134,27 @@ int main(int argc, char** argv)
                                 gradientWindow.Create();
                                 gradientWindow.FrameLoop();
                             }
-                            break;
+                        break;
                         
                         case sf::Keyboard::T:
                             std::cout << "transparency " << (fluid.ToggleTransparency()? "enabled":"disabled") << '\n';
-                            break;
+                        break;
                         
-                        case sf::Keyboard::M:
-                        {
-                            const bool isActive = mouse.ToggleActive();
-                            std::cout << "Mouse is " << (isActive? "enabled":"disabled") << '\n';
-                            mainwindow.setMouseCursorVisible(!isActive);  // hide cursor when Mouse_T is displayed
-                            break;
-                        }
                         case sf::Keyboard::N:
                         {
                             const auto [mouseX, mouseY] = sf::Mouse::getPosition(mainwindow);
                             std::cout << "Mouse@ [" << mouseX << ", " << mouseY << "] \n";
-                            break;
                         }
+                        break;
                         
                         //case sf::Keyboard::_:
-                        //  break;
+                        //break;
+                        
                         default:
-                            break;
+                        break;
                     }
-                    break;
                 }
+                break;
                 
                 case sf::Event::MouseMoved:
                 case sf::Event::MouseLeft:
@@ -160,7 +162,7 @@ int main(int argc, char** argv)
                 case sf::Event::MouseButtonPressed:
                 case sf::Event::MouseButtonReleased:
                     mouse.HandleEvent(event);
-                    break;
+                break;
                 
                 case sf::Event::Resized:
                 {
@@ -176,10 +178,11 @@ int main(int argc, char** argv)
                     std::cout << "view: [" << newviewsize.x << ", " << newviewsize.y << "] ";
                     std::cout << "viewport: [" << newport.width << ", " << newport.height << "] ";
                     std::cout << '\n'; */
-                    break;
                 }
+                break;
                 
-                default: break;
+                default:
+                break;
             }
         }
         

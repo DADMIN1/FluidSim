@@ -12,17 +12,20 @@
 class Mouse_T: private sf::Mouse, public sf::CircleShape
 {
     enum Mode {
-        None,  // Disabled
+        Disabled,
+        None,  // Inactive, but enabled (waiting for clicks)
         Push,  // Acts like a high-density particle
         Pull,  // Acts like a negative-density particle
         Drag,  // Captures particles inside radius
         Fill,  // spawn more particles
         Erase, // erase particles
-    } mode {None};
+    } mode {Disabled};
     
     const sf::Window& window;
     static constexpr float defaultRadius {SPATIAL_RESOLUTION*1.5};
     float radius {defaultRadius};
+    float strength {32.0};        // for push/pull modes
+    unsigned int radialDist {2};  // distance of adjacent cells included in effect
 
     using Cell = DiffusionField_T::Cell;
     using CellMatrix = DiffusionField_T::CellMatrix;
@@ -41,8 +44,8 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     Mouse_T(sf::Window& theWindow, CellMatrix* const mptr)
     : sf::CircleShape(defaultRadius), window{theWindow}
     {
-        setOutlineThickness(1.f);
-        setOutlineColor(sf::Color::White);
+        setOutlineThickness(2.f);
+        setOutlineColor(sf::Color::Cyan);
         setFillColor(sf::Color::Transparent);
         setOrigin(defaultRadius, defaultRadius);
         matrixptr = mptr;
@@ -54,13 +57,13 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     
     // swaps the current mode with the saved mode; returns true unless mode is None
     bool ToggleActive() {
-        static Mode prev {Push};
-        if (mode == None) { SwitchMode(prev); prev = None; return true; }
-        else              { prev = mode; SwitchMode(None); return false; }
+        static Mode prev {None};
+        if (mode == Disabled) { SwitchMode(prev); prev = Disabled; return true;  }
+        else                  { prev = mode; SwitchMode(Disabled); return false; }
     }
     
     private:
-    void UpdateHovered(const int x, const int y);
+    std::size_t UpdateHovered();  // returns ID of hoveredCell
     std::size_t StoreCell(Cell* const cellptr);  // saves the cell's current state, returns cellID
     void ModifyCell(const std::size_t cellID); // modifies cell's properties based on mode
     void RestoreCell(const std::size_t cellID); // restores original state and removes entry for cell

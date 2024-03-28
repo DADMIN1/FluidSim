@@ -14,9 +14,10 @@ struct CellState_T
     
     struct Mod_T // stores modifications applied by the mouse-mode
     {
-        float density;
-        sf::Color outlineColor;
-        //sf::Color fillColor;  // problem: Cell.UpdateColor will overwrite fillColor every frame
+        float density {0.0};
+        // sf::Color outlineColor;
+        // sf::Color fillColor;  // problem: Cell.UpdateColor will overwrite fillColor every frame
+        // sf::RectangleShape overlay;
     } mod;
     
     CellState_T(Cell* const ptr): cellptr{ptr}, originalState{*ptr}
@@ -46,14 +47,29 @@ void Mouse_T::ModifyCell(const std::size_t cellID)
 {
     switch(mode)
     { 
-        case Push: case Pull: case Drag:
-            savedState.at(cellID).cellptr->setOutlineColor(sf::Color::Cyan);
-            savedState.at(cellID).cellptr->setOutlineThickness(2.5f);
-            break;
+        case None:
+        {
+            CellState_T& state = savedState.at(cellID);
+            state.cellptr->setOutlineColor(sf::Color::Cyan);
+            state.cellptr->setOutlineThickness(2.5f);
+        }
+        break;
         
-        // these modes don't need to store any state?
-        case None: case Fill: case Erase:
+        case Pull:
+        case Push:
+        {
+            CellState_T& state = savedState.at(cellID);
+            state.cellptr->setOutlineColor(sf::Color::Cyan);
+            state.cellptr->setOutlineThickness(2.5f);
+            state.mod.density = ((mode==Push)? strength : -strength);
+            state.cellptr->density += state.mod.density;
+        }
+        break;
+        
+        case Drag: case Fill: case Erase: 
+        case Disabled:
         default:
+            assert(false && "modifycell called with unexpected mode");
             break;
     }
     return;
@@ -62,9 +78,13 @@ void Mouse_T::ModifyCell(const std::size_t cellID)
 // restores original state and removes entry from map
 void Mouse_T::RestoreCell(const std::size_t cellID)
 {
-    CellState_T state = savedState.extract(cellID).mapped();
+    // CellState_T& state = shouldRemove? savedState.extract(cellID).mapped() : savedState.at(cellID);
+    const CellState_T state = savedState.extract(cellID).mapped();
+    //state.cellptr->density -= state.mod.density;  // will be overwitten by originalState anyway
+    // colors/outlines are restored by the read from originalState
+    
     // accounting for any external changes made to density (not from Mouse) since it was stored
-    const float densityAdjustment = state.cellptr->density - state.originalState.density;
+    const float densityAdjustment = (state.cellptr->density - state.mod.density) - state.originalState.density;
     *state.cellptr = state.originalState;
     state.cellptr->density += densityAdjustment;
     return;
@@ -72,7 +92,7 @@ void Mouse_T::RestoreCell(const std::size_t cellID)
 
 void Mouse_T::InvalidateHover()
 {
-    if (hoveredCell)
+    if (hoveredCell && savedState.contains(hoveredCell->UUID))
     {
         // restore all stored cells here?
         RestoreCell(hoveredCell->UUID);
@@ -82,63 +102,99 @@ void Mouse_T::InvalidateHover()
     return;
 }
 
+
 void Mouse_T::SwitchMode(Mode nextmode)
 {
+    if (mode == nextmode) { return; }
+    // handling transition from current mode
+    if ((mode == None) || (mode == Disabled)) {
+        // these modes shouldn't store any mods, so no need to restore hoveredCell
+        shouldDisplay = false;
+    } else {
+        // we need to restore hoveredCell, otherwise it won't revert on mouse-release
+        // because ModifyCell doesn't undo existing mods, and None-mode doesn't handle mods at all
+        // also we'll lose information about which mode the mods were set with (the current one)
+        InvalidateHover();
+    }
+    
+    mode = nextmode;
     switch(nextmode)
     {
-        case Push: case Pull: case Drag: case Fill: case Erase:
-            break;
-        
-        // these modes don't need to store any state?
         case None:
+        {
+            const auto id = UpdateHovered();
+            ModifyCell(id);  // just drawing hoveredCell's outline
+        }
+        break;
+        
+        case Push:
+        case Pull:
+        {
+            const auto id = UpdateHovered();
+            ModifyCell(id);
+            shouldDisplay = true;
+        }
+        break;
+        
+        /* case Drag: case Fill: case Erase:
+        break; */
+        
+        case Disabled:
         default:
             InvalidateHover();
-            break;
+        break;
     }
-    mode = nextmode;
     return;
 }
 
-void Mouse_T::UpdateHovered(const int x, const int y)
+
+std::size_t Mouse_T::UpdateHovered()
 {
+    const auto [x, y] = sf::Mouse::getPosition(window);
     setPosition(x, y); // moving the sf::CircleShape
     if (hoveredCell) // checking if we're still hovering the same cell
     {
         //auto& [minX, minY] = hoveredCell->getPosition();
-        if (hoveredCell->getGlobalBounds().contains(x, y)) // TODO: global or local bounds?
-            return; // still inside oldcell
-        else { // restore original state to previous cell (before hoveredCell is updated)
-            RestoreCell(hoveredCell->UUID);
+        if (hoveredCell->getGlobalBounds().contains(x, y))
+        { // still inside oldcell
+            if (!savedState.contains(hoveredCell->UUID))
+                StoreCell(hoveredCell);
+            return hoveredCell->UUID;
+        }
+        else 
+        { // restore original state to previous cell (before hoveredCell is updated)
+            if (savedState.contains(hoveredCell->UUID))
+                RestoreCell(hoveredCell->UUID);  // removes from map
+            hoveredCell = nullptr;
         }
     }
     
     // finding indecies for new hoveredCell  // TODO: do this better
     unsigned int xi = x/SPATIAL_RESOLUTION;
     unsigned int yi = y/SPATIAL_RESOLUTION;
-    if ((xi > DiffusionField_T::maxIX) || (yi > DiffusionField_T::maxIY)) {
+    /* if ((xi > DiffusionField_T::maxIX) || (yi > DiffusionField_T::maxIY)) {
         std::cerr << "bad indecies calculated: ";
         std::cerr << xi << ", " << yi << '\n';
         return;
-    }
+    } */
     assert((xi <= DiffusionField_T::maxIX) && (yi <= DiffusionField_T::maxIY) && "index of hovered-cell out of range");
     
     hoveredCell = matrixptr->at(xi).at(yi);
     const auto ID = StoreCell(hoveredCell);
-    ModifyCell(ID);
-    return;
+    //ModifyCell(ID);
+    return ID;
 }
 
 void Mouse_T::HandleEvent(sf::Event event)
 {
-    if (mode == None) { return; }
+    if (mode == Disabled) { return; }
     
     switch(event.type)
     {
         case sf::Event::MouseLeft:  // mouse left the window
-        {
             InvalidateHover();
-            break;
-        }
+        break;
+        
         /* case sf::Event::MouseEntered:  // no special handling required
             break; */ // can't fallthrough because it has no data, unlike MouseMoved
         case sf::Event::MouseMoved:
@@ -152,32 +208,68 @@ void Mouse_T::HandleEvent(sf::Event event)
             };
             
             if (insideWindow) {
-                shouldDisplay = true;
-                UpdateHovered(mouseX, mouseY);
+                const Cell* const oldptr = hoveredCell;
+                const auto id = UpdateHovered();
+                if (hoveredCell != oldptr) { ModifyCell(id); }  // only update if ptr changed
+                //if (!hoveredCell) { InvalidateHover(); }
+                /* for (const auto& [i, state]: savedState) {
+                    ;
+                } */
             } else {
                 InvalidateHover();
-                shouldDisplay = false;
-                //mode = None;
             }
-            break;
         }
-        /* case sf::Event::MouseButtonPressed:
+        break;
+        
+        case sf::Event::MouseButtonPressed:
         {
+            // std::cout << "mousebutton: " << event.mouseButton.button << '\n';
             switch (event.mouseButton.button)
             {
                 case 0: //Left-click
                 {
-                    
+                    if (mode != None) { break; } // only allow one button at a time
+                    SwitchMode(Push);
+                    setOutlineColor(sf::Color::Cyan);
                 }
+                break;
+                
+                case 1: //Right-click
+                {
+                    if (mode != None) { break; } // only allow one button at a time
+                    SwitchMode(Pull);
+                    setOutlineColor(sf::Color::Magenta);
+                }
+                break;
                 
                 default:
-                    std::cout << "mousebutton: " << event.mouseButton.button << '\n';
-                    break;
+                break;
             }
-            break;
-        } */
+        }
+        break;
         
-        default: break;
+        case sf::Event::MouseButtonReleased:
+        {
+            switch (event.mouseButton.button)
+            {
+                case 0: //Left-click
+                    // handling the case where two mouse-buttons are held;
+                    // the second press switches the mode, so releases do nothing if the mode doesn't match
+                    if (mode == Push) { SwitchMode(None); } else { break; }
+                break;
+                
+                case 1: //Right-click
+                    if (mode == Pull) { SwitchMode(None); } else { break; }
+                break;
+                
+                default:
+                break;
+            }
+        }
+        break;
+        
+        default:
+        break;
     }
     
     return;
