@@ -19,6 +19,7 @@
 
 
 extern void EmbedMacroTest();  // MacroTest.cpp
+extern void PrintKeybinds();   // Keybinds.cpp
 
 bool isPaused{false};
 bool TogglePause()
@@ -60,7 +61,9 @@ int main(int argc, char** argv)
     //EmbedMacroTest();
     GradientWindow_T gradientWindow{};
     
-    sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM");
+    // Title-bar is implied (for Style::Close)
+    constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
+    sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM", mainstyle);
     Fluid fluid;
     if (!fluid.Initialize())
     {
@@ -68,6 +71,8 @@ int main(int argc, char** argv)
         return 1;
     }
     Mouse_T mouse(mainwindow, fluid.GetCellMatrixPtr());
+    
+    PrintKeybinds();
 
     #if DYNAMICFRAMEDELAY
     sf::Clock frametimer{};
@@ -95,7 +100,7 @@ int main(int argc, char** argv)
                             mainwindow.close();
                             break;
                         
-                        case sf::Keyboard::G: 
+                        case sf::Keyboard::G:
                             std::cout << "gravity " << (fluid.ToggleGravity()? "enabled":"disabled") << '\n';
                             break;
                         
@@ -111,6 +116,10 @@ int main(int argc, char** argv)
                             break;
                         
                         case sf::Keyboard::F1:
+                            PrintKeybinds();
+                            break;
+                        
+                        case sf::Keyboard::F2:
                             if (gradientWindow.isOpen()) { gradientWindow.close(); }
                             else
                             {
@@ -124,8 +133,18 @@ int main(int argc, char** argv)
                             break;
                         
                         case sf::Keyboard::M:
-                            std::cout << "Mouse is " << (mouse.ToggleActive()? "enabled":"disabled") << '\n';
+                        {
+                            const bool isActive = mouse.ToggleActive();
+                            std::cout << "Mouse is " << (isActive? "enabled":"disabled") << '\n';
+                            mainwindow.setMouseCursorVisible(!isActive);  // hide cursor when Mouse_T is displayed
                             break;
+                        }
+                        case sf::Keyboard::N:
+                        {
+                            const auto [mouseX, mouseY] = sf::Mouse::getPosition(mainwindow);
+                            std::cout << "Mouse@ [" << mouseX << ", " << mouseY << "] \n";
+                            break;
+                        }
                         
                         //case sf::Keyboard::_:
                         //  break;
@@ -142,6 +161,23 @@ int main(int argc, char** argv)
                 case sf::Event::MouseButtonReleased:
                     mouse.HandleEvent(event);
                     break;
+                
+                case sf::Event::Resized:
+                {
+                    auto [newwidth, newheight] = event.size;
+                    sf::View newview {mainwindow.getView()};
+                    //newview.setSize(newwidth, newheight);
+                    newview.setViewport({0, 0, float{1000.f/newwidth}, float{1000.f/newheight}});
+                    mainwindow.setView(newview);
+                    
+                    /* auto newviewsize = mainwindow.getView().getSize();
+                    auto newport = mainwindow.getView().getViewport();
+                    std::cout << "newsize: [" << newwidth << ", " << newheight << "] ";
+                    std::cout << "view: [" << newviewsize.x << ", " << newviewsize.y << "] ";
+                    std::cout << "viewport: [" << newport.width << ", " << newport.height << "] ";
+                    std::cout << '\n'; */
+                    break;
+                }
                 
                 default: break;
             }

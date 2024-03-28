@@ -102,11 +102,6 @@ void Mouse_T::SwitchMode(Mode nextmode)
 void Mouse_T::UpdateHovered(const int x, const int y)
 {
     setPosition(x, y); // moving the sf::CircleShape
-    /* if (!matrixptr) {
-        std::cerr << "invalid matrixptr, can't search for cell\n";
-        return;
-    } */
-    
     if (hoveredCell) // checking if we're still hovering the same cell
     {
         //auto& [minX, minY] = hoveredCell->getPosition();
@@ -127,7 +122,7 @@ void Mouse_T::UpdateHovered(const int x, const int y)
     }
     assert((xi <= DiffusionField_T::maxIX) && (yi <= DiffusionField_T::maxIY) && "index of hovered-cell out of range");
     
-    hoveredCell = matrixptr->at(xi).at(yi);  // this crashes if the window has been resized
+    hoveredCell = matrixptr->at(xi).at(yi);
     const auto ID = StoreCell(hoveredCell);
     ModifyCell(ID);
     return;
@@ -149,19 +144,14 @@ void Mouse_T::HandleEvent(sf::Event event)
         case sf::Event::MouseMoved:
         {
             const auto [winsizeX, winsizeY] = window.getSize();
-            const auto [mouseX, mouseY] = event.mouseMove;
+            //const auto [mouseX, mouseY] = event.mouseMove;
+            const auto [mouseX, mouseY] = sf::Mouse::getPosition(window);
             const bool insideWindow {
                 (mouseX >= 0) && (mouseY >= 0) && 
                 (u_int(mouseX) < winsizeX) && (u_int(mouseY) < winsizeY)
             };
             
             if (insideWindow) {
-                // If the window has been resized, BOXWIDTH/HEIGHT will not match window-dimensions
-                if ((mouseX >= BOXWIDTH) || (mouseY >= BOXHEIGHT)) {
-                    InvalidateHover();
-                    shouldDisplay = false;
-                    break;
-                }
                 shouldDisplay = true;
                 UpdateHovered(mouseX, mouseY);
             } else {

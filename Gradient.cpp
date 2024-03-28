@@ -94,7 +94,7 @@ void GradientWindow_T::FrameLoop()
                     switch (gw_event.key.code) {
                         case sf::Keyboard::Key::Q:
                         case sf::Keyboard::Key::Escape:
-                        case sf::Keyboard::F1:
+                        case sf::Keyboard::F2:
                             close(); return;
                         default: break;
                     }
