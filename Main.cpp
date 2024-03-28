@@ -94,21 +94,22 @@ int main(int argc, char** argv)
                         case sf::Keyboard::Q:
                             mainwindow.close();
                             break;
+                        
                         case sf::Keyboard::G: 
-                        {
-                            bool g = fluid.ToggleGravity();
-                            std::cout << "gravity " << (g?"enabled":"disabled") << '\n';
+                            std::cout << "gravity " << (fluid.ToggleGravity()? "enabled":"disabled") << '\n';
                             break;
-                        }
+                        
                         case sf::Keyboard::Space:
                             std::cout << (TogglePause()?"paused":"unpaused") << '\n';
                             break;
+                        
                         case sf::Keyboard::BackSpace:
                             if (!isPaused) TogglePause();
                             fluid.Freeze();
                             std::cout << "Velocities have been zeroed (and gravity disabled)\n";
                             goto frameAdvance;
                             break;
+                        
                         case sf::Keyboard::F1:
                             if (gradientWindow.isOpen()) { gradientWindow.close(); }
                             else
@@ -117,13 +118,17 @@ int main(int argc, char** argv)
                                 gradientWindow.FrameLoop();
                             }
                             break;
-                        case sf::Keyboard::T:
-                        {
-                            bool t = fluid.ToggleTransparency();
-                            std::cout << "transparency " << (t?"enabled":"disabled") << '\n';
-                        }
                         
-                        //case sf::Keyboard::
+                        case sf::Keyboard::T:
+                            std::cout << "transparency " << (fluid.ToggleTransparency()? "enabled":"disabled") << '\n';
+                            break;
+                        
+                        case sf::Keyboard::M:
+                            std::cout << "Mouse is " << (mouse.ToggleActive()? "enabled":"disabled") << '\n';
+                            break;
+                        
+                        //case sf::Keyboard::_:
+                        //  break;
                         default:
                             break;
                     }
@@ -131,6 +136,8 @@ int main(int argc, char** argv)
                 }
                 
                 case sf::Event::MouseMoved:
+                case sf::Event::MouseLeft:
+                case sf::Event::MouseEntered:
                 case sf::Event::MouseButtonPressed:
                 case sf::Event::MouseButtonReleased:
                     mouse.HandleEvent(event);
@@ -153,7 +160,8 @@ frameAdvance:
         mainwindow.draw(fluid.DrawGrid());
         mainwindow.draw(fluid.Draw());
         
-        if (mouse.insideWindow) {
+        // TODO: allow mouse to update and be redrawn even while paused
+        if (mouse.shouldDisplay) {
             mainwindow.draw(mouse);
         }
         
