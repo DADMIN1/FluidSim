@@ -199,14 +199,21 @@ std::size_t Mouse_T::UpdateHovered()
         //auto& [minX, minY] = hoveredCell->getPosition();
         if (hoveredCell->getGlobalBounds().contains(x, y))
         { // still inside oldcell
-            if (!savedState.contains(hoveredCell->UUID))
-                StoreCell(hoveredCell);
+            /* if (!savedState.contains(hoveredCell->UUID))
+                StoreCell(hoveredCell); */
             return hoveredCell->UUID;
         }
         else 
         { // restore original state to previous cell (before hoveredCell is updated)
+            /* 
             if (savedState.contains(hoveredCell->UUID))
                 RestoreCell(hoveredCell->UUID);  // removes from map
+             */
+            const bool sd {shouldDisplay};
+            const bool so {shouldOutline};
+            InvalidateHover();
+            shouldDisplay = sd;
+            shouldOutline = so;
             hoveredCell = nullptr;
         }
     }
@@ -217,13 +224,13 @@ std::size_t Mouse_T::UpdateHovered()
     /* if ((xi > DiffusionField_T::maxIX) || (yi > DiffusionField_T::maxIY)) {
         std::cerr << "bad indecies calculated: ";
         std::cerr << xi << ", " << yi << '\n';
-        return;
+        return 0;
     } */
     assert((xi <= DiffusionField_T::maxIX) && (yi <= DiffusionField_T::maxIY) && "index of hovered-cell out of range");
     
     hoveredCell = fieldptr->cellmatrix.at(xi).at(yi);
-    if (savedState.contains(hoveredCell->UUID))
-        RestoreCell(hoveredCell->UUID);
+    /* if (savedState.contains(hoveredCell->UUID))
+        RestoreCell(hoveredCell->UUID); */
     // const auto ID = StoreCell(hoveredCell)->first;
     StoreCell(hoveredCell);
     outlined.setPosition(hoveredCell->getPosition());

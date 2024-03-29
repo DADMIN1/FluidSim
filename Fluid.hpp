@@ -57,15 +57,16 @@ class Fluid
     sf::RenderTexture particle_texture;
     std::vector<std::vector<Particle>> particles;
 
-    std::array<DiffusionField_T, 2> DiffusionFields;
+    // std::array<DiffusionField_T, 2> DiffusionFields;
+    DiffusionField_T DiffusionField;
     //bool buffer_index{0}; // which diffusion field is being used as the 'current' (not working) buffer
     // why even bother swapping them? A copy to the other buffer will need to be made regardless
     //inline void SwapStateBuffers() { buffer_index = !buffer_index; }
 
     public:
     // mouse needs to access this pointer to lookup cell (given an X/Y coord)
-    DiffusionField_T* GetDiffusionFieldPtr() { return &DiffusionFields[0]; }
-    void PrintAllCells() {DiffusionFields[0].PrintAllCells();}
+    DiffusionField_T* GetDiffusionFieldPtr() { return &DiffusionField; }
+    void PrintAllCells() {DiffusionField.PrintAllCells();}
     
     bool ToggleGravity(bool noArg=true) // if you pass false, it always disables
     { 
@@ -107,7 +108,7 @@ class Fluid
     sf::Sprite DrawGrid()
     {
         // DiffusionFields[0]  // update densities here
-        return DiffusionFields[0].Draw();
+        return DiffusionField.Draw();
     }
 };
 
