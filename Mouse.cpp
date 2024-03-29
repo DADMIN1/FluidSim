@@ -49,35 +49,26 @@ auto Mouse_T::StoreCell(Cell* const cellptr)
 
 
 // modifies properties based on mouse's current mode
-void Mouse_T::ModifyCell(const std::size_t cellID)
+void Mouse_T::ModifyCell(const Cell* const cellptr)
 {
-    if (hoveredCell)
-    {
-        if (!(hoveredCell->UUID == cellID))
-        {
-            std::cerr << "ModifyCell while hoveredCell's UUID doesn't match: ";
-            std::cerr << hoveredCell->UUID << ", " << cellID << '\n';
-        }
-    } else {
-        std::cerr << "ModifyCell while hoveredCell is nullptr: ";
-        std::cerr << cellID << '\n';
-    }
-    
     switch(mode)
     { 
         case None:
+            if (!hoveredCell) { return; }
+            outlined.setPosition(hoveredCell->getPosition());
+            shouldOutline = true;
         break;
         
         case Pull:
         case Push:
         {
-            CellState_T& state = savedState.at(cellID);
+            CellState_T& state = savedState.at(cellptr->UUID);
             state.mod.density = ((mode==Push)? strength : -strength);
             state.cellptr->density += state.mod.density;
             for (unsigned int dist{1}; dist <= radialDist; ++dist)
             {
                 const float adjStrength = {((mode==Push)? strength : -strength)/(1.75f*dist)};
-                const CellRef_T adjacent {fieldptr->GetCellNeighbors(cellID, dist)};
+                const CellRef_T adjacent {fieldptr->GetCellNeighbors(cellptr->UUID, dist)};
                 for (Cell* const cellptr: adjacent)
                 {
                     if (savedState.contains(cellptr->UUID))
@@ -162,16 +153,19 @@ void Mouse_T::SwitchMode(Mode nextmode)
         case None:
         {
             // just drawing hoveredCell's outline
-            UpdateHovered();
-            shouldOutline = true;
+            if (UpdateHovered()) {
+                outlined.setPosition(hoveredCell->getPosition());
+                shouldOutline = true;
+                shouldDisplay = false;
+            }
         }
         break;
         
         case Push:
         case Pull:
         {
-            const auto id = UpdateHovered();
-            ModifyCell(id);
+            if(!UpdateHovered()) { return; }  // invalidate hover?
+            ModifyCell(hoveredCell);
             shouldDisplay = true;
             shouldOutline = false;
         }
@@ -190,53 +184,53 @@ void Mouse_T::SwitchMode(Mode nextmode)
 }
 
 
-std::size_t Mouse_T::UpdateHovered()
+bool Mouse_T::UpdateHovered()
 {
+    if (!isInsideWindow()) { return false; }
     const auto [x, y] = sf::Mouse::getPosition(window);
     setPosition(x, y); // moving the sf::CircleShape
     if (hoveredCell) // checking if we're still hovering the same cell
     {
-        //auto& [minX, minY] = hoveredCell->getPosition();
         if (hoveredCell->getGlobalBounds().contains(x, y))
         { // still inside oldcell
-            /* if (!savedState.contains(hoveredCell->UUID))
-                StoreCell(hoveredCell); */
-            return hoveredCell->UUID;
+            if (!savedState.contains(hoveredCell->UUID))
+                StoreCell(hoveredCell);
+            return true;
         }
         else 
         { // restore original state to previous cell (before hoveredCell is updated)
-            /* 
-            if (savedState.contains(hoveredCell->UUID))
-                RestoreCell(hoveredCell->UUID);  // removes from map
-             */
-            const bool sd {shouldDisplay};
-            const bool so {shouldOutline};
-            InvalidateHover();
-            shouldDisplay = sd;
-            shouldOutline = so;
-            hoveredCell = nullptr;
+            if (isPaintingMode) {
+                if (savedState.contains(hoveredCell->UUID))
+                    RestoreCell(hoveredCell->UUID);  // removes from map
+                hoveredCell = nullptr;
+            }
+            else {
+                const bool sd {shouldDisplay};
+                const bool so {shouldOutline};
+                InvalidateHover();
+                shouldDisplay = sd;
+                shouldOutline = so;
+            }
         }
     }
     
     // finding indecies for new hoveredCell  // TODO: do this better
     unsigned int xi = x/SPATIAL_RESOLUTION;
     unsigned int yi = y/SPATIAL_RESOLUTION;
-    /* if ((xi > DiffusionField_T::maxIX) || (yi > DiffusionField_T::maxIY)) {
+    if ((xi > DiffusionField_T::maxIX) || (yi > DiffusionField_T::maxIY)) {
         std::cerr << "bad indecies calculated: ";
         std::cerr << xi << ", " << yi << '\n';
-        return 0;
-    } */
+        return false;
+    }
     assert((xi <= DiffusionField_T::maxIX) && (yi <= DiffusionField_T::maxIY) && "index of hovered-cell out of range");
     
     hoveredCell = fieldptr->cellmatrix.at(xi).at(yi);
-    /* if (savedState.contains(hoveredCell->UUID))
-        RestoreCell(hoveredCell->UUID); */
-    // const auto ID = StoreCell(hoveredCell)->first;
+    if (savedState.contains(hoveredCell->UUID))
+        RestoreCell(hoveredCell->UUID);
     StoreCell(hoveredCell);
-    outlined.setPosition(hoveredCell->getPosition());
-    //ModifyCell(ID);
-    return hoveredCell->UUID;
+    return true;
 }
+
 
 void Mouse_T::HandleEvent(sf::Event event)
 {
@@ -248,32 +242,38 @@ void Mouse_T::HandleEvent(sf::Event event)
             InvalidateHover();
         break;
         
-        /* case sf::Event::MouseEntered:  // no special handling required
-            break; */ // can't fallthrough because it has no data, unlike MouseMoved
         case sf::Event::MouseMoved:
         {
-            const auto [winsizeX, winsizeY] = window.getSize();
-            //const auto [mouseX, mouseY] = event.mouseMove;
-            const auto [mouseX, mouseY] = sf::Mouse::getPosition(window);
-            const bool insideWindow {
-                (mouseX >= 0) && (mouseY >= 0) && 
-                (u_int(mouseX) < winsizeX) && (u_int(mouseY) < winsizeY)
-            };
+            if (!isInsideWindow()) { return; }
             
-            if (insideWindow) {
-                const Cell* const oldptr = hoveredCell;
-                const auto id = UpdateHovered();
-                if (hoveredCell != oldptr) { ModifyCell(id); }  // only update if ptr changed
-                //if ((hoveredCell != oldptr) && (hoveredCell) && (oldptr)) { ModifyCell(id); }  // only update if ptr changed
-                //if (!hoveredCell) { InvalidateHover(); }
-            } else {
+            const Cell* const oldptr = hoveredCell;
+            /* if (!UpdateHovered()) {
+                const bool sd {shouldDisplay};
+                const bool so {shouldOutline};
                 InvalidateHover();
+                shouldDisplay = sd;
+                shouldOutline = so;
+            } */
+            if (!UpdateHovered()) {
+                shouldDisplay = false;
+                shouldOutline = false;
+                //InvalidateHover();
+                return;
             }
+            
+            // only update if ptr changed
+            if (hoveredCell != oldptr) { 
+                ModifyCell(hoveredCell);
+            }  
+            //if ((hoveredCell != oldptr) && (hoveredCell) && (oldptr)) { ModifyCell(id); }  // only update if ptr changed
+            //if (!hoveredCell) { InvalidateHover(); }
+            
         }
         break;
         
         case sf::Event::MouseButtonPressed:
         {
+            if (!isInsideWindow()) { return; }
             // std::cout << "mousebutton: " << event.mouseButton.button << '\n';
             switch (event.mouseButton.button)
             {
@@ -301,6 +301,7 @@ void Mouse_T::HandleEvent(sf::Event event)
         
         case sf::Event::MouseButtonReleased:
         {
+            // these need to be handled even if they occur outside of the window-area
             switch (event.mouseButton.button)
             {
                 case 0: //Left-click

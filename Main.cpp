@@ -148,6 +148,12 @@ int main(int argc, char** argv)
                         }
                         break;
                         
+                        case sf::Keyboard::P:
+                        {
+                            mouse.isPaintingMode = !mouse.isPaintingMode;
+                            std::cout << "Painting mode: " << ((mouse.isPaintingMode)? "enabled": "disabled") << '\n';
+                        }
+                        
                         //case sf::Keyboard::_:
                         //break;
                         

@@ -23,7 +23,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{9};
+    static constexpr auto numkeybinds{10};
     std::vector<Keybind> all;
     
     #define KEY(key, description) \
@@ -38,6 +38,7 @@ struct AllKeybinds
         KEY(BackSpace, "freeze particles");
         KEY(Tab, "toggle mouse interactions");
         KEY(G, "toggle gravity");
+        KEY(P, "toggle painting-mode");
         KEY(T, "toggle particle transparency");
         KEY(N, "print mouse position");
         KEY(F2, "open the gradient-viewing window");
@@ -51,6 +52,9 @@ struct AllKeybinds
             "      Left-Click  = Push (increases density)\n"
             "      Right-Click = Pull (negative density)\n";
         // just abusing string concatenation for more visually-intuitive formatting
+        
+        keybind_P.extrainfo = "in painting-mode, mouse-interactions stay active over traveled areas\n"
+                        "  (until mouse-button is released)";
     }
     #undef KEY
 } Keybinds{};

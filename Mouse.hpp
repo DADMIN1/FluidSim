@@ -38,9 +38,10 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     // is it actually necessary to even inherit from sf::Mouse?
     
     public:
-    bool shouldDisplay{false};  // controls drawing of the mouse (circle)
+    bool shouldDisplay{false}; // controls drawing of the mouse (circle)
     bool shouldOutline{false}; // hoveredCell-outline
     sf::RectangleShape outlined;
+    bool isPaintingMode{false};  // mouse-interactions stay painted over traveled areas
     
     // Do not call the constructor for sf::Mouse (it's virtual)?
     Mouse_T(sf::Window& theWindow, DiffusionField_T* const mptr)
@@ -74,10 +75,21 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
         else                  { prev = mode; SwitchMode(Disabled); return false; }
     }
     
+    bool isInsideWindow() 
+    {
+        const auto [winsizeX, winsizeY] = window.getSize();
+        const auto [mouseX, mouseY] = sf::Mouse::getPosition(window);
+        const bool insideWindow {
+            (mouseX >= 0) && (mouseY >= 0) && 
+            (u_int(mouseX) <= winsizeX) && (u_int(mouseY) <= winsizeY)
+        };
+        return insideWindow;
+    }
+    
     private:
-    std::size_t UpdateHovered();  // returns ID of hoveredCell
+    bool UpdateHovered();  // returns true if hoveredCell was found
     auto StoreCell(Cell* const cellptr);  // saves the cell's current state, returns an iterator
-    void ModifyCell(const std::size_t cellID); // modifies cell's properties based on mode
+    void ModifyCell(const Cell* const cellptr); // modifies cell's properties based on mode
     void RestoreCell(const std::size_t cellID); // restores original state and removes entry for cell
 };
 
