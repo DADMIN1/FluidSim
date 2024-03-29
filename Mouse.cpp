@@ -7,7 +7,6 @@
 struct CellState_T
 {
     using Cell = DiffusionField_T::Cell;
-    using CellMatrix = DiffusionField_T::CellMatrix;
     Cell* const cellptr;
     const Cell originalState;  // needed to restore the cell after moving or releasing-button
     // saving the whole cell is overkill; only the modified/necessary components should be copied
@@ -33,36 +32,61 @@ struct CellState_T
 std::unordered_map<std::size_t, CellState_T> savedState {};
 
 
-std::size_t Mouse_T::StoreCell(Cell* const cellptr)
+auto Mouse_T::StoreCell(Cell* const cellptr)
 {
     const std::size_t ID = cellptr->UUID;
     //savedState[cellptr->UUID] = CellState_T(cellptr); // can't do because some members are const
+    if (savedState.contains(ID))
+    {
+        std::cerr << "savedState already contains ID: " << ID;
+    }
     const auto result = savedState.emplace(ID, cellptr);
+    assert((result.first->first == ID) && "inserted IDs don't match!!");
     assert(result.second && "Cell-state was not saved! (entry already exists)");
-    return ID;
+    // std::cout << "stored: " << ID << '\n';
+    return result.first;
 }
+
 
 // modifies properties based on mouse's current mode
 void Mouse_T::ModifyCell(const std::size_t cellID)
 {
+    if (hoveredCell)
+    {
+        if (!(hoveredCell->UUID == cellID))
+        {
+            std::cerr << "ModifyCell while hoveredCell's UUID doesn't match: ";
+            std::cerr << hoveredCell->UUID << ", " << cellID << '\n';
+        }
+    } else {
+        std::cerr << "ModifyCell while hoveredCell is nullptr: ";
+        std::cerr << cellID << '\n';
+    }
+    
     switch(mode)
     { 
         case None:
-        {
-            CellState_T& state = savedState.at(cellID);
-            state.cellptr->setOutlineColor(sf::Color::Cyan);
-            state.cellptr->setOutlineThickness(2.5f);
-        }
         break;
         
         case Pull:
         case Push:
         {
             CellState_T& state = savedState.at(cellID);
-            state.cellptr->setOutlineColor(sf::Color::Cyan);
-            state.cellptr->setOutlineThickness(2.5f);
             state.mod.density = ((mode==Push)? strength : -strength);
             state.cellptr->density += state.mod.density;
+            for (unsigned int dist{1}; dist <= radialDist; ++dist)
+            {
+                const float adjStrength = {((mode==Push)? strength : -strength)/(2.0f*dist)};
+                const CellRef_T adjacent {fieldptr->GetCellNeighbors(cellID, dist)};
+                for (Cell* const cellptr: adjacent)
+                {
+                    if (savedState.contains(cellptr->UUID))
+                        RestoreCell(cellptr->UUID);
+                    auto entry = StoreCell(cellptr);
+                    entry->second.mod.density = adjStrength;
+                    cellptr->density += adjStrength;
+                }
+            }
         }
         break;
         
@@ -87,17 +111,31 @@ void Mouse_T::RestoreCell(const std::size_t cellID)
     const float densityAdjustment = (state.cellptr->density - state.mod.density) - state.originalState.density;
     *state.cellptr = state.originalState;
     state.cellptr->density += densityAdjustment;
+    // std::cout << "Restored: " << cellID << '\n';
     return;
 }
 
 void Mouse_T::InvalidateHover()
 {
-    if (hoveredCell && savedState.contains(hoveredCell->UUID))
+    std::vector<std::size_t> ids{};
+    ids.reserve(savedState.size());
+    for (auto iter{savedState.cbegin()}; iter != savedState.cend(); ++iter)
     {
-        // restore all stored cells here?
-        RestoreCell(hoveredCell->UUID);
+        // these iterators get invalidated from extraction, it seems.
+        //const auto node = savedState.extract(iter);
+        //const CellState_T& state = node.mapped();
+        ids.push_back(iter->first);
     }
+    for (const auto id: ids)
+    {
+        const CellState_T state = savedState.extract(id).mapped();
+        const float densityAdjustment = (state.cellptr->density - state.mod.density) - state.originalState.density;
+        *state.cellptr = state.originalState;
+        state.cellptr->density += densityAdjustment;
+    }
+    
     shouldDisplay = false;
+    shouldOutline = false;
     hoveredCell = nullptr;
     return;
 }
@@ -107,6 +145,7 @@ void Mouse_T::SwitchMode(Mode nextmode)
 {
     if (mode == nextmode) { return; }
     // handling transition from current mode
+    // InvalidateHover();
     if ((mode == None) || (mode == Disabled)) {
         // these modes shouldn't store any mods, so no need to restore hoveredCell
         shouldDisplay = false;
@@ -122,8 +161,9 @@ void Mouse_T::SwitchMode(Mode nextmode)
     {
         case None:
         {
-            const auto id = UpdateHovered();
-            ModifyCell(id);  // just drawing hoveredCell's outline
+            // just drawing hoveredCell's outline
+            UpdateHovered();
+            shouldOutline = true;
         }
         break;
         
@@ -133,6 +173,7 @@ void Mouse_T::SwitchMode(Mode nextmode)
             const auto id = UpdateHovered();
             ModifyCell(id);
             shouldDisplay = true;
+            shouldOutline = false;
         }
         break;
         
@@ -142,6 +183,7 @@ void Mouse_T::SwitchMode(Mode nextmode)
         case Disabled:
         default:
             InvalidateHover();
+            shouldOutline = false;
         break;
     }
     return;
@@ -179,10 +221,14 @@ std::size_t Mouse_T::UpdateHovered()
     } */
     assert((xi <= DiffusionField_T::maxIX) && (yi <= DiffusionField_T::maxIY) && "index of hovered-cell out of range");
     
-    hoveredCell = matrixptr->at(xi).at(yi);
-    const auto ID = StoreCell(hoveredCell);
+    hoveredCell = fieldptr->cellmatrix.at(xi).at(yi);
+    if (savedState.contains(hoveredCell->UUID))
+        RestoreCell(hoveredCell->UUID);
+    // const auto ID = StoreCell(hoveredCell)->first;
+    StoreCell(hoveredCell);
+    outlined.setPosition(hoveredCell->getPosition());
     //ModifyCell(ID);
-    return ID;
+    return hoveredCell->UUID;
 }
 
 void Mouse_T::HandleEvent(sf::Event event)
@@ -211,10 +257,8 @@ void Mouse_T::HandleEvent(sf::Event event)
                 const Cell* const oldptr = hoveredCell;
                 const auto id = UpdateHovered();
                 if (hoveredCell != oldptr) { ModifyCell(id); }  // only update if ptr changed
+                //if ((hoveredCell != oldptr) && (hoveredCell) && (oldptr)) { ModifyCell(id); }  // only update if ptr changed
                 //if (!hoveredCell) { InvalidateHover(); }
-                /* for (const auto& [i, state]: savedState) {
-                    ;
-                } */
             } else {
                 InvalidateHover();
             }

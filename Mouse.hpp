@@ -2,6 +2,7 @@
 #define FLUIDSIM_MOUSE_HPP_INCLUDED
 
 #include <SFML/Graphics/CircleShape.hpp>
+#include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Window.hpp>  // defines mouse and window
 
 #include "Globals.hpp"
@@ -28,8 +29,7 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     unsigned int radialDist {2};  // distance of adjacent cells included in effect
 
     using Cell = DiffusionField_T::Cell;
-    using CellMatrix = DiffusionField_T::CellMatrix;
-    CellMatrix* matrixptr {nullptr}; // &fluid.DiffusionFields[0]
+    DiffusionField_T* fieldptr {nullptr}; // &fluid.DiffusionFields[0]
     Cell* hoveredCell {nullptr};
     
     //static void sf::Mouse::setPosition(const sf::Vector2i& position);
@@ -38,17 +38,29 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     // is it actually necessary to even inherit from sf::Mouse?
     
     public:
-    bool shouldDisplay{false};  // controls drawing of the mouse (circle and hoveredCell-outline)
+    bool shouldDisplay{false};  // controls drawing of the mouse (circle)
+    bool shouldOutline{false}; // hoveredCell-outline
+    sf::RectangleShape outlined;
     
     // Do not call the constructor for sf::Mouse (it's virtual)?
-    Mouse_T(sf::Window& theWindow, CellMatrix* const mptr)
+    Mouse_T(sf::Window& theWindow, DiffusionField_T* const mptr)
     : sf::CircleShape(defaultRadius), window{theWindow}
     {
         setOutlineThickness(2.f);
         setOutlineColor(sf::Color::Cyan);
         setFillColor(sf::Color::Transparent);
         setOrigin(defaultRadius, defaultRadius);
-        matrixptr = mptr;
+        fieldptr = mptr;
+        
+        // default cell appearance
+        sf::RectangleShape basecell {sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}};
+        basecell.setFillColor(sf::Color::Transparent);
+        basecell.setOutlineColor(sf::Color(0xFFFFFF80));  // half-transparent white
+        basecell.setOutlineThickness(1);
+        
+        outlined = basecell;
+        outlined.setOutlineColor(sf::Color::Cyan);
+        outlined.setOutlineThickness(2.5f);
     }
     
     void HandleEvent(sf::Event);
@@ -64,7 +76,7 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     
     private:
     std::size_t UpdateHovered();  // returns ID of hoveredCell
-    std::size_t StoreCell(Cell* const cellptr);  // saves the cell's current state, returns cellID
+    auto StoreCell(Cell* const cellptr);  // saves the cell's current state, returns an iterator
     void ModifyCell(const std::size_t cellID); // modifies cell's properties based on mode
     void RestoreCell(const std::size_t cellID); // restores original state and removes entry for cell
 };

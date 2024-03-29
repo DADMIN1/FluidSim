@@ -9,9 +9,10 @@
 
 #include "Globals.hpp"
 
-
+constexpr unsigned int radialdist_limit {5}; // highest radial_distance implemented by GetNeighbors
 constexpr unsigned int DIFFUSION_RADIUS {3};  // number of neighboring grid-cells affected during density calculations (0 = only current cell is affected)
 constexpr float DIFFUSION_SCALING {1.0/float(DIFFUSION_RADIUS+1)};  // diffusion-strength needs to decrease with distance, and must be scaled with radius
+static_assert((DIFFUSION_RADIUS <= radialdist_limit) && "too big");
 
 constexpr std::array<std::array<float, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION> DensityGrid{};  // holds 'densities' for each cell
 // TODO: move global definitions to another file
@@ -113,9 +114,12 @@ class DiffusionField_T
     //Cells* const state {&cells[0]};
     //Cells* state_working {&cells[1]};
     
-    const sf::Vector2f CalcDiffusionVec(std::size_t UUID);
+    // finds cells at a single distance
     const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID);
+    // finds cells at every distance up to (and including) current DIFFUSION_RADIUS
+    const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist);
     const std::vector<DoubleCoord> GetAdjacentPlus(const std::size_t UUID); // returns pairs of absolute and relative coords
+    const sf::Vector2f CalcDiffusionVec(std::size_t UUID);
     
     bool Initialize()  // returns success/fail
     {

@@ -70,7 +70,8 @@ int main(int argc, char** argv)
         std::cout << "fluid initialization failed!!";
         return 1;
     }
-    Mouse_T mouse(mainwindow, fluid.GetCellMatrixPtr());
+    // TODO: refactor diffusionfield out of fluid
+    Mouse_T mouse(mainwindow, fluid.GetDiffusionFieldPtr());
     
     PrintKeybinds();
 
@@ -197,6 +198,7 @@ frameAdvance:
         fluid.UpdateDensities();
         fluid.ApplyDiffusion();
         mainwindow.draw(fluid.DrawGrid());
+        if (mouse.shouldOutline) { mainwindow.draw(mouse.outlined); }
         mainwindow.draw(fluid.Draw());
         
         // TODO: allow mouse to update and be redrawn even while paused

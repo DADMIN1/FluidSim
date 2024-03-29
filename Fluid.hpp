@@ -64,7 +64,7 @@ class Fluid
 
     public:
     // mouse needs to access this pointer to lookup cell (given an X/Y coord)
-    DiffusionField_T::CellMatrix* GetCellMatrixPtr() { return &DiffusionFields[0].cellmatrix; }
+    DiffusionField_T* GetDiffusionFieldPtr() { return &DiffusionFields[0]; }
     void PrintAllCells() {DiffusionFields[0].PrintAllCells();}
     
     bool ToggleGravity(bool noArg=true) // if you pass false, it always disables

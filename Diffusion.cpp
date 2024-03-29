@@ -129,7 +129,20 @@ const auto GetNeighborsAll(const int radial_distance, const int IX, const int IY
     return absoluteCoords;
 };
 
+// result is for only a single distance
+const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist)
+{
+    assert((radialdist <= radialdist_limit) && "radialdist too large");
+    const Cell& cell = cells.at(UUID);
+    std::vector<Cell*> reflist{};
+    const Coordlist coords = GetNeighbors(radialdist, cell.IX, cell.IY);
+    for (const auto& [ix, iy]: coords) {
+        reflist.push_back(cellmatrix.at(ix).at(iy));
+    }
+    return reflist;
+}
 
+// result is for every distance up to (and including) current DIFFUSION_RADIUS
 const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID)
 {
     const Cell& cell = cells.at(UUID);
