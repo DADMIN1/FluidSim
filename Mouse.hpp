@@ -23,10 +23,10 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     } mode {Disabled};
     
     const sf::Window& window;
-    static constexpr float defaultRadius {SPATIAL_RESOLUTION*2.5};
+    static constexpr float defaultRadius {SPATIAL_RESOLUTION*3.5};
     float radius {defaultRadius};
-    float strength {64.0};        // for push/pull modes
-    unsigned int radialDist {3};  // distance of adjacent cells included in effect
+    float strength {127.0};        // for push/pull modes
+    unsigned int radialDist {5};  // distance of adjacent cells included in effect
 
     using Cell = DiffusionField_T::Cell;
     DiffusionField_T* fieldptr {nullptr}; // &fluid.DiffusionFields[0]

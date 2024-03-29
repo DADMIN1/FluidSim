@@ -179,8 +179,9 @@ void Fluid::ApplyDiffusion()
             // TODO: implement this better
             if (particle.prevCellID != particle.cellID) // taking care of velocity scaling after cell transition
             {
-                DiffusionField_T::Cell& oldcell = DiffusionField.cells[particle.prevCellID];
-                float densityRatio = (cell.density+1.0)/(oldcell.density+1.0); // accounting for the density added/subtracted by this particle
+                const DiffusionField_T::Cell& oldcell = DiffusionField.cells[particle.prevCellID];
+                float densityRatio = (std::abs(cell.density)+1.0)/(std::abs(oldcell.density)+1.0); // accounting for the density added/subtracted by this particle
+                // it seems that densityRatio causes crashes when negative densities are involved (cell0 becomes very dense??)
                 // particle.velocity += particle.velocity*fdensity*(1.0f-densityRatio);
                 particle.velocity -= particle.velocity*fdensity*densityRatio;
                 particle.prevCellID = particle.cellID;  // only perform this calculation once

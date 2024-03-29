@@ -10,7 +10,7 @@
 #include "Globals.hpp"
 
 constexpr unsigned int radialdist_limit {5}; // highest radial_distance implemented by GetNeighbors
-constexpr unsigned int DIFFUSION_RADIUS {3};  // number of neighboring grid-cells affected during density calculations (0 = only current cell is affected)
+constexpr unsigned int DIFFUSION_RADIUS {5};  // number of neighboring grid-cells affected during density calculations (0 = only current cell is affected)
 constexpr float DIFFUSION_SCALING {1.0/float(DIFFUSION_RADIUS+1)};  // diffusion-strength needs to decrease with distance, and must be scaled with radius
 static_assert((DIFFUSION_RADIUS <= radialdist_limit) && "too big");
 
@@ -66,7 +66,7 @@ class DiffusionField_T
     friend struct Mouse_T;
     // TODO: make a version with const(expr) indecies and IDs
     class Cell: public sf::RectangleShape {
-        static constexpr float colorscaling {16.0}; // density required for all-white color;
+        static constexpr float colorscaling {24.0}; // density required for all-white color;
         public:
         //static int counterX, counterY;
         //const int IX, IY;
@@ -90,8 +90,14 @@ class DiffusionField_T
         }
         
         void UpdateColor() {
+            if (density < 0) {  // painting negative-density areas red/magenta
+                sf::Uint8 alpha = (std::abs(density) >= 127/colorscaling ? 255 : colorscaling*std::abs(density) + 127);
+                sf::Uint8 colorchannel = (std::abs(density) >= colorscaling ? 255 : (127/colorscaling)*std::abs(density) + 127);
+                this->setFillColor(sf::Color(colorchannel, 0, colorchannel/2, alpha/1.5));
+                return; 
+            }
             sf::Uint8 alpha = (density >= 127/colorscaling ? 255 : colorscaling*density + 127); // avoiding overflows
-            sf::Uint8 colorchannel = (density >= 255/colorscaling ? 255 : colorscaling*density); // avoiding overflows
+            sf::Uint8 colorchannel = (density >= colorscaling ? 255 : (255/colorscaling)*density); // avoiding overflows
             this->setFillColor(sf::Color(colorchannel, colorchannel, colorchannel, alpha));  // white
         }
     };

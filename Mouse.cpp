@@ -76,7 +76,7 @@ void Mouse_T::ModifyCell(const std::size_t cellID)
             state.cellptr->density += state.mod.density;
             for (unsigned int dist{1}; dist <= radialDist; ++dist)
             {
-                const float adjStrength = {((mode==Push)? strength : -strength)/(2.0f*dist)};
+                const float adjStrength = {((mode==Push)? strength : -strength)/(1.75f*dist)};
                 const CellRef_T adjacent {fieldptr->GetCellNeighbors(cellID, dist)};
                 for (Cell* const cellptr: adjacent)
                 {
