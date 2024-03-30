@@ -5,10 +5,10 @@
 #include <numeric>
 
 
-void DiffusionField_T::PrintAllCells()
+void DiffusionField_T::PrintAllCells() const
 {
     std::cout << "maxIX, maxIY = " << maxIX << ", " << maxIY << '\n';
-    for (Cell& cell: cells) {
+    for (const Cell& cell: cells) {
         std::cout << "UUID: " << cell.UUID << " ";
         std::cout << "ix: " << cell.IX << " ";
         std::cout << "iy: " << cell.IY << " ";
@@ -130,7 +130,7 @@ const auto GetNeighborsAll(const int radial_distance, const int IX, const int IY
 };
 
 // result is for only a single distance
-const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist)
+const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist) const
 {
     assert((radialdist <= radialdist_limit) && "radialdist too large");
     const Cell& cell = cells.at(UUID);
@@ -143,7 +143,7 @@ const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID, const
 }
 
 // result is for every distance up to (and including) current DIFFUSION_RADIUS
-const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID)
+const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID) const
 {
     const Cell& cell = cells.at(UUID);
     std::vector<Cell*> reflist;
@@ -158,7 +158,7 @@ const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID)
 //const std::vector<Cell*> reflist{GetCellNeighbors(UUID)};
 
 // the pairs within DoubleCoords are ordered: Absolute, Relative
-const std::vector<DoubleCoord> DiffusionField_T::GetAdjacentPlus(const std::size_t UUID)
+const std::vector<DoubleCoord> DiffusionField_T::GetAdjacentPlus(const std::size_t UUID) const
 {
     const Cell& baseCell = cells.at(UUID);
     const int IX = baseCell.IX;
@@ -179,7 +179,7 @@ const std::vector<DoubleCoord> DiffusionField_T::GetAdjacentPlus(const std::size
     return coords;
 }
 
-const sf::Vector2f DiffusionField_T::CalcDiffusionVec(const std::size_t UUID)
+const sf::Vector2f DiffusionField_T::CalcDiffusionVec(const std::size_t UUID) const
 {
     const Cell& cell = cells.at(UUID);
     const std::vector<DoubleCoord> coordpairs = GetAdjacentPlus(UUID);
@@ -189,7 +189,7 @@ const sf::Vector2f DiffusionField_T::CalcDiffusionVec(const std::size_t UUID)
     for (const auto& [abs, rel]: coordpairs) {
         const auto& [ix, iy] = abs;
         //reflist.push_back(cellmatrix.at(ix).at(iy));
-        Cell* neighbor = cellmatrix.at(ix).at(iy);
+        const Cell* const neighbor = cellmatrix.at(ix).at(iy);
         // scaling neighbor's density by distance
         const int orthodist = std::max(std::abs(rel.first), std::abs(rel.second));
         // taking max of either axis so that diagonals are considered a distance of 1, instead of 2

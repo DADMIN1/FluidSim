@@ -9,12 +9,8 @@
 
 #include "Globals.hpp"
 
-constexpr unsigned int radialdist_limit {5}; // highest radial_distance implemented by GetNeighbors
-constexpr unsigned int DIFFUSION_RADIUS {5};  // number of neighboring grid-cells affected during density calculations (0 = only current cell is affected)
-constexpr float DIFFUSION_SCALING {1.0/float(DIFFUSION_RADIUS+1)};  // diffusion-strength needs to decrease with distance, and must be scaled with radius
-static_assert((DIFFUSION_RADIUS <= radialdist_limit) && "too big");
 
-constexpr std::array<std::array<float, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION> DensityGrid{};  // holds 'densities' for each cell
+constexpr static std::array<std::array<float, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION> DensityGrid{};  // holds 'densities' for each cell
 // TODO: move global definitions to another file
 // TODO: replace DensityGrid with DiffusionField_T
 
@@ -23,7 +19,7 @@ consteval float DiffusionStrength(const unsigned int radial_distance) // radial-
     // can't use static_assert (until std23?) because radial_distance doesn't count as constexpr, apparently.
     assert((radial_distance <= DIFFUSION_RADIUS) && "DiffusionStrength called for cell beyond radius of effect");
     // TODO: generate static lookup-arrays for diffusion strength based on radius and resolution
-    // TODO: scaling function that always totals to 1.0 regardless of radius
+    // TODO: scaling function that always totals to 1.0 regardless of radius (use trig functions)
     return 1.0 - DIFFUSION_SCALING*(radial_distance);
 }
 
@@ -37,8 +33,8 @@ inline const float* CellLookup(const float positionX, const float positionY)
     return radial_distance;
 } */
 // std::size_t so they can be used for array sizing
-constexpr std::size_t NeighborCountsAtDist[] = {0, 4, 8, 16, 20};  // number of neighbors at a given radial distance
-constexpr int BaseNeighborCounts[] = {0, 4, 12, 28, 48};  // number of neighbors (cumulative) for a given radial distance
+constexpr static std::size_t NeighborCountsAtDist[] = {0, 4, 8, 16, 20};  // number of neighbors at a given radial distance
+constexpr static int BaseNeighborCounts[] = {0, 4, 12, 28, 48};  // number of neighbors (cumulative) for a given radial distance
 int CalcBaseNCount(int radial_distance);  // returns the relative coords of neighbors at radial_distance
 
 // X/Y indexes are parameters because we need to specialize for cells within DIFFUSION_RADIUS of the edge
@@ -72,8 +68,8 @@ class DiffusionField_T
         //const int IX, IY;
         unsigned int IX, IY, UUID;  // UUID is the array index of Cell
         float density{0.0};
-        
-        // TODO: Cells should be larger than 1 pixel??
+
+        // TODO: implement momentum system
         Cell()
         : sf::RectangleShape(sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}),
         IX{0}, IY{0}, UUID{0} 
@@ -108,7 +104,7 @@ class DiffusionField_T
     static constexpr unsigned int maxSizeY = maxIY+1;
 
     // these are added with signed-ints in GetCellNeighbors (because the result might be negative); hence the assertion.
-    static_assert((maxIX < __INT_MAX__) && (maxIY < __INT_MAX__) && "max-indecies will overflow");
+    static_assert((maxIX < __INT_MAX__) && (maxIY < __INT_MAX__), "max-indecies will overflow");
     
     using CellMatrix = std::array<std::array<Cell*, maxSizeY>, maxSizeX>;
     //using CellArray = std::array<Cell, ((maxSizeY)*(maxSizeX))>; // crashes
@@ -121,11 +117,11 @@ class DiffusionField_T
     //Cells* state_working {&cells[1]};
     
     // finds cells at a single distance
-    const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID);
+    const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID) const;
     // finds cells at every distance up to (and including) current DIFFUSION_RADIUS
-    const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist);
-    const std::vector<DoubleCoord> GetAdjacentPlus(const std::size_t UUID); // returns pairs of absolute and relative coords
-    const sf::Vector2f CalcDiffusionVec(std::size_t UUID);
+    const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist) const;
+    const std::vector<DoubleCoord> GetAdjacentPlus(const std::size_t UUID) const; // returns pairs of absolute and relative coords
+    const sf::Vector2f CalcDiffusionVec(std::size_t UUID) const;
     
     bool Initialize()  // returns success/fail
     {
@@ -151,7 +147,7 @@ class DiffusionField_T
         Initialize();
         cellgrid_texture.create(BOXWIDTH, BOXHEIGHT);
     } */
-    void PrintAllCells();
+    void PrintAllCells() const;
     
     sf::Sprite Draw() 
     {

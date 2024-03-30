@@ -3,6 +3,24 @@
 #include <iostream>
 #include <unordered_map>
 
+#include <SFML/Graphics/RectangleShape.hpp>
+// TODO: refactor this out of Mouse.cpp/hpp completely; it can go in main.
+sf::RectangleShape hoverOutline{sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}};
+
+static std::vector<sf::Vector2f> outlined{};
+void Mouse_T::DrawOutlines() const
+{
+    sf::RectangleShape outline{sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}};
+    // outline.setFillColor(sf::Color::Transparent);
+    outline.setFillColor({0x00, 0x00, 0x00, 0x42});
+    outline.setOutlineColor({0x00, 0x99, 0x9A, 0xCD});
+    outline.setOutlineThickness(SPATIAL_RESOLUTION/-5.0);
+
+    for (sf::Vector2f& position: outlined) {
+        outline.setPosition(position);
+        window.draw(outline);
+    }
+}
 
 struct CellState_T
 {
@@ -28,8 +46,8 @@ struct CellState_T
     }
 };
 
-
-std::unordered_map<std::size_t, CellState_T> savedState {};
+// TODO: reserve based on neighbor counts?
+static std::unordered_map<std::size_t, CellState_T> savedState {};
 
 
 auto Mouse_T::StoreCell(Cell* const cellptr)
@@ -55,7 +73,7 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
     { 
         case None:
             if (!hoveredCell) { return; }
-            outlined.setPosition(hoveredCell->getPosition());
+            hoverOutline.setPosition(hoveredCell->getPosition());
             shouldOutline = true;
         break;
         
@@ -65,17 +83,26 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
             CellState_T& state = savedState.at(cellptr->UUID);
             state.mod.density = ((mode==Push)? strength : -strength);
             state.cellptr->density += state.mod.density;
-            for (unsigned int dist{1}; dist <= radialDist; ++dist)
+            if (isPaintingMode)
+            {
+                hoverOutline.setFillColor({0x1A, 0xFF, 0x1A, 0x82});
+                hoverOutline.setPosition(hoveredCell->getPosition());
+                outlined.clear();
+                outlined.push_back(hoveredCell->getPosition());
+            }
+            for (int dist{1}; dist <= radialDist; ++dist)
             {
                 const float adjStrength = {((mode==Push)? strength : -strength)/(1.75f*dist)};
                 const CellRef_T adjacent {fieldptr->GetCellNeighbors(cellptr->UUID, dist)};
                 for (Cell* const cellptr: adjacent)
                 {
-                    if (savedState.contains(cellptr->UUID))
+                    if (savedState.contains(cellptr->UUID)) {
                         RestoreCell(cellptr->UUID);
+                    }
                     auto entry = StoreCell(cellptr);
                     entry->second.mod.density = adjStrength;
                     cellptr->density += adjStrength;
+                    outlined.push_back(cellptr->getPosition());
                 }
             }
         }
@@ -128,11 +155,12 @@ void Mouse_T::InvalidateHover()
     shouldDisplay = false;
     shouldOutline = false;
     hoveredCell = nullptr;
+    outlined.clear();
     return;
 }
 
 
-void Mouse_T::SwitchMode(Mode nextmode)
+void Mouse_T::SwitchMode(const Mode nextmode)
 {
     if (mode == nextmode) { return; }
     // handling transition from current mode
@@ -152,9 +180,10 @@ void Mouse_T::SwitchMode(Mode nextmode)
     {
         case None:
         {
+            hoverOutline.setFillColor(sf::Color::Transparent);
             // just drawing hoveredCell's outline
             if (UpdateHovered()) {
-                outlined.setPosition(hoveredCell->getPosition());
+                hoverOutline.setPosition(hoveredCell->getPosition());
                 shouldOutline = true;
                 shouldDisplay = false;
             }
@@ -168,6 +197,7 @@ void Mouse_T::SwitchMode(Mode nextmode)
             ModifyCell(hoveredCell);
             shouldDisplay = true;
             shouldOutline = false;
+            if (isPaintingMode) { shouldOutline = true; }  // required for outlined
         }
         break;
         
@@ -200,8 +230,10 @@ bool Mouse_T::UpdateHovered()
         else 
         { // restore original state to previous cell (before hoveredCell is updated)
             if (isPaintingMode) {
-                if (savedState.contains(hoveredCell->UUID))
-                    RestoreCell(hoveredCell->UUID);  // removes from map
+                /* if (savedState.contains(hoveredCell->UUID))
+                    RestoreCell(hoveredCell->UUID);  // removes from map */
+                // don't remove it from the map; it'll get restored and re-inserted during ModifyCell
+                // if you remove it now, you'll get holes (and it won't work at all if radialDist is 0)
                 hoveredCell = nullptr;
             }
             else {
@@ -232,14 +264,38 @@ bool Mouse_T::UpdateHovered()
 }
 
 
-void Mouse_T::HandleEvent(sf::Event event)
+void Mouse_T::HandleEvent(const sf::Event& event)
 {
     if (mode == Disabled) { return; }
     
     switch(event.type)
     {
+        // not currently passed by mainwindow
         case sf::Event::MouseLeft:  // mouse left the window
+            std::cerr << "mouseleft!\n";
             InvalidateHover();
+        break;
+        
+        case sf::Event::MouseWheelScrolled:
+        {
+            const int oldRD = radialDist;
+            ChangeRadius((event.mouseWheelScroll.delta >= 0));
+            if ((mode != None) && (radialDist != oldRD) && (!isPaintingMode))
+            {
+                InvalidateHover();  // without this, it will grow, but not shrink
+                UpdateHovered();    // only necessary because of InvalidateHover
+                // unfortunately, InvalidateHover wipes the whole board when painting-mode is enabled
+                
+                // almost works with just this and ModifyCell; but it only grows; doesn't shrink
+                // and it doesn't wipe the board in painting-mode
+                /* if (savedState.contains(hoveredCell->UUID))
+                    RestoreCell(hoveredCell->UUID);
+                StoreCell(hoveredCell); */
+                
+                ModifyCell(hoveredCell); // redraws
+                shouldDisplay = true; // only necessary because of InvalidateHover
+            }
+        }
         break;
         
         case sf::Event::MouseMoved:

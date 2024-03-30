@@ -2,11 +2,15 @@
 #define FLUIDSIM_MOUSE_HPP_INCLUDED
 
 #include <SFML/Graphics/CircleShape.hpp>
-#include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Window.hpp>  // defines mouse and window
 
 #include "Globals.hpp"
 #include "Diffusion.hpp"
+
+
+static constexpr int defaultRD{2};
+static constexpr float defaultRadius{(defaultRD + 0.65) * 0.65 * SPATIAL_RESOLUTION}; // radius of the circleshape, specifically
+static constexpr int defaultPointCount{128};  // larger numbers don't seem to do anything
 
 
 // Provides mouse-related interactions for the simulation
@@ -22,14 +26,12 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
         Erase, // erase particles
     } mode {Disabled};
     
-    const sf::Window& window;
-    static constexpr float defaultRadius {SPATIAL_RESOLUTION*3.5};
-    float radius {defaultRadius};
-    float strength {127.0};        // for push/pull modes
-    unsigned int radialDist {5};  // distance of adjacent cells included in effect
-
+    sf::RenderWindow& window;
+    float strength {127.0};  // for push/pull modes
+    int radialDist {defaultRD};  // orthogonal distance of adjacent cells included in effect
+    
     using Cell = DiffusionField_T::Cell;
-    DiffusionField_T* fieldptr {nullptr}; // &fluid.DiffusionFields[0]
+    const DiffusionField_T* const fieldptr; // &fluid.DiffusionField
     Cell* hoveredCell {nullptr};
     
     //static void sf::Mouse::setPosition(const sf::Vector2i& position);
@@ -38,44 +40,32 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     // is it actually necessary to even inherit from sf::Mouse?
     
     public:
-    bool shouldDisplay{false}; // controls drawing of the mouse (circle)
-    bool shouldOutline{false}; // hoveredCell-outline
-    sf::RectangleShape outlined;
+    bool shouldDisplay{false};   // controls drawing of the mouse (circle)
+    bool shouldOutline{false};   // hoveredCell-outline
     bool isPaintingMode{false};  // mouse-interactions stay painted over traveled areas
     
     // Do not call the constructor for sf::Mouse (it's virtual)?
-    Mouse_T(sf::Window& theWindow, DiffusionField_T* const mptr)
-    : sf::CircleShape(defaultRadius), window{theWindow}
+    Mouse_T(sf::RenderWindow& theWindow, DiffusionField_T* const mptr)
+        : sf::CircleShape(defaultRadius, defaultPointCount), window{theWindow}, fieldptr{mptr}
     {
-        setOutlineThickness(2.f);
+        setOutlineThickness(((defaultRD == 0) ? 1.0 : defaultRD));
+        setOrigin(getRadius(), getRadius());
         setOutlineColor(sf::Color::Cyan);
         setFillColor(sf::Color::Transparent);
-        setOrigin(defaultRadius, defaultRadius);
-        fieldptr = mptr;
-        
-        // default cell appearance
-        sf::RectangleShape basecell {sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}};
-        basecell.setFillColor(sf::Color::Transparent);
-        basecell.setOutlineColor(sf::Color(0xFFFFFF80));  // half-transparent white
-        basecell.setOutlineThickness(1);
-        
-        outlined = basecell;
-        outlined.setOutlineColor(sf::Color::Cyan);
-        outlined.setOutlineThickness(2.5f);
     }
     
-    void HandleEvent(sf::Event);
-    void InvalidateHover(); // restores current hoveredCell (if any), then disables hovering
-    void SwitchMode(Mode);
+    void HandleEvent(const sf::Event&);
+    void InvalidateHover(); // restores current hoveredCell and all modified cells
+    void SwitchMode(const Mode);
     
-    // swaps the current mode with the saved mode; returns true unless mode is None
+    // swaps the current mode with the saved mode; returns true unless the new mode is 'Disabled'
     bool ToggleActive() {
         static Mode prev {None};
         if (mode == Disabled) { SwitchMode(prev); prev = Disabled; return true;  }
         else                  { prev = mode; SwitchMode(Disabled); return false; }
     }
     
-    bool isInsideWindow() 
+    bool isInsideWindow() const
     {
         const auto [winsizeX, winsizeY] = window.getSize();
         const auto [mouseX, mouseY] = sf::Mouse::getPosition(window);
@@ -86,11 +76,37 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
         return insideWindow;
     }
     
+    void ChangeRadius(const bool increase) {
+        shouldDisplay = true; // before early-returns; otherwise it doesn't show at limits
+        radialDist += (increase? 1 : -1);
+        if (radialDist > int(radialdist_limit)) { radialDist = radialdist_limit; return; }
+        else if (radialDist < 0)                { radialDist = 0;                return; }
+        // since adjustments are made incrementally, the previous value of any illegal change must be the limit
+        // therefore, the state will not change; hence the early returns.
+
+        setOutlineThickness(((radialDist == 0) ? 1.0 : radialDist));
+        setRadius((radialDist+0.65) * 0.65 * SPATIAL_RESOLUTION);
+        setOrigin(getRadius(), getRadius());
+        // window.draw() ? need to display the new size even if 'shouldDisplay' is false
+        // implement some kind of timer to temporarily reveal the radius
+    }
+    
+    void DrawOutlines() const;  // for painting mode, outlines every cell around mouse
+    
+    // TODO: should these even be member functions?
     private:
     bool UpdateHovered();  // returns true if hoveredCell was found
     auto StoreCell(Cell* const cellptr);  // saves the cell's current state, returns an iterator
     void ModifyCell(const Cell* const cellptr); // modifies cell's properties based on mode
     void RestoreCell(const std::size_t cellID); // restores original state and removes entry for cell
 };
+
+
+// dynamic thickness/transparency
+/* setOutlineThickness(-1 * (radialDist * radialDist));
+sf::Color asdf{getOutlineColor()};
+asdf.a = 0xFF - (0x1A * radialDist);
+setOutlineColor(asdf); */
+
 
 #endif

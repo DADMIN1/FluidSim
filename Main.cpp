@@ -28,6 +28,9 @@ bool TogglePause()
     return isPaused;
 }
 
+// Mouse.cpp
+extern sf::RectangleShape hoverOutline;
+
 
 int main(int argc, char** argv)
 {
@@ -64,6 +67,11 @@ int main(int argc, char** argv)
     // Title-bar is implied (for Style::Close)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM", mainstyle);
+    
+    hoverOutline.setFillColor(sf::Color::Transparent);
+    hoverOutline.setOutlineColor(sf::Color::Cyan);
+    hoverOutline.setOutlineThickness(2.5f);
+    
     Fluid fluid;
     if (!fluid.Initialize())
     {
@@ -75,7 +83,7 @@ int main(int argc, char** argv)
     
     PrintKeybinds();
 
-    #if DYNAMICFRAMEDELAY
+#if DYNAMICFRAMEDELAY
     sf::Clock frametimer{};
     #endif
     // frameloop
@@ -121,6 +129,21 @@ int main(int argc, char** argv)
                             const bool isActive = mouse.ToggleActive();
                             std::cout << "Mouse is " << (isActive? "enabled":"disabled") << '\n';
                             mainwindow.setMouseCursorVisible(!isActive);  // hide cursor when Mouse_T is displayed
+                            // mainwindow.setMouseCursorGrabbed(isActive);  // for some reason this only works the first time???
+                            if (isActive) {
+                                mainwindow.requestFocus();
+                                mainwindow.setMouseCursorGrabbed(true);
+                                //std::cout << "grabbed\n";
+                            } else {
+                                mainwindow.setMouseCursorGrabbed(false);
+                                //std::cout << "ungrabbed\n";
+                            }
+                            /*  For whatever reason, trying to grab the mouse after toggling to false here doesn't work.
+                                once it's released the cursor, it can't seem to grab it again UNLESS the window is unfocused/refocused.
+                                (even though you can manually set it to true/false any number of times earlier and still get the first grab)
+                                It doesn't have to lose focus specifically; clicking the titlebar also works. Toggling the gradient-window is another easy method.
+                                In fact, it seems that changing focus ALWAYS triggers the cursor-grab, even if it's supposed to be disabled.
+                                Maybe it's just a problem with my window-manager, or the function is only meant to be called once? */
                         }
                         break;
                         
@@ -153,6 +176,7 @@ int main(int argc, char** argv)
                             mouse.isPaintingMode = !mouse.isPaintingMode;
                             std::cout << "Painting mode: " << ((mouse.isPaintingMode)? "enabled": "disabled") << '\n';
                         }
+                        break;
                         
                         //case sf::Keyboard::_:
                         //break;
@@ -164,10 +188,11 @@ int main(int argc, char** argv)
                 break;
                 
                 case sf::Event::MouseMoved:
-                case sf::Event::MouseLeft:
-                case sf::Event::MouseEntered:
+                //case sf::Event::MouseLeft:
+                //case sf::Event::MouseEntered:
                 case sf::Event::MouseButtonPressed:
                 case sf::Event::MouseButtonReleased:
+                case sf::Event::MouseWheelScrolled:
                     mouse.HandleEvent(event);
                 break;
                 
@@ -204,9 +229,13 @@ frameAdvance:
         fluid.UpdateDensities();
         fluid.ApplyDiffusion();
         mainwindow.draw(fluid.DrawGrid());
-        if (mouse.shouldOutline) { mainwindow.draw(mouse.outlined); }
+        if (mouse.shouldOutline) { 
+            mainwindow.draw(hoverOutline); 
+            if (mouse.isPaintingMode && mouse.shouldDisplay) mouse.DrawOutlines();
+        }
         mainwindow.draw(fluid.Draw());
         
+
         // TODO: allow mouse to update and be redrawn even while paused
         if (mouse.shouldDisplay) {
             mainwindow.draw(mouse);
