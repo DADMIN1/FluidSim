@@ -7,13 +7,16 @@ ifeq (debug, $(filter debug, $(MAKECMDGOALS)))
 DEBUGFLAG = true
 target_executable = fluidsym_dbg
 OBJECTFILE_DIR = build/objects_dbg
-CXXFLAGS := -std=c++23 -ggdb -Og -g -march=native -pipe -Wall -Wextra -Wpedantic
+CXXFLAGS := -std=c++23 -g -Og -pipe -Wall -Wextra -Wpedantic -Wfatal-errors
 # c++23 standard isn't required for anything; 20 works fine
+# '-g' is preferrable to '-ggdb'?? '-g3' or '-ggdb3' for extra info (like macro definitions). Default level is 2
 else
 DEBUGFLAG = false
 target_executable = fluidsym
 OBJECTFILE_DIR = build/objects
-CXXFLAGS := -std=c++23 -O3 -march=native -pipe -Wall -Wextra -Wpedantic -DNDEBUG
+#CXXFLAGS := -std=c++23 -O3 -march=native -mtune=native -pipe -Wall -Wextra -Wpedantic -DNDEBUG
+CXXFLAGS := -std=c++23 -O1 -pipe -Wall -Wextra -Wpedantic -Wfatal-errors
+# -fmax-errors=1  or  -Wfatal-errors ???
 endif
 
 # TODO: add a 'release' build with more optimization and '-DNDEBUG'
@@ -74,8 +77,9 @@ ${target_executable}: $(OBJFILES) | ${SUBDIRS}
 # that's important because the builddir's MTIME is updated every time a file is compiled;
 # which would then trigger rebuilds for every file every time.
 
+# this Makefile is added as a prerequisite to trigger rebuilds whenever it's modified
 
-$(OBJECTFILE_DIR)/%.o: %.cpp | ${SUBDIRS}
+$(OBJECTFILE_DIR)/%.o: %.cpp Makefile | ${SUBDIRS}
 	$(CXX) $(CXXFLAGS) -MMD -c $< -o $@
 # The -MMD and -MP flags together create dependency-files (.d)
 # actually don't use '-MP'; it creates fake empty dependency rules for the '.hpp' files
