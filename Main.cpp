@@ -4,17 +4,15 @@
 //#include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>  // defines sf::Event
 
-#include "Fluid.hpp"
-//#include "ValarrayTest.hpp"
-#include "Diffusion.hpp"
+#include "Simulation.hpp"
 #include "Mouse.hpp"
 #include "Gradient.hpp"
+//#include "ValarrayTest.hpp"
 
 
 // inspired by Sebastian Lague
 
 
-// TODO: handle window resizing
 // TODO: imgui
 
 
@@ -73,14 +71,13 @@ int main(int argc, char** argv)
     hoverOutline.setOutlineColor(sf::Color::Cyan);
     hoverOutline.setOutlineThickness(2.5f);
     
-    Fluid fluid;
-    if (!fluid.Initialize())
-    {
-        std::cout << "fluid initialization failed!!";
+    Simulation simulation{};
+    if (!simulation.Initialize()) {
+        std::cerr << "simulation failed to initialize!\n";
         return 1;
     }
-    // TODO: refactor diffusionfield out of fluid
-    Mouse_T mouse(mainwindow, fluid.GetDiffusionFieldPtr());
+    
+    Mouse_T mouse(mainwindow, simulation.GetDiffusionFieldPtr());
     
     PrintKeybinds();
     
@@ -111,7 +108,7 @@ int main(int argc, char** argv)
                         break;
                         
                         case sf::Keyboard::G:
-                            std::cout << "gravity " << (fluid.ToggleGravity()? "enabled":"disabled") << '\n';
+                            std::cout << "gravity " << (simulation.ToggleGravity()? "enabled":"disabled") << '\n';
                         break;
                         
                         case sf::Keyboard::Space:
@@ -120,7 +117,7 @@ int main(int argc, char** argv)
                         
                         case sf::Keyboard::BackSpace:
                             if (!isPaused) TogglePause();
-                            fluid.Freeze();
+                            simulation.Freeze();
                             std::cout << "Velocities have been zeroed (and gravity disabled)\n";
                             goto frameAdvance;
                         break;
@@ -162,7 +159,7 @@ int main(int argc, char** argv)
                         break;
                         
                         case sf::Keyboard::T:
-                            std::cout << "transparency " << (fluid.ToggleTransparency()? "enabled":"disabled") << '\n';
+                            std::cout << "transparency " << (simulation.ToggleTransparency()? "enabled":"disabled") << '\n';
                         break;
                         
                         case sf::Keyboard::N:
@@ -233,14 +230,12 @@ int main(int argc, char** argv)
 frameAdvance:
         mainwindow.clear();
         
-        fluid.Update();
-        fluid.UpdateDensities();
-        fluid.ApplyDiffusion();
+        simulation.Update();
         
         // TODO: hide the gridlines in painting-mode
         // grid must be temporarily displayed when you draw in painting-mode (otherwise the effect would be invisible)
         if (shouldDrawGrid || (mouse.isPaintingMode && mouse.isActive(true))) {
-            mainwindow.draw(fluid.DrawGrid());
+            mainwindow.draw(simulation.DrawGrid());
         }
         else if (mouse.isActive()) // when grid is NOT drawn: always draw mouse-radius and disable cell-outline
         {  // TODO: refactor this logic to not check on every frame
@@ -253,7 +248,7 @@ frameAdvance:
             if (mouse.isPaintingMode && mouse.shouldDisplay) mouse.DrawOutlines();
         }
         
-        mainwindow.draw(fluid.Draw());
+        mainwindow.draw(simulation.DrawFluid());
         
         // TODO: allow mouse to update and be redrawn even while paused
         if (mouse.shouldDisplay) {

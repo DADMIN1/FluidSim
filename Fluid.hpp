@@ -24,6 +24,8 @@ constexpr int delaycompN{13}, delaycompD{15}; // the sleepdelay is multiplied by
 #endif
 const sf::Time sleepDelay {sf::microseconds((1000000*delaycompN)/(framerateCap*delaycompD))};
 constexpr float timestepRatio {1.0/float(framerateCap/60)};  // normalizing timesteps to make physics independent of frame-rate
+//TODO: timestepRatio needs to adjust when framerate is below cap
+//TODO: refactor all the framerate-related stuff out of this file
 
 
 class Particle : public sf::CircleShape
@@ -34,6 +36,7 @@ class Particle : public sf::CircleShape
     // 'true' indicates a positive direction on that axis
     public:
     friend class Fluid;
+    friend class Simulation;
     void UpdateColor(bool useTransparency);
     
     Particle(float radius=DEFAULTRADIUS, std::size_t pointcount=DEFAULTPOINTCOUNT) 
@@ -45,52 +48,24 @@ class Particle : public sf::CircleShape
 };
 
 
-class Fluid 
+class Fluid
 {
-    bool hasGravity {false};
     float gravity {0.175};
     float bounceDampening {0.15};
     float viscosity {0.005};
     float fdensity {0.0125};  // controls 'force' of diffusion
     float vcap {7.5};
-    bool useTransparency {false};  // slow-moving particles are more transparent
+    
     sf::RenderTexture particle_texture;
     std::vector<std::vector<Particle>> particles;
 
-    // std::array<DiffusionField_T, 2> DiffusionFields;
-    DiffusionField_T DiffusionField;
-    //bool buffer_index{0}; // which diffusion field is being used as the 'current' (not working) buffer
-    // why even bother swapping them? A copy to the other buffer will need to be made regardless
-    //inline void SwapStateBuffers() { buffer_index = !buffer_index; }
-
     public:
-    // mouse needs to access this pointer to lookup cell (given an X/Y coord)
-    DiffusionField_T* GetDiffusionFieldPtr() { return &DiffusionField; }
-    void PrintAllCells() {DiffusionField.PrintAllCells();}
+    friend class Simulation;
     
-    bool ToggleGravity(bool noArg=true) // if you pass false, it always disables
-    { 
-        if (noArg) hasGravity = !hasGravity;
-        else hasGravity = false;
-        return hasGravity; 
-    }
-    bool ToggleTransparency() { useTransparency = !useTransparency; return useTransparency; }
-    //const DiffusionField_T* state;
-    bool Initialize();
-    void Update();
-    void UpdateDensities();
-    void ApplyDiffusion();
-    void Freeze() // sets all velocities to 0
-    {
-        for (auto& column: particles) {
-            for (Particle& particle: column) {
-                particle.velocity = {0, 0};
-                particle.UpdateColor(useTransparency);
-            }
-        }
-        hasGravity = false;
-    }
-    void Reset(); // TODO: implement reset
+    bool Initialize(DiffusionField_T& dfref);
+    void Update(const bool applyGravity, const bool useTransparency);
+    void UpdateDensities(DiffusionField_T& dfref);
+    void ApplyDiffusion(const DiffusionField_T& dfref);
     
     sf::Sprite Draw()
     {
@@ -103,12 +78,6 @@ class Fluid
         }
         particle_texture.display();
         return sf::Sprite(particle_texture.getTexture());
-    }
-    
-    sf::Sprite DrawGrid()
-    {
-        // DiffusionFields[0]  // update densities here
-        return DiffusionField.Draw();
     }
 };
 

@@ -39,18 +39,12 @@ void Particle::UpdateColor(bool useTransparency)
 }
 
 
-bool Fluid::Initialize()
+bool Fluid::Initialize(DiffusionField_T& dfref)
 {
     assert((bounceDampening >= 0.0) && (bounceDampening <= 1.0) && "collision-damping must be between 0 and 1");
     
     if (!particle_texture.create(BOXWIDTH, BOXHEIGHT))
         return false;
-    
-    DiffusionField.Initialize();
-    /* for (auto& F: DiffusionFields) {
-        if (!F.Initialize())
-            return false;
-    } */
     
     // TODO: does this reserve actually work? or do I need to reserve each nested vector as well?
     particles.reserve(NUMCOLUMNS*NUMROWS);
@@ -66,7 +60,7 @@ bool Fluid::Initialize()
             unsigned int xi = x/SPATIAL_RESOLUTION;
             unsigned int yi = y/SPATIAL_RESOLUTION;
             assert((xi <= DiffusionField_T::maxIX) && (yi <= DiffusionField_T::maxIY) && "out-of-bounds index");
-            DiffusionField_T::Cell* cell = DiffusionField.cellmatrix.at(xi).at(yi);
+            DiffusionField_T::Cell* cell = dfref.cellmatrix.at(xi).at(yi);
             particle.cellID = cell->UUID;
             particle.prevCellID = cell->UUID;
             cell->density += 1.0;
@@ -78,13 +72,13 @@ bool Fluid::Initialize()
 
 // we must not allow position == limit in this function; 
 // otherwise, when we look up the related cell, it'll index past the end of the cellmatrix
-void Fluid::Update()
+void Fluid::Update(const bool applyGravity, const bool useTransparency)
 {
     for (int c{0}; c < NUMCOLUMNS; ++c) { 
         for (int r{0}; r < NUMROWS; ++r) {
             Particle& particle = particles[c][r];
             
-            if (hasGravity)
+            if (applyGravity)
                 particle.velocity.y += gravity;
             
             /* particle.velocity -= { 
@@ -142,17 +136,17 @@ void Fluid::Update()
     }
 }
 
-void Fluid::UpdateDensities()
+void Fluid::UpdateDensities(DiffusionField_T& dfref)
 {
     for (auto& innervec: particles) {
         for (Particle& particle: innervec) {
             const auto& [x, y] = particle.getPosition();
             unsigned int xi = x/SPATIAL_RESOLUTION;
             unsigned int yi = y/SPATIAL_RESOLUTION;
-            DiffusionField_T::Cell* cell = DiffusionField.cellmatrix.at(xi).at(yi);
+            DiffusionField_T::Cell* cell = dfref.cellmatrix.at(xi).at(yi);
             if (cell->UUID != particle.cellID)
             {
-                DiffusionField_T::Cell& oldcell = DiffusionField.cells[particle.cellID];
+                DiffusionField_T::Cell& oldcell = dfref.cells[particle.cellID];
                 /* float densityRatio = (oldcell.density+1.0) / (cell->density+1.0);
                 particle.velocity *= densityRatio; */
                 // can't do that calculation here because not every cell has it's density updated yet (it blows up)
@@ -171,22 +165,22 @@ void Fluid::UpdateDensities()
 }
 
 // expects that UpdateDensities has already been called for the frame
-void Fluid::ApplyDiffusion()
+void Fluid::ApplyDiffusion(const DiffusionField_T& dfref)
 {
     for (auto& innervec: particles) {
         for (Particle& particle: innervec) {
-            const DiffusionField_T::Cell& cell = DiffusionField.cells[particle.cellID];
+            const DiffusionField_T::Cell& cell = dfref.cells[particle.cellID];
             // TODO: implement this better
             if (particle.prevCellID != particle.cellID) // taking care of velocity scaling after cell transition
             {
-                const DiffusionField_T::Cell& oldcell = DiffusionField.cells[particle.prevCellID];
+                const DiffusionField_T::Cell& oldcell = dfref.cells[particle.prevCellID];
                 float densityRatio = (std::abs(cell.density)+1.0)/(std::abs(oldcell.density)+1.0); // accounting for the density added/subtracted by this particle
                 // it seems that densityRatio causes crashes when negative densities are involved (cell0 becomes very dense??)
                 // particle.velocity += particle.velocity*fdensity*(1.0f-densityRatio);
                 particle.velocity -= particle.velocity*fdensity*densityRatio;
                 particle.prevCellID = particle.cellID;  // only perform this calculation once
             }
-            particle.velocity += DiffusionField.CalcDiffusionVec(particle.cellID) * timestepRatio * fdensity;
+            particle.velocity += dfref.CalcDiffusionVec(particle.cellID) * timestepRatio * fdensity;
             // Applying current cell's diffusion
             const float diffusionForce = (cell.density-1.0)*fdensity;
             const sf::Vector2f diffvec { diffusionForce*(particle.reldirections[0] ? 1.0f : -1.0f ), 
