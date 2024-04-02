@@ -58,6 +58,8 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     void InvalidateHover(); // restores current hoveredCell and all modified cells
     void SwitchMode(const Mode);
     
+    // checks if mouse is enabled, optionally checks if any effect is being applied (hasEffect=true)
+    bool isActive(const bool hasEffect=false) const { return (mode != Disabled) && (hasEffect? (mode != None) : true); }
     // swaps the current mode with the saved mode; returns true unless the new mode is 'Disabled'
     bool ToggleActive() {
         static Mode prev {None};

@@ -22,11 +22,12 @@ extern void EmbedMacroTest();  // MacroTest.cpp
 extern void PrintKeybinds();   // Keybinds.cpp
 
 bool isPaused{false};
-bool TogglePause()
-{
-    isPaused = !isPaused;
-    return isPaused;
-}
+bool TogglePause() { isPaused = !isPaused; return isPaused;}
+
+// mouse.cpp
+extern bool shouldDrawGrid;
+bool ToggleGridDisplay();
+// TODO: refactor these elsewhere
 
 // Mouse.cpp
 extern sf::RectangleShape hoverOutline;
@@ -82,7 +83,7 @@ int main(int argc, char** argv)
     Mouse_T mouse(mainwindow, fluid.GetDiffusionFieldPtr());
     
     PrintKeybinds();
-
+    
 #if DYNAMICFRAMEDELAY
     sf::Clock frametimer{};
     #endif
@@ -178,8 +179,15 @@ int main(int argc, char** argv)
                         }
                         break;
                         
-                        //case sf::Keyboard::_:
-                        //break;
+                        case sf::Keyboard::C:
+                        {
+                            ToggleGridDisplay();
+                            std::cout << "Grid-display " << ((shouldDrawGrid) ? "enabled" : "disabled") << '\n';
+                        }
+                        break;
+                        
+                        // case sf::Keyboard::_:
+                        // break;
                         
                         default:
                         break;
@@ -220,29 +228,40 @@ int main(int argc, char** argv)
         
         // marked unlikely to (hopefully) optimize for the unpaused state
         if (isPaused) [[unlikely]] { continue; }
-    
+        
 // This jump exists to redraw the screen BEFORE pausing (pause-statement will be hit following frame)
 frameAdvance:
         mainwindow.clear();
-
+        
         fluid.Update();
         fluid.UpdateDensities();
         fluid.ApplyDiffusion();
-        mainwindow.draw(fluid.DrawGrid());
+        
+        // TODO: hide the gridlines in painting-mode
+        // grid must be temporarily displayed when you draw in painting-mode (otherwise the effect would be invisible)
+        if (shouldDrawGrid || (mouse.isPaintingMode && mouse.isActive(true))) {
+            mainwindow.draw(fluid.DrawGrid());
+        }
+        else if (mouse.isActive()) // when grid is NOT drawn: always draw mouse-radius and disable cell-outline
+        {  // TODO: refactor this logic to not check on every frame
+            mouse.shouldDisplay = true;
+            mouse.shouldOutline = false;
+        }
+        
         if (mouse.shouldOutline) { 
             mainwindow.draw(hoverOutline); 
             if (mouse.isPaintingMode && mouse.shouldDisplay) mouse.DrawOutlines();
         }
+        
         mainwindow.draw(fluid.Draw());
         
-
         // TODO: allow mouse to update and be redrawn even while paused
         if (mouse.shouldDisplay) {
             mainwindow.draw(mouse);
         }
         
         mainwindow.display();
-
+        
         // framerate cap
         #if DYNAMICFRAMEDELAY
         const sf::Time adjustedDelay = sleepDelay - frametimer.getElapsedTime();

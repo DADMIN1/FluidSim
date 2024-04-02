@@ -22,6 +22,11 @@ void Mouse_T::DrawOutlines() const
     }
 }
 
+// TODO: refactor this elsewhere
+bool shouldDrawGrid {true};
+bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGrid; }
+
+
 struct CellState_T
 {
     using Cell = DiffusionField_T::Cell;
@@ -338,6 +343,8 @@ void Mouse_T::HandleEvent(const sf::Event& event)
                     if (mode != None) { break; } // only allow one button at a time
                     SwitchMode(Push);
                     setOutlineColor(sf::Color::Cyan);
+                    if (!shouldDrawGrid)
+                        setFillColor({0x20, 0x77, 0x77, 0x64});
                 }
                 break;
                 
@@ -346,6 +353,8 @@ void Mouse_T::HandleEvent(const sf::Event& event)
                     if (mode != None) { break; } // only allow one button at a time
                     SwitchMode(Pull);
                     setOutlineColor(sf::Color::Magenta);
+                    if (!shouldDrawGrid)
+                        setFillColor({0xFF, 0x00, 0x77, 0x32});
                 }
                 break;
                 
@@ -363,11 +372,13 @@ void Mouse_T::HandleEvent(const sf::Event& event)
                 case 0: //Left-click
                     // handling the case where two mouse-buttons are held;
                     // the second press switches the mode, so releases do nothing if the mode doesn't match
-                    if (mode == Push) { SwitchMode(None); } else { break; }
+                    if (mode == Push) { SwitchMode(None); setFillColor(sf::Color::Transparent); }
+                    else { break; }
                 break;
                 
                 case 1: //Right-click
-                    if (mode == Pull) { SwitchMode(None); } else { break; }
+                    if (mode == Pull) { SwitchMode(None); setFillColor(sf::Color::Transparent); }
+                    else { break; }
                 break;
                 
                 default:
