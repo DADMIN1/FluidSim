@@ -61,7 +61,7 @@ class Fluid
     public:
     friend class Simulation;
     
-    bool Initialize(DiffusionField_T& dfref);
+    bool Initialize();
     void UpdatePositions();
     void UpdateDensities(DiffusionField_T& dfref);
     void ApplyDiffusion(const DiffusionField_T& dfref);

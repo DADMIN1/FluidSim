@@ -38,7 +38,7 @@ void Fluid::Particle::UpdateColor(const bool useTransparency)
 }
 
 
-bool Fluid::Initialize(DiffusionField_T& dfref)
+bool Fluid::Initialize()
 {
     assert((bounceDampening >= 0.0) && (bounceDampening <= 1.0) && "collision-damping must be between 0 and 1");
     
@@ -50,16 +50,8 @@ bool Fluid::Initialize(DiffusionField_T& dfref)
         for (int r{0}; r < NUMROWS; ++r) {
             Particle& particle = particles.emplace_back(Particle{});
             particle.setPosition((c*INITIALSPACINGX)+INITIALOFFSETX, (r*INITIALSPACINGY)+INITIALOFFSETY);
-            
-            // finding/setting initial cell
-            const auto& [x, y] = particle.getPosition();
-            unsigned int xi = x/SPATIAL_RESOLUTION;
-            unsigned int yi = y/SPATIAL_RESOLUTION;
-            assert((xi <= DiffusionField_T::maxIX) && (yi <= DiffusionField_T::maxIY) && "out-of-bounds index");
-            DiffusionField_T::Cell* cell = dfref.cellmatrix.at(xi).at(yi);
-            particle.cellID = cell->UUID;
-            particle.prevCellID = cell->UUID;
-            cell->density += 1.0;
+            // the particles still need their Cell-related variables set
+            // and the cells need to have their density increased
         }
     }
     
@@ -145,11 +137,6 @@ void Fluid::UpdateDensities(DiffusionField_T& dfref)
             particle.prevCellID = particle.cellID;
             particle.cellID = cell->UUID;
         }
-        
-        // finding position relative to center of the cell
-        const sf::Vector2f halfway = cell->getPosition() + sf::Vector2f{float(SPATIAL_RESOLUTION/2), float(SPATIAL_RESOLUTION/2)};
-        particle.reldirections[0] = (x > halfway.x);
-        particle.reldirections[1] = (y > halfway.y);
     }
 }
 
@@ -172,15 +159,18 @@ void Fluid::ApplyDiffusion(const DiffusionField_T& dfref)
         // Applying nonlocal diffusion force (relative density of nearby cells)
         particle.velocity += dfref.CalcDiffusionVec(particle.cellID) * timestepRatio * fdensity;
         
+        // finding position relative to center of the cell
+        const auto& [x, y] = particle.getPosition();
+        //cell.getGlobalBounds().contains(particle.getPosition());
+        const sf::Vector2f halfway = cell.getPosition() + sf::Vector2f{float(SPATIAL_RESOLUTION / 2), float(SPATIAL_RESOLUTION / 2)};
+        particle.reldirections[0] = (x > halfway.x);
+        particle.reldirections[1] = (y > halfway.y);
+        
         // Applying current cell's anti-density force (simply pushes the particle away from the cell's center)
         const float diffusionForce = (cell.density-1.0) * timestepRatio * fdensity;
         const sf::Vector2f diffvec { diffusionForce*(particle.reldirections[0] ? 1.0f : -1.0f ), 
                                      diffusionForce*(particle.reldirections[1] ? 1.0f : -1.0f ), };
         particle.velocity += diffvec;
-        
-        /* if (particle.velocity.x < 1.0) {
-            particle.velocity.x += diffusionForce*(particle.reldirections[0] ? float(-1.0) : float(1.0));
-        } */
     }
 }
 

@@ -12,6 +12,7 @@ class Simulation
     
     bool hasGravity {false};
     bool useTransparency {false};  // slow-moving particles are more transparent
+    bool isPaused{false};
     
     public:
     bool Initialize();
@@ -21,12 +22,14 @@ class Simulation
     DiffusionField_T* GetDiffusionFieldPtr() { return &diffusionField; }
     void PrintAllCells() { diffusionField.PrintAllCells(); }
     
+    bool TogglePause() { isPaused = !isPaused; return isPaused; }
     bool ToggleGravity(bool noArg=true) // if you pass false, it always disables gravity
     { hasGravity = (noArg? (!hasGravity) : false); return hasGravity; }
     bool ToggleTransparency() { useTransparency = !useTransparency; return useTransparency; }
     
     void Freeze() // sets all velocities to 0
     {
+        if(!isPaused) { TogglePause(); }
         fluid.Freeze();
         //hasGravity = false;
     }
@@ -35,6 +38,17 @@ class Simulation
     sf::Sprite DrawFluid() { return fluid.Draw(useTransparency); }
     sf::Sprite DrawGrid () { return diffusionField.Draw(); }
 };
+
+
+// TODO: implement class RenderState to manage all visuals (including mouse)
+// holds textures/sprites for each member
+/* class RenderState
+{
+    sf::RenderTarget* target; // &mainwindow
+    std::array<sf::RenderTexture, 5> texture;
+    public:
+    std::array<sf::Sprite, 5> sprites;
+}; */
 
 
 #endif

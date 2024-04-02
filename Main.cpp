@@ -19,15 +19,11 @@
 extern void EmbedMacroTest();  // MacroTest.cpp
 extern void PrintKeybinds();   // Keybinds.cpp
 
-bool isPaused{false};
-bool TogglePause() { isPaused = !isPaused; return isPaused;}
 
-// mouse.cpp
+// TODO: refactor these elsewhere
+// Mouse.cpp
 extern bool shouldDrawGrid;
 bool ToggleGridDisplay();
-// TODO: refactor these elsewhere
-
-// Mouse.cpp
 extern sf::RectangleShape hoverOutline;
 
 
@@ -114,14 +110,12 @@ int main(int argc, char** argv)
                         break;
                         
                         case sf::Keyboard::Space:
-                            std::cout << (TogglePause()?"paused":"unpaused") << '\n';
+                            std::cout << (simulation.TogglePause()?"paused":"unpaused") << '\n';
                         break;
                         
                         case sf::Keyboard::BackSpace:
-                            if (!isPaused) TogglePause();
                             simulation.Freeze();
                             std::cout << "Velocities have been zeroed\n";
-                            goto frameAdvance;
                         break;
                         
                         case sf::Keyboard::Tab:
@@ -225,11 +219,6 @@ int main(int argc, char** argv)
             }
         }
         
-        // marked unlikely to (hopefully) optimize for the unpaused state
-        if (isPaused) [[unlikely]] { continue; }
-        
-// This jump exists to redraw the screen BEFORE pausing (pause-statement will be hit following frame)
-frameAdvance:
         mainwindow.clear();
         
         simulation.Update();
