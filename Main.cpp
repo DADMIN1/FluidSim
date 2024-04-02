@@ -61,11 +61,13 @@ int main(int argc, char** argv)
     
     
     //EmbedMacroTest();
-    GradientWindow_T gradientWindow{};
     
     // Title-bar is implied (for Style::Close)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM", mainstyle);
+    mainwindow.setPosition({mainwindow.getPosition().x, 0});
+    
+    GradientWindow_T gradientWindow{};
     
     hoverOutline.setFillColor(sf::Color::Transparent);
     hoverOutline.setOutlineColor(sf::Color::Cyan);

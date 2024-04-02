@@ -39,26 +39,24 @@
 
 
 /* ------------------------------------- GradientWindow_T ------------------------------------- */
-// gradientPtr is nullptr by default
-GradientWindow_T::GradientWindow_T(Gradient_T* gradientPtr) : sf::RenderWindow()
+void GradientWindow_T::Initialize()
 {
-    if (gradientPtr) { m_gradient = gradientPtr; }
-    else { m_gradient = new Gradient_T(); }
     m_texture.create(m_width, m_height);
     for (std::size_t i{0}; i<1024; ++i) {
-      sf::RectangleShape strip(sf::Vector2f{1, 127});
-      strip.setFillColor(m_gradient->Lookup(i));
-      strip.setPosition(i,0);
-      m_texture.draw(strip);
+        sf::RectangleShape band(sf::Vector2f{1, 127});
+        band.setFillColor(m_gradient->Lookup(i));
+        band.setPosition(i,0);
+        m_texture.draw(band);
     }
     m_texture.display();
     m_sprite = sf::Sprite(m_texture.getTexture()); // must call .display before constructing sprite
+    return;
 }
 
-// 
+
 GradientWindow_T::~GradientWindow_T()  // TODO: call RenderWindow destructor??
 {
-    delete m_gradient;
+    if (ownsPtr) delete m_gradient;
 }
 
 
@@ -70,6 +68,7 @@ void GradientWindow_T::Create()
     // sf::Style::Default = Titlebar | Resize | Close
     sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "Gradient", m_style);
     setPosition({getPosition().x+360, 360});
+    return;
 }
 
 

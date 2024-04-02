@@ -51,9 +51,18 @@ class GradientWindow_T: public sf::RenderWindow
     static constexpr int m_width {1024}; //pixels
     static constexpr int m_height {127};
     
+    const bool ownsPtr; // prevents the destructor from deleting pointers it does not own
+    void Initialize();  // setup steps shared by both constructors
+    
     public:
-    // default constructor does not actually create the window; call '.create()' later
-    GradientWindow_T(Gradient_T* gradientPtr=nullptr);
+    // constructors do not actually create the window; call '.create()' later
+    GradientWindow_T(): sf::RenderWindow(), 
+      m_gradient{new Gradient_T()}, ownsPtr{true}
+    { Initialize(); }
+    
+    GradientWindow_T(Gradient_T* const gradientPtr): sf::RenderWindow(), 
+      m_gradient{gradientPtr}, ownsPtr{false}
+    { Initialize(); }
     
     void Create(); // calls sf::RenderWindow.create(...) with some arguments
     void FrameLoop(); // returns after gradient_window is closed
