@@ -27,17 +27,12 @@ class Simulation
     
     void Freeze() // sets all velocities to 0
     {
-        for (auto& column: fluid.particles) {
-            for (Particle& particle: column) {
-                particle.velocity = {0, 0};
-                particle.UpdateColor(useTransparency);
-            }
-        }
-        hasGravity = false;
+        fluid.Freeze();
+        //hasGravity = false;
     }
     void Reset(); // TODO: implement reset
     
-    sf::Sprite DrawFluid() { return fluid.Draw(); }
+    sf::Sprite DrawFluid() { return fluid.Draw(useTransparency); }
     sf::Sprite DrawGrid () { return diffusionField.Draw(); }
 };
 

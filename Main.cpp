@@ -118,7 +118,7 @@ int main(int argc, char** argv)
                         case sf::Keyboard::BackSpace:
                             if (!isPaused) TogglePause();
                             simulation.Freeze();
-                            std::cout << "Velocities have been zeroed (and gravity disabled)\n";
+                            std::cout << "Velocities have been zeroed\n";
                             goto frameAdvance;
                         break;
                         

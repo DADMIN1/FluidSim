@@ -28,26 +28,6 @@ constexpr float timestepRatio {1.0/float(framerateCap/60)};  // normalizing time
 //TODO: refactor all the framerate-related stuff out of this file
 
 
-class Particle : public sf::CircleShape
-{
-    sf::Vector2f velocity {0.0, 0.0};
-    unsigned int cellID {0}, prevCellID {0};
-    bool reldirections[2] {true, true};  // tracks position relative to cell's center (X, Y axes)
-    // 'true' indicates a positive direction on that axis
-    public:
-    friend class Fluid;
-    friend class Simulation;
-    void UpdateColor(bool useTransparency);
-    
-    Particle(float radius=DEFAULTRADIUS, std::size_t pointcount=DEFAULTPOINTCOUNT) 
-    : Particle::CircleShape(radius, pointcount)
-    {
-        const sf::Color defaultcolor (0x0888FFFF);
-        this->setFillColor(defaultcolor);
-    }
-};
-
-
 class Fluid
 {
     float gravity {0.175};
@@ -56,25 +36,56 @@ class Fluid
     float fdensity {0.0125};  // controls 'force' of diffusion
     float vcap {7.5};
     
+    class Particle : public sf::CircleShape
+    {
+        sf::Vector2f velocity {0.0, 0.0};
+        unsigned int cellID {0}, prevCellID {0};
+        bool reldirections[2] {false, false};  // tracks position relative to cell's center (X, Y axes)
+        // 'true' indicates a positive direction on that axis
+        public:
+        friend class Fluid;
+        friend class Simulation;
+        void UpdateColor(const bool useTransparency);
+        
+        Particle(float radius=DEFAULTRADIUS, std::size_t pointcount=DEFAULTPOINTCOUNT) 
+        : Particle::CircleShape(radius, pointcount)
+        {
+            const sf::Color defaultcolor (0x0888FFFF);
+            this->setFillColor(defaultcolor);
+        }
+    };
+    
     sf::RenderTexture particle_texture;
-    std::vector<std::vector<Particle>> particles;
-
+    std::vector<Particle> particles;
+    
     public:
     friend class Simulation;
     
     bool Initialize(DiffusionField_T& dfref);
-    void Update(const bool applyGravity, const bool useTransparency);
+    void UpdatePositions();
     void UpdateDensities(DiffusionField_T& dfref);
     void ApplyDiffusion(const DiffusionField_T& dfref);
     
-    sf::Sprite Draw()
+    void ApplyGravity() {
+        for (Particle& particle : particles) {
+            particle.velocity.y += gravity;
+        }
+    }
+
+    void Freeze() // sets all velocities to 0
+    {
+        for (Particle& particle: particles) {
+            particle.velocity = {0, 0};
+            particle.UpdateColor(false); // even if transparency is enabled, non-moving particles should be opaque
+        }
+    }
+    
+    sf::Sprite Draw(const bool useTransparency)
     {
         particle_texture.clear(sf::Color::Transparent);
-        for (int c{0}; c < NUMCOLUMNS; ++c){ 
-            for (int r{0}; r < NUMROWS; ++r) {
-                //particles[c][r].UpdateColor();
-                particle_texture.draw(particles[c][r]);
-            }
+        for (Particle& particle: particles) {
+            particle.UpdateColor(useTransparency);
+            particle_texture.draw(particle);
         }
         particle_texture.display();
         return sf::Sprite(particle_texture.getTexture());

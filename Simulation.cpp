@@ -14,7 +14,10 @@ bool Simulation::Initialize()
 
 void Simulation::Update()
 {
-    fluid.Update(hasGravity, useTransparency);
+    if (hasGravity) { fluid.ApplyGravity(); }
+    fluid.UpdatePositions();
     fluid.UpdateDensities(diffusionField);
     fluid.ApplyDiffusion(diffusionField);
+    
+    return;
 }
