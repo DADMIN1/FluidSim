@@ -29,7 +29,7 @@ bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGr
 
 struct CellState_T
 {
-    using Cell = DiffusionField_T::Cell;
+    using Cell = DiffusionField::Cell;
     Cell* const cellptr;
     const Cell originalState;  // needed to restore the cell after moving or releasing-button
     // saving the whole cell is overkill; only the modified/necessary components should be copied
@@ -254,12 +254,12 @@ bool Mouse_T::UpdateHovered()
     // finding indecies for new hoveredCell  // TODO: do this better
     unsigned int xi = x/SPATIAL_RESOLUTION;
     unsigned int yi = y/SPATIAL_RESOLUTION;
-    if ((xi > DiffusionField_T::maxIX) || (yi > DiffusionField_T::maxIY)) {
+    if ((xi > DiffusionField::maxIX) || (yi > DiffusionField::maxIY)) {
         std::cerr << "bad indecies calculated: ";
         std::cerr << xi << ", " << yi << '\n';
         return false;
     }
-    assert((xi <= DiffusionField_T::maxIX) && (yi <= DiffusionField_T::maxIY) && "index of hovered-cell out of range");
+    assert((xi <= DiffusionField::maxIX) && (yi <= DiffusionField::maxIY) && "index of hovered-cell out of range");
     
     hoveredCell = fieldptr->cellmatrix.at(xi).at(yi);
     if (savedState.contains(hoveredCell->UUID))

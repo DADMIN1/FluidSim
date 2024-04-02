@@ -10,7 +10,6 @@
 #include <SFML/System/Time.hpp>
 
 #include "Globals.hpp"
-#include "Diffusion.hpp"
 
 
 // disable dynamic frame-delay to compensate with a hardcoded ratio instead
@@ -38,20 +37,20 @@ class Fluid
     
     class Particle : public sf::CircleShape
     {
+        const unsigned int UUID;
+        unsigned int cellID{0};
         sf::Vector2f velocity {0.0, 0.0};
-        unsigned int cellID {0}, prevCellID {0};
-        bool reldirections[2] {false, false};  // tracks position relative to cell's center (X, Y axes)
-        // 'true' indicates a positive direction on that axis
+        
         public:
         friend class Fluid;
         friend class Simulation;
         void UpdateColor(const bool useTransparency);
         
-        Particle(float radius=DEFAULTRADIUS, std::size_t pointcount=DEFAULTPOINTCOUNT) 
-        : Particle::CircleShape(radius, pointcount)
+        Particle(const unsigned int ID, float radius=DEFAULTRADIUS, std::size_t pointcount=DEFAULTPOINTCOUNT) 
+        : Particle::CircleShape(radius, pointcount), UUID{ID}
         {
             const sf::Color defaultcolor (0x0888FFFF);
-            this->setFillColor(defaultcolor);
+            setFillColor(defaultcolor);
         }
     };
     
@@ -63,8 +62,6 @@ class Fluid
     
     bool Initialize();
     void UpdatePositions();
-    void UpdateDensities(DiffusionField_T& dfref);
-    void ApplyDiffusion(const DiffusionField_T& dfref);
     
     void ApplyGravity() {
         for (Particle& particle : particles) {
@@ -75,7 +72,7 @@ class Fluid
     void Freeze() // sets all velocities to 0
     {
         for (Particle& particle: particles) {
-            particle.velocity = {0, 0};
+            particle.velocity = {0,0};
             particle.UpdateColor(false); // even if transparency is enabled, non-moving particles should be opaque
         }
     }

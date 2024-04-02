@@ -5,7 +5,7 @@
 #include <numeric>
 
 
-void DiffusionField_T::PrintAllCells() const
+void DiffusionField::PrintAllCells() const
 {
     std::cout << "maxIX, maxIY = " << maxIX << ", " << maxIY << '\n';
     for (const Cell& cell: cells) {
@@ -92,7 +92,7 @@ const Coordlist GetNeighbors(const int radial_distance, const int IX, const int 
         const int resultX = IX+dx;
         const int resultY = IY+dy;
         if((resultX < 0) || (resultY < 0)) continue;
-        else if((resultX > int(DiffusionField_T::maxIX)) || (resultY > int(DiffusionField_T::maxIY))) continue;
+        else if((resultX > int(DiffusionField::maxIX)) || (resultY > int(DiffusionField::maxIY))) continue;
         else {
             absoluteCoords.push_back({resultX, resultY});
         }
@@ -130,7 +130,7 @@ const auto GetNeighborsAll(const int radial_distance, const int IX, const int IY
 };
 
 // result is for only a single distance
-const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist) const
+const CellRef_T DiffusionField::GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist) const
 {
     assert((radialdist <= radialdist_limit) && "radialdist too large");
     const Cell& cell = cells.at(UUID);
@@ -143,7 +143,7 @@ const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID, const
 }
 
 // result is for every distance up to (and including) current DIFFUSION_RADIUS
-const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID) const
+const CellRef_T DiffusionField::GetCellNeighbors(const std::size_t UUID) const
 {
     const Cell& cell = cells.at(UUID);
     std::vector<Cell*> reflist;
@@ -158,7 +158,7 @@ const CellRef_T DiffusionField_T::GetCellNeighbors(const std::size_t UUID) const
 //const std::vector<Cell*> reflist{GetCellNeighbors(UUID)};
 
 // the pairs within DoubleCoords are ordered: Absolute, Relative
-const std::vector<DoubleCoord> DiffusionField_T::GetAdjacentPlus(const std::size_t UUID) const
+const std::vector<DoubleCoord> DiffusionField::GetAdjacentPlus(const std::size_t UUID) const
 {
     const Cell& baseCell = cells.at(UUID);
     const int IX = baseCell.IX;
@@ -170,7 +170,7 @@ const std::vector<DoubleCoord> DiffusionField_T::GetAdjacentPlus(const std::size
             const int resultX = IX+dx;
             const int resultY = IY+dy;
             if ((resultX < 0) || (resultY < 0)) continue;
-            else if ((resultX > int(DiffusionField_T::maxIX)) || (resultY > int(DiffusionField_T::maxIY))) continue;
+            else if ((resultX > int(DiffusionField::maxIX)) || (resultY > int(DiffusionField::maxIY))) continue;
             else {
                 coords.push_back({{resultX, resultY}, {dx, dy}});
             }
@@ -179,7 +179,9 @@ const std::vector<DoubleCoord> DiffusionField_T::GetAdjacentPlus(const std::size
     return coords;
 }
 
-const sf::Vector2f DiffusionField_T::CalcDiffusionVec(const std::size_t UUID) const
+// TODO: store the constexpr parts seperately
+// coordpairs, cellmatrix-indecies, orthodist, etc. will all be static for a given UUID
+const sf::Vector2f DiffusionField::CalcDiffusionVec(const std::size_t UUID) const
 {
     const Cell& cell = cells.at(UUID);
     const std::vector<DoubleCoord> coordpairs = GetAdjacentPlus(UUID);
@@ -196,8 +198,8 @@ const sf::Vector2f DiffusionField_T::CalcDiffusionVec(const std::size_t UUID) co
         const float magnitude = (cell.density - neighbor->density) * (1.0f - float(orthodist*DIFFUSION_SCALING));
         
         // we need to find the directional components of the vector (angle);
-        int orthodist_sum {std::abs(rel.first) + std::abs(rel.second)};
-        std::pair<float, float> angleComponents { 
+        const int orthodist_sum {std::abs(rel.first) + std::abs(rel.second)};
+        const std::pair<float, float> angleComponents { 
             float(rel.first /orthodist_sum), 
             float(rel.second/orthodist_sum), 
         };

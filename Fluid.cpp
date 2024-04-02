@@ -45,10 +45,11 @@ bool Fluid::Initialize()
     if (!particle_texture.create(BOXWIDTH, BOXHEIGHT))
         return false;
     
+    unsigned int nextID{0};
     particles.reserve(NUMCOLUMNS*NUMROWS);
     for (int c{0}; c < NUMCOLUMNS; ++c) { 
         for (int r{0}; r < NUMROWS; ++r) {
-            Particle& particle = particles.emplace_back(Particle{});
+            Particle& particle = particles.emplace_back(nextID++);
             particle.setPosition((c*INITIALSPACINGX)+INITIALOFFSETX, (r*INITIALSPACINGY)+INITIALOFFSETY);
             // the particles still need their Cell-related variables set
             // and the cells need to have their density increased
@@ -115,62 +116,6 @@ void Fluid::UpdatePositions()
         }
         
         particle.setPosition(nextPosition);
-    }
-}
-
-
-void Fluid::UpdateDensities(DiffusionField_T& dfref)
-{
-    for (Particle& particle: particles) {
-        const auto& [x, y] = particle.getPosition();
-        const unsigned int xi = x/SPATIAL_RESOLUTION;
-        const unsigned int yi = y/SPATIAL_RESOLUTION;
-        DiffusionField_T::Cell* cell = dfref.cellmatrix.at(xi).at(yi);
-        if (cell->UUID != particle.cellID)
-        {
-            DiffusionField_T::Cell& oldcell = dfref.cells[particle.cellID];
-            /* float densityRatio = (oldcell.density+1.0) / (cell->density+1.0);
-            particle.velocity *= densityRatio; */
-            // can't do that calculation here because not every cell has it's density updated yet (it blows up)
-            oldcell.density -= 1.0;
-            cell->density += 1.0;
-            particle.prevCellID = particle.cellID;
-            particle.cellID = cell->UUID;
-        }
-    }
-}
-
-
-// expects that UpdateDensities has already been called for the frame
-void Fluid::ApplyDiffusion(const DiffusionField_T& dfref)
-{
-    for (Particle& particle: particles) {
-        const DiffusionField_T::Cell& cell = dfref.cells[particle.cellID];
-        // TODO: implement this better
-        if (particle.prevCellID != particle.cellID) // taking care of velocity scaling after cell transition
-        {
-            const DiffusionField_T::Cell& oldcell = dfref.cells[particle.prevCellID];
-            const float densityRatio = (std::abs(cell.density)+1.0)/(std::abs(oldcell.density)+1.0); // accounting for the density added/subtracted by this particle
-            // it seems that densityRatio causes crashes when negative densities are involved (cell0 becomes very dense??)
-            // particle.velocity += particle.velocity*fdensity*(1.0f-densityRatio);
-            particle.velocity -= particle.velocity * fdensity * densityRatio;
-            particle.prevCellID = particle.cellID;  // only perform this calculation once
-        }
-        // Applying nonlocal diffusion force (relative density of nearby cells)
-        particle.velocity += dfref.CalcDiffusionVec(particle.cellID) * timestepRatio * fdensity;
-        
-        // finding position relative to center of the cell
-        const auto& [x, y] = particle.getPosition();
-        //cell.getGlobalBounds().contains(particle.getPosition());
-        const sf::Vector2f halfway = cell.getPosition() + sf::Vector2f{float(SPATIAL_RESOLUTION / 2), float(SPATIAL_RESOLUTION / 2)};
-        particle.reldirections[0] = (x > halfway.x);
-        particle.reldirections[1] = (y > halfway.y);
-        
-        // Applying current cell's anti-density force (simply pushes the particle away from the cell's center)
-        const float diffusionForce = (cell.density-1.0) * timestepRatio * fdensity;
-        const sf::Vector2f diffvec { diffusionForce*(particle.reldirections[0] ? 1.0f : -1.0f ), 
-                                     diffusionForce*(particle.reldirections[1] ? 1.0f : -1.0f ), };
-        particle.velocity += diffvec;
     }
 }
 

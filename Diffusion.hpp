@@ -12,7 +12,7 @@
 
 constexpr static std::array<std::array<float, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION> DensityGrid{};  // holds 'densities' for each cell
 // TODO: move global definitions to another file
-// TODO: replace DensityGrid with DiffusionField_T
+// TODO: replace DensityGrid with DiffusionField
 
 consteval float DiffusionStrength(const unsigned int radial_distance) // radial-distance is number of cells away from particle
 {
@@ -53,23 +53,27 @@ using Coordlist = std::vector<std::pair<int, int>>;
 using DoubleCoord = std::pair<std::pair<int, int>, std::pair<int, int>>;
 
 
-class DiffusionField_T
+class DiffusionField
 {
     sf::RenderTexture cellgrid_texture;
+    
     public:
-    //friend class Cell;
-    friend class Fluid;
-    friend struct Mouse_T;
+    friend class Mouse_T;
+    friend class Simulation;
+    
     // TODO: make a version with const(expr) indecies and IDs
     class Cell: public sf::RectangleShape {
         static constexpr float colorscaling {24.0}; // density required for all-white color;
-        public:
-        //static int counterX, counterY;
-        //const int IX, IY;
-        unsigned int IX, IY, UUID;  // UUID is the array index of Cell
+        unsigned int IX, IY, UUID; // UUID is the array index of Cell
+        sf::Vector2f diffusionVec{0.0, 0.0}; // force calculated from the density of nearby cells
+        sf::Vector2f momentum{0.0, 0.0}; // stored velocity imparted by particles, distributed to local particles
         float density{0.0};
-
-        // TODO: implement momentum system
+        
+        public:
+        friend class DiffusionField;
+        friend class Simulation;
+        friend class Mouse_T;
+        
         Cell()
         : sf::RectangleShape(sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}),
         IX{0}, IY{0}, UUID{0} 
@@ -79,22 +83,22 @@ class DiffusionField_T
         : sf::RectangleShape(sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}),
         IX{X}, IY{Y}, UUID{UUID}
         {
-            this->setFillColor(sf::Color::Transparent);
-            this->setOutlineColor(sf::Color(0xFFFFFF80));  // half-transparent white
-            this->setOutlineThickness(1);
-            this->setPosition(sf::Vector2f{float(X*SPATIAL_RESOLUTION), float(Y*SPATIAL_RESOLUTION)});
+            setFillColor(sf::Color::Transparent);
+            setOutlineColor(sf::Color(0xFFFFFF80));  // half-transparent white
+            setOutlineThickness(1);
+            setPosition(sf::Vector2f{float(X*SPATIAL_RESOLUTION), float(Y*SPATIAL_RESOLUTION)});
         }
         
         void UpdateColor() {
             if (density < 0) {  // painting negative-density areas red/magenta
                 sf::Uint8 alpha = (std::abs(density) >= 127/colorscaling ? 255 : colorscaling*std::abs(density) + 127);
                 sf::Uint8 colorchannel = (std::abs(density) >= colorscaling ? 255 : (127/colorscaling)*std::abs(density) + 127);
-                this->setFillColor(sf::Color(colorchannel, 0, colorchannel/2, alpha/1.5));
+                setFillColor(sf::Color(colorchannel, 0, colorchannel/2, alpha/1.5));
                 return; 
             }
             sf::Uint8 alpha = (density >= 127/colorscaling ? 255 : colorscaling*density + 127); // avoiding overflows
             sf::Uint8 colorchannel = (density >= colorscaling ? 255 : (255/colorscaling)*density); // avoiding overflows
-            this->setFillColor(sf::Color(colorchannel, colorchannel, colorchannel, alpha));  // white
+            setFillColor(sf::Color(colorchannel, colorchannel, colorchannel, alpha));  // white
         }
     };
     
@@ -111,10 +115,6 @@ class DiffusionField_T
     using CellArray = std::vector<Cell>; // doesn't crash
     CellArray cells; // TODO: figure out how to do this with an array without crashing
     CellMatrix cellmatrix;
-    
-    //std::array<Cells, 2> cells;  // two buffers; a read-only 'current' state, and a working buffer
-    //Cells* const state {&cells[0]};
-    //Cells* state_working {&cells[1]};
     
     // finds cells at a single distance
     const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID) const;
@@ -134,19 +134,13 @@ class DiffusionField_T
         for (unsigned int c{0}; c < (maxSizeX); ++c) {
             for (unsigned int r{0}; r < (maxSizeY); ++r) {
                 //cells[ID] = Cell{c, r, ID};
-                Cell& newcell = cells.emplace_back(c, r, ID);
+                Cell& newcell = cells.emplace_back(c, r, ID++);
                 cellmatrix[c][r] = &newcell;
-                ++ID;
             }
         }
         return true;
     }
     
-    /* DiffusionField_T()
-    {
-        Initialize();
-        cellgrid_texture.create(BOXWIDTH, BOXHEIGHT);
-    } */
     void PrintAllCells() const;
     
     sf::Sprite Draw() 
@@ -159,53 +153,18 @@ class DiffusionField_T
         cellgrid_texture.display();
         return sf::Sprite(cellgrid_texture.getTexture());
     }
+    
+    void ResetMomentum() {
+        for (Cell& cell: cells) {
+            cell.momentum = {0.0, 0.0};
+        }
+    }
 };
 
-using CellRef_T = std::vector<DiffusionField_T::Cell*>;
+using CellRef_T = std::vector<DiffusionField::Cell*>;
 
 //template <std::size_t RD, std::size_t X, std::size_t Y>  // radial_distance, X/Y index into DensityGrid
 //constexpr void UpdateDiffusion(RD, X, Y);  // updates the counts for cells in diffusion delta-map (for neighbors of radial_distance RD)
-
-// alternatively, we could just return nullptr for 
-
-// these should be member functions
-//void UpdateDensities();
-//void ModifyVelocities();
-
-/* 
-// Density updates should be done in the following steps:
-// 1. Update the 'CurrentCell' for each particle. If it's unchanged, break
-// 2. Record the change (+newcell, -oldcell) into an intermediate table; this should allow you to skip net-zero calculations
-//  (if particle A moves to a new-cell, and particle B moves into A's prev-cell, the densities for A's prev-cell AND it's (diffusion) neighbors do not need to be recalculated)
-//  (the subtraction from B's prev-cell and addition to A's new-cell still need to be calculated)
-// The intermediate-table will contain the net-difference in number of particles per grid-cell since last frame
-// 3. From this table, you can create another intermediate-table for the delta to neighbor-cells' density
-// Getting the neighbor-cells should be consteval. It's probably not worth doing cancellation/masking like we did in the first step?
-//  (actually, we can combine the subtractions from prev-cell and additions to new-cell by combining them;
-//   the delta should be the sum of: -1*DiffusionStrength(dist_from_oldcell) + DiffusionStrength(dist_from_newcell) 
-//   the formula requires DiffusionStrength to return 0 if the distance is greater than the max diffusion radius
-//   this might only be efficient when particles move within the diffusion radius per frame? (maybe not, we'd need to do the subtractions/additions anyway)
-//   we might even be able to precalculate the masks/deltas for each movement, but that would probably require an absurd number of template instantiations (and limit velocities to 1 cell/frame)
-//   perhaps you could create a formula that generates the mask/deltas from a single calculation on the distance between oldcell and newcell??)
-// I think we might want seperate intermediate subtraction/addition maps for Diffusion-deltas?
-// The Diffusion neighbor-cell MASK (per-particle) holds the delta in prev/next radial-distances;
-//   if a cell goes from a radial distance of 3->1, the density of that cell will change by (2*Diffusion_Scaling); equivalent to simply adding DiffusionStrength at distance=2
-//   another example; previous-cell's DiffusionStrength will drop from 1.0 to DiffusionStrength(dist_to_prevcell); literally equivalent to 1.0 - DIFFUSION_SCALING*(dist_to_prevcell)
-//   algebraically, the prev-density of a cell equals: 1.0-DIFFUSION_SCALING*(prev_radial_distance), and the new density equals: 1.0-DIFFUSION_SCALING*(radial_distance)
-//   therefore, the difference equals: 
-//      (1.0 - DIFFUSION_SCALING*(prev_radial_distance)) - (1.0 - DIFFUSION_SCALING*(radial_distance))
-//      (-DIFFUSION_SCALING*(prev_radial_distance)) - (-DIFFUSION_SCALING*(radial_distance))
-//      DIFFUSION_SCALING*(radial_distance) - DIFFUSION_SCALING*(prev_radial_distance)
-//      DIFFUSION_SCALING * (radial_distance - prev_radial_distance)  // should be negative, actually?
-// The intermediate delta-map for Diffusion holds the combined deltas for each radial-distance from all particles;
-//  With linear DIFFUSION_SCALING / DiffusionStrength, I think you could just sum all the deltas, then multiply by DIFFUSION_SCALING?
-//  But nonlinear equations will require you to track the counts for each radial-distance seperately, at which point you may as well just directly calculate / modify DiffusionStrength directly
-// Maybe you could create an intermediate map for each radial-distance? That might actually work well if NeighborLookup is called for each radial-distance
- */
-
-
-
-
 
 
 #endif

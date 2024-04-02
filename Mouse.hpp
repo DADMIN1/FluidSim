@@ -30,8 +30,8 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     float strength {127.0};  // for push/pull modes
     int radialDist {defaultRD};  // orthogonal distance of adjacent cells included in effect
     
-    using Cell = DiffusionField_T::Cell;
-    const DiffusionField_T* const fieldptr; // &fluid.DiffusionField
+    using Cell = DiffusionField::Cell;
+    const DiffusionField* const fieldptr; // &fluid.DiffusionField
     Cell* hoveredCell {nullptr};
     
     //static void sf::Mouse::setPosition(const sf::Vector2i& position);
@@ -45,7 +45,7 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     bool isPaintingMode{false};  // mouse-interactions stay painted over traveled areas
     
     // Do not call the constructor for sf::Mouse (it's virtual)?
-    Mouse_T(sf::RenderWindow& theWindow, DiffusionField_T* const mptr)
+    Mouse_T(sf::RenderWindow& theWindow, DiffusionField* const mptr)
         : sf::CircleShape(defaultRadius, defaultPointCount), window{theWindow}, fieldptr{mptr}
     {
         setOutlineThickness(((defaultRD == 0) ? 1.0 : defaultRD));

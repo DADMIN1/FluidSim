@@ -52,8 +52,8 @@ int main(int argc, char** argv)
     } */
     
     std::cout << "max indecies: " 
-        << DiffusionField_T::maxIX << ", " 
-        << DiffusionField_T::maxIY << '\n';
+        << DiffusionField::maxIX << ", " 
+        << DiffusionField::maxIY << '\n';
     
     
     //EmbedMacroTest();
