@@ -70,16 +70,16 @@ void Fluid::UpdatePositions()
         }; */
         
         if (particle.velocity.x > vcap) {
-            particle.velocity.x -= viscosity;
+            particle.velocity.x -= viscosity*timestepRatio;
         }
         else if (particle.velocity.x < -vcap) {
-            particle.velocity.x += viscosity;
+            particle.velocity.x += viscosity*timestepRatio;
         }
         if (particle.velocity.y > vcap) {
-            particle.velocity.y -= viscosity;
+            particle.velocity.y -= viscosity*timestepRatio;
         }
         else if (particle.velocity.y < -vcap) {
-            particle.velocity.y += viscosity;
+            particle.velocity.y += viscosity*timestepRatio;
         }
         
         sf::Vector2f nextPosition = particle.getPosition();
@@ -92,26 +92,26 @@ void Fluid::UpdatePositions()
         if (nextPosition.y >= BOXHEIGHT) {
             nextPosition.y = BOXHEIGHT-DEFAULTRADIUS;
             particle.velocity.y *= (-1.0 + bounceDampening);
-            particle.velocity.y -= 0.05f;  // forcing particles with 0 velocity away from the edge
+            particle.velocity.y -= 0.001f;  // forcing particles with 0 velocity away from the edge
             assert(particle.velocity.y <= 0 && "y-velocity should be negative");
         }
         else if (nextPosition.y <= 0) {
             nextPosition.y = -1*nextPosition.y;
             particle.velocity.y *= (-1.0 + bounceDampening);
-            particle.velocity.y += 0.05f;  // forcing particles with 0 velocity away from the edge
+            particle.velocity.y += 0.001f;  // forcing particles with 0 velocity away from the edge
             assert(particle.velocity.y >= 0 && "y-velocity should be positive");
         }
         
         if (nextPosition.x >= BOXWIDTH) {
             nextPosition.x = BOXWIDTH-DEFAULTRADIUS;
             particle.velocity.x *= (-1.0 + bounceDampening);
-            particle.velocity.x -= 0.05f;   // forcing particles with 0 velocity away from the edge
+            particle.velocity.x -= 0.001f;   // forcing particles with 0 velocity away from the edge
             assert(particle.velocity.x <= 0 && "x-velocity should be negative");
         }
         else if (nextPosition.x <= 0) {
             nextPosition.x = -1*nextPosition.x;
             particle.velocity.x *= (-1.0 + bounceDampening);
-            particle.velocity.x += 0.05f;   // forcing particles with 0 velocity away from the edge
+            particle.velocity.x += 0.001f;   // forcing particles with 0 velocity away from the edge
             assert(particle.velocity.x >= 0 && "x-velocity should be positive");
         }
         

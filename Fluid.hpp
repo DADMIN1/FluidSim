@@ -13,7 +13,7 @@
 
 
 // disable dynamic frame-delay to compensate with a hardcoded ratio instead
-#define DYNAMICFRAMEDELAY false
+#define DYNAMICFRAMEDELAY true
 constexpr int framerateCap{300};
 #if DYNAMICFRAMEDELAY
 constexpr int delaycompN{1}, delaycompD{1};
@@ -22,17 +22,17 @@ constexpr int delaycompN{13}, delaycompD{15}; // the sleepdelay is multiplied by
 // (with framerateCap=300): 298fps actual [delay=2888us] (with compensation) vs 262fps actual [delay=3333us] (without)
 #endif
 const sf::Time sleepDelay {sf::microseconds((1000000*delaycompN)/(framerateCap*delaycompD))};
-constexpr float timestepRatio {1.0/float(framerateCap/60)};  // normalizing timesteps to make physics independent of frame-rate
-//TODO: timestepRatio needs to adjust when framerate is below cap
+// main.cpp
+extern float timestepRatio;  // normalizing timesteps to make physics independent of frame-rate
 //TODO: refactor all the framerate-related stuff out of this file
 
 
 class Fluid
 {
-    float gravity {0.175};
-    float bounceDampening {0.15};
+    float gravity {0.425};
+    float bounceDampening {0.25};
     float viscosity {0.005};
-    float fdensity {0.0125};  // controls 'force' of diffusion
+    float fdensity {0.0075};  // controls 'force' of diffusion
     float vcap {7.5};
     
     class Particle : public sf::CircleShape
@@ -65,7 +65,7 @@ class Fluid
     
     void ApplyGravity() {
         for (Particle& particle : particles) {
-            particle.velocity.y += gravity;
+            particle.velocity.y += gravity*timestepRatio;
         }
     }
 

@@ -20,6 +20,9 @@ extern void EmbedMacroTest();  // MacroTest.cpp
 extern void PrintKeybinds();   // Keybinds.cpp
 
 
+float timestepRatio{1.0/float(framerateCap/60.0)};  // normalizing timesteps to make physics independent of frame-rate
+
+
 // TODO: refactor these elsewhere
 // Mouse.cpp
 extern bool shouldDrawGrid;
@@ -41,8 +44,8 @@ int main(int argc, char** argv)
         std::cout << "C: " << C << " \t arg: " << arg << '\n';
     }
     
-    /* ValarrayTest();
-    ValarrayExample(); */
+    // ValarrayExample();
+    // ValarrayTest();
     
     /* int targetCount = 5;
     for (int s{1}; s <= targetCount; ++s) {
@@ -251,14 +254,14 @@ int main(int argc, char** argv)
         // framerate cap
         #if DYNAMICFRAMEDELAY
         const sf::Time adjustedDelay = sleepDelay - frametimer.getElapsedTime();
-        if (adjustedDelay == sf::Time::Zero) [[unlikely]] {
+        if (adjustedDelay == sf::Time::Zero) {
             //std::cout << "adjusted-delay is negative!: " << adjustedDelay.asMicroseconds() << "us" << '\n';
-            std::cout << "adjusted-delay is negative!: " << adjustedDelay.asMilliseconds() << "ms" << '\n';
             continue;
         }
         sf::sleep(adjustedDelay);
+        timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
         #else // using hardcoded delay-compensation
-        sf::sleep(sleepDelay);
+        sf::sleep(sleepDelay);  // bad
         #endif
         
     }
