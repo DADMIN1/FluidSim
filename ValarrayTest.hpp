@@ -35,6 +35,7 @@ void PrintValarray(std::string_view rem, auto const& v, bool nl = false)
         std::cout << "}";
     }
     std::cout << (nl ? ";\n" : ";  ");
+    return;
 }
 
 
@@ -46,7 +47,7 @@ void PrintValarray(std::string_view rem, auto const& v, bool nl = false)
 
 void ValarrayExample()
 {
-    std::cout << "--Valarray Example--\n";
+    std::cout << "\n\n--Valarray Example--\n";
     std::valarray<int> x, y;
     //#define SETVALS(A, B) x=A; y=B; PRINTVALARRAY(x), PRINTVALARRAY(y)
     //SETVALS(({1, 2, 3}), ({4, 5, 6}));
@@ -59,18 +60,22 @@ void ValarrayExample()
     PRINTVALARRAY(x, {1,3,4,7}), PRINTVALARRAY(y, {1,1,3,5}), PRINTVALARRAYOP(x &= y); //bitwise and
     PRINTVALARRAY(x, {1,3,4,7}), PRINTVALARRAY(y, {1,1,3,5}), PRINTVALARRAYOP(x |= y); //bitwise or
     PRINTVALARRAY(x, {1,3,4,7}), PRINTVALARRAY(y, {1,1,3,5}), PRINTVALARRAYOP(x ^= y); //bitwise xor
-    PRINTVALARRAY(x, {0,1,2,4}), PRINTVALARRAY(y, {4,3,2,1}), PRINTVALARRAYOP(x <<=y);
+    PRINTVALARRAY(x, {0,1,2,4}), PRINTVALARRAY(y, {4,3,2,1}), PRINTVALARRAYOP(x <<=y); //left-shift
     std::cout << '\n';
     PRINTVALARRAY(x, {1,2,3,4}), PRINTVALARRAYOP(x += 5);
     PRINTVALARRAY(x, {1,2,3,4}), PRINTVALARRAYOP(x *= 2);
     PRINTVALARRAY(x, {8,6,4,2}), PRINTVALARRAYOP(x /= 2);
-    PRINTVALARRAY(x, {8,4,2,1}), PRINTVALARRAYOP(x >>=1);
-    std::cout << '\n' << '\n';
+    PRINTVALARRAY(x, {8,4,2,1}), PRINTVALARRAYOP(x >>=1); //right-shift
+    std::cout << '\n';
+    
+    return;
 }
 
 
 void ValarrayTest()
 {
+    std::cout << "\n\n--Valarray Test--\n";
+    
     // can't be constexpr because brace-enclosed-initializer list copies
     std::valarray<int> testarr {
         1, 2, 3, 4, 5, 6, 7, 8,
@@ -90,12 +95,19 @@ void ValarrayTest()
     std::cout << "testarr sum = " << testarr.sum() << '\n';
     std::cout << "testarrtwo sum = " << testarrtwo.sum() << '\n';
     
-    testarrtwo += testarr;
+    testarr += testarrtwo;
     std::cout << "combined sum = " << testarr.sum() << '\n' << '\n';
     SIMPLEPRINTVA(testarr);
     SIMPLEPRINTVA(testarrtwo);
     std::cout << '\n' << '\n';
+    
+    return;
 }
+
+
+/* #undef SIMPLEPRINTVA
+#undef PRINTVALARRAY
+#undef PRINTVALARRAYOP */
 
 
 #endif
