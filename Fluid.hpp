@@ -26,13 +26,15 @@ const sf::Time sleepDelay {sf::microseconds((1000000*delaycompN)/(framerateCap*d
 extern float timestepRatio;  // normalizing timesteps to make physics independent of frame-rate
 //TODO: refactor all the framerate-related stuff out of this file
 
+// counts the number of times two particles shared EXACTLY the same position (in CalcLocalForce)
+extern int exactOverlapCounter;
 
 class Fluid
 {
-    float gravity {0.425};
+    float gravity {0.325};
     float bounceDampening {0.25};
     float viscosity {0.005};
-    float fdensity {0.0075};  // controls 'force' of diffusion
+    float fdensity {0.0125};  // controls 'force' of diffusion
     float vcap {7.5};
     
     class Particle : public sf::CircleShape
@@ -52,8 +54,14 @@ class Fluid
             const sf::Color defaultcolor (0x0888FFFF);
             setFillColor(defaultcolor);
         }
+        
+        float Distance(const Particle& rh) const; // unused
+        static float Distance(const Particle& lh, const Particle& rh); // unused
     };
-    
+    // calculates diffusion-force between particles within the same cell
+    sf::Vector2f CalcLocalForce(const Particle& lh, const Particle& rh) const;
+    // unfortunately, it can't be static because it uses 'fdensity'
+
     sf::RenderTexture particle_texture;
     std::vector<Particle> particles;
     

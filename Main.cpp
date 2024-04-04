@@ -265,6 +265,7 @@ int main(int argc, char** argv)
         #endif
         
     }
+    std::cout << "Exact overlaps: " << exactOverlapCounter << '\n';
     
     return 0;
 }

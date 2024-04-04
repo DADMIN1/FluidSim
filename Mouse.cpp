@@ -23,7 +23,7 @@ void Mouse_T::DrawOutlines() const
 }
 
 // TODO: refactor this elsewhere
-bool shouldDrawGrid {true};
+bool shouldDrawGrid {false};
 bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGrid; }
 
 

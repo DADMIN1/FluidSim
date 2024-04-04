@@ -2,7 +2,8 @@
 #include "Gradient.hpp"
 
 //#include <vector>
-#include <numeric>
+//#include <numeric>
+#include <cmath>
 #include <cassert>
 
 #include <SFML/Graphics/CircleShape.hpp>
@@ -59,6 +60,42 @@ bool Fluid::Initialize()
     return true;
 }
 
+
+float Fluid::Particle::Distance(const Particle& rh) const
+{
+    auto [diffx, diffy] = this->getPosition() - rh.getPosition();
+    return std::sqrt((diffx*diffx) + (diffy*diffy)); // pythagorean theorem
+}
+
+float Fluid::Particle::Distance(const Particle& lh, const Particle& rh)
+{
+    auto [diffx, diffy] = lh.getPosition() - rh.getPosition();
+    return std::sqrt((diffx*diffx) + (diffy*diffy));
+}
+
+// the distance between two opposite corners of a cell (pythagorean theorem)
+static constexpr float intracellDistMax{std::sqrt(SPATIAL_RESOLUTION*SPATIAL_RESOLUTION*2)};
+
+int exactOverlapCounter{0};
+
+// calculates diffusion-force between particles within the same cell
+sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Particle& rh) const
+{
+    const auto [diffx, diffy] = lh.getPosition() - rh.getPosition();
+    const float totalDistance = std::sqrt((diffx*diffx) + (diffy*diffy));
+    if (totalDistance == 0) { ++exactOverlapCounter; return {0,0}; }  // TODO: should return random direction, ideally
+    
+    // mapping to output range of: 0 to PI/4 (cosine hits zero at PI/4)
+    const float normalized = (totalDistance/intracellDistMax) * (M_PI/4);
+    const float cosine_cubed = std::cos(normalized)*std::cos(normalized)*std::cos(normalized);
+    const float magnitude = cosine_cubed * fdensity * timestepRatio;
+    
+    // TODO: division by zero here if diffx AND diffy both equal zero
+    const float denominator = (std::abs(diffx) + std::abs(diffy));
+    const sf::Vector2f directionalRatio {diffx/denominator, diffy/denominator};
+    
+    return directionalRatio*magnitude;
+}
 
 void Fluid::UpdatePositions()
 {

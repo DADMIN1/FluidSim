@@ -85,8 +85,9 @@ void Simulation::HandleTransitions(const TransitionList& transitions)
         // updating particleMap
         NegativeMerge(particleMap[cellID], deltas.negative.particleIDs);
         particleMap[cellID].merge(deltas.positive.particleIDs);
+        
         if (particleMap[cellID].empty()) {
-            diffusionField.cells[cellID].momentum = {0.0, 0.0};
+            //diffusionField.cells[cellID].momentum = {0.0, 0.0}; //TODO: should be enabled, probably
             particleMap.erase(cellID);
         }
     }
@@ -108,11 +109,40 @@ void Simulation::UpdateParticles()
         const sf::Vector2f momentumPerParticle = momentumDistributed / float(particleset.size());
         cell.momentum -= momentumDistributed;
         
+        std::vector<sf::Vector2f> localForces;
+        localForces.resize(particleset.size(), {0,0});
+        
+        // calculating localForce between all particles in the cell
+        // nested loops avoid recalculating the force between every particle twice (by storing the negative)
+        std::vector<sf::Vector2f>::iterator iterVecTop{localForces.begin()};
+        for (auto iterTop{particleset.begin()}; iterTop != particleset.end(); ++iterTop)
+        {
+            Fluid::Particle& particleTop = fluid.particles.at(*iterTop);
+            std::vector<sf::Vector2f>::iterator iterVecBottom{iterVecTop};
+            ++iterVecBottom;
+            
+            // notice the iteration in the loop condition (it can't be initialized with 'iterTop+1')
+            for (auto iterBottom{iterTop}; ++iterBottom != particleset.end();) {
+                const Fluid::Particle& particleBottom = fluid.particles.at(*iterBottom);
+                const sf::Vector2f localforce = fluid.CalcLocalForce(particleTop, particleBottom);
+                
+                // cell.momentum += localforce;
+                *iterVecTop += localforce;
+                *iterVecBottom -= localforce; // the other particle experiences forces in the opposite direction
+                
+                ++iterVecBottom;
+            }
+            
+            particleTop.velocity += *iterVecTop;
+            particleTop.velocity += cell.diffusionVec + momentumPerParticle; //distributing momentum
+            ++iterVecTop;
+        }
+        
         // distributing momentum and applying diffusionVec
-        for (unsigned int particleID: particleset) {
+        /* for (unsigned int particleID: particleset) {
             Fluid::Particle& particle = fluid.particles.at(particleID);
             particle.velocity += cell.diffusionVec + momentumPerParticle;
-        }
+        } */
     }
     
     return;
