@@ -14,7 +14,7 @@
 
 
 // TODO: imgui
-
+// TODO: overlay displaying stats for hovered cell/particles
 
 extern void EmbedMacroTest();  // MacroTest.cpp
 extern void PrintKeybinds();   // Keybinds.cpp
@@ -55,8 +55,8 @@ int main(int argc, char** argv)
     } */
     
     std::cout << "max indecies: " 
-        << DiffusionField::maxIX << ", " 
-        << DiffusionField::maxIY << '\n';
+        << Cell::maxIX << ", " 
+        << Cell::maxIY << '\n';
     
     
     //EmbedMacroTest();

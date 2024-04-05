@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <tuple>
+#include <cassert>
 
 
 std::size_t NegativeMerge(std::unordered_set<unsigned int>& source, const std::unordered_set<unsigned int>& toRemove)
@@ -27,8 +28,8 @@ bool Simulation::Initialize()
         const auto& [x, y] = particle.getPosition();
         const unsigned int xi = x / SPATIAL_RESOLUTION;
         const unsigned int yi = y / SPATIAL_RESOLUTION;
-        assert((xi <= DiffusionField::maxIX) && (yi <= DiffusionField::maxIY) && "out-of-bounds index");
-        DiffusionField::Cell* cell = diffusionField.cellmatrix.at(xi).at(yi);
+        assert((xi <= Cell::maxIX) && (yi <= Cell::maxIY) && "out-of-bounds index");
+        Cell* cell = diffusionField.cellmatrix.at(xi).at(yi);
         
         particleMap[cell->UUID].emplace(particle.UUID);
         particle.cellID = cell->UUID;
@@ -48,7 +49,7 @@ TransitionList Simulation::FindCellTransitions() const
             const auto& [x, y] = particle.getPosition();
             const unsigned int xi = x / SPATIAL_RESOLUTION;
             const unsigned int yi = y / SPATIAL_RESOLUTION;
-            assert((xi <= DiffusionField::maxIX) && (yi <= DiffusionField::maxIY) && "out-of-bounds index");
+            assert((xi <= Cell::maxIX) && (yi <= Cell::maxIY) && "out-of-bounds index");
             transitions.emplace_back(particle.UUID, particle.cellID, diffusionField.cellmatrix.at(xi).at(yi)->UUID);
         }
     }
@@ -107,7 +108,7 @@ void Simulation::HandleTransitions(const TransitionList& transitions)
 IDset_T Simulation::BuildAdjacentSet(const std::size_t cellID, const IDset_T& excluded)
 {
     std::unordered_set<unsigned int> localParticles{};
-    const CellPtrArray adjacentCells = diffusionField.GetCellNeighbors(cellID);
+    const std::vector<Cell*> adjacentCells = diffusionField.GetCellNeighbors(cellID);
     
     for (const auto* const cellptr: adjacentCells)
     {
@@ -212,7 +213,7 @@ void Simulation::UpdateParticles()
     { // VERY IMPORTANT: particleset should NOT be a reference if you merge with it
         assert((particleset.size() > 0) && "empty particleset!");
         
-        DiffusionField::Cell& cell = diffusionField.cells.at(cellID);
+        Cell& cell = diffusionField.cells.at(cellID);
         cell.diffusionVec = diffusionField.CalcDiffusionVec(cellID) * timestepRatio * fluid.fdensity;
         // TODO: repurpose diffusionVec to redistribute/smooth momentum between cells
         

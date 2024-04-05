@@ -3,11 +3,12 @@
 #include <vector>
 #include <iostream>
 //#include <numeric>
+#include <cassert>
 
 
 void DiffusionField::PrintAllCells() const
 {
-    std::cout << "maxIX, maxIY = " << maxIX << ", " << maxIY << '\n';
+    std::cout << "maxIX, maxIY = " << Cell::maxIX << ", " << Cell::maxIY << '\n';
     for (const Cell& cell: cells) {
         std::cout << "UUID: " << cell.UUID << " ";
         std::cout << "ix: " << cell.IX << " ";
@@ -17,121 +18,9 @@ void DiffusionField::PrintAllCells() const
     }
 }
 
-// returns the relative coords of neighbors at radial_distance
-int CalcBaseNCount(int radial_distance) {
-    if (radial_distance == 0) { return 0; }
-    std::vector<std::pair<int, int>> coords{};
-    int count {0};
-    for (int x{radial_distance}, y{radial_distance-x}; x>=0; --x, ++y) {
-        //int y = radial_distance-x;
-        coords.push_back({x, y});
-        count += 1;
-        if (y > 0)
-        {
-            coords.push_back({x, -y});
-            count += 1;
-        }
-        if (x > 0) {
-            coords.push_back({-x, y});
-            count += 1;
-            if (y > 0)
-            {
-                coords.push_back({-x, -y});
-                count += 1;
-            }
-        }
-    }
-    
-    for (auto& [x, y]: coords) {
-        std::cout << "(" << x << ", " << y << "), ";
-    }
-    return count;
-}
-
-
-// TODO: write constexpr (template) version of this
-const CoordlistRel GetNeighbors(const int radial_distance) // relative verison
-{
-    switch (radial_distance) {
-        case 0: return CoordlistRel {};
-        case 1: return CoordlistRel { {1, 0}, {-1, 0}, {0, 1}, {0, -1}, };
-        case 2: return CoordlistRel {
-            {2, 0}, {-2, 0}, { 0, 2}, { 0, -2}, 
-            {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-        };
-        case 3: return CoordlistRel {
-            {3, 0}, {-3, 0}, { 0, 3}, { 0, -3}, 
-            {2, 1}, {2, -1}, {-2, 1}, {-2, -1}, 
-            {1, 2}, {1, -2}, {-1, 2}, {-1, -2},
-        };
-        case 4: return CoordlistRel {
-            {4, 0}, {-4, 0}, { 0, 4}, { 0, -4},
-            {3, 1}, {3, -1}, {-3, 1}, {-3, -1}, 
-            {2, 2}, {2, -2}, {-2, 2}, {-2, -2}, 
-            {1, 3}, {1, -3}, {-1, 3}, {-1, -3},
-        };
-        case 5: return CoordlistRel {
-            {5, 0}, {-5, 0}, { 0, 5}, { 0, -5},
-            {4, 1}, {4, -1}, {-4, 1}, {-4, -1}, 
-            {3, 2}, {3, -2}, {-3, 2}, {-3, -2}, 
-            {2, 3}, {2, -3}, {-2, 3}, {-2, -3}, 
-            {1, 4}, {1, -4}, {-1, 4}, {-1, -4},
-        };
-        default: 
-            assert(false && "Neighbor-coords not defined for radial distance: " && radial_distance);
-            return CoordlistRel {};
-    }
-};
-
-// X/Y parameters are indecies into DensityGrid
-// absolute version; can be used as indecies into DensityGrid
-CoordlistAbs GetNeighbors(const int radial_distance, const int IX, const int IY)
-{
-    CoordlistAbs absoluteCoords{};
-    for (const auto& [dx, dy] : GetNeighbors(radial_distance)) {
-        const int resultX = IX+dx;
-        const int resultY = IY+dy;
-        // TODO: return something to handle the edges (out-of-bounds)
-        if((resultX < 0) || (resultY < 0)) continue;
-        else if((resultX > int(DiffusionField::maxIX)) || (resultY > int(DiffusionField::maxIY))) continue;
-        else {
-            absoluteCoords.push_back({resultX, resultY});
-        }
-    }
-    return absoluteCoords;
-}
-
-
-// TODO: write constexpr (template) version of this
-std::vector<CoordlistRel> GetNeighborsAll(const int radial_distance) // relative verison
-{
-    std::vector<CoordlistRel> coords{};
-    coords.reserve(radial_distance-1);
-    for (int d{1}; d < radial_distance; ++d) {
-        // TODO: use a flat array (probably)
-        /* const auto N = GetNeighborCoordsRel(d);
-        coords.insert(coords.end(), N.begin(), N.end()); */
-        coords.push_back(GetNeighbors(d));
-    }
-    return coords;
-};
-
-
-// X/Y parameters are indecies into DensityGrid
-// absolute version; can be used as indecies into DensityGrid
-std::vector<CoordlistAbs> GetNeighborsAll(const int radial_distance, const int IX, const int IY)
-{
-    std::vector<CoordlistAbs> absoluteCoords{};
-    absoluteCoords.reserve(radial_distance-1);
-    for (int d{1}; d <= radial_distance; ++d) {
-        // absolute overload of GetNeighbors already does a bounds-check on results
-        absoluteCoords.push_back(GetNeighbors(d, IX, IY));
-    }
-    return absoluteCoords;
-};
 
 // result is for only a single distance
-CellPtrArray DiffusionField::GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist) const
+std::vector<Cell*> DiffusionField::GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist) const
 {
     assert((radialdist <= radialdist_limit) && "radialdist too large");
     const Cell& cell = cells.at(UUID);
@@ -144,7 +33,7 @@ CellPtrArray DiffusionField::GetCellNeighbors(const std::size_t UUID, const unsi
 }
 
 // result is for every distance up to (and including) current DIFFUSION_RADIUS
-CellPtrArray DiffusionField::GetCellNeighbors(const std::size_t UUID) const
+std::vector<Cell*> DiffusionField::GetCellNeighbors(const std::size_t UUID) const
 {
     const Cell& cell = cells.at(UUID);
     std::vector<Cell*> reflist;
@@ -171,7 +60,7 @@ std::vector<DoubleCoord> DiffusionField::GetAdjacentPlus(const std::size_t UUID)
             const int resultX = IX+dx;
             const int resultY = IY+dy;
             if ((resultX < 0) || (resultY < 0)) continue;
-            else if ((resultX > int(DiffusionField::maxIX)) || (resultY > int(DiffusionField::maxIY))) continue;
+            else if ((resultX > int(Cell::maxIX)) || (resultY > int(Cell::maxIY))) continue;
             else {
                 coords.push_back({{resultX, resultY}, {dx, dy}});
             }

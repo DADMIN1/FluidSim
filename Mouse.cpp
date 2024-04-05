@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <unordered_map>
+#include <cassert>
 
 #include <SFML/Graphics/RectangleShape.hpp>
 // TODO: refactor this out of Mouse.cpp/hpp completely; it can go in main.
@@ -29,7 +30,6 @@ bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGr
 
 struct CellState_T
 {
-    using Cell = DiffusionField::Cell;
     Cell* const cellptr;
     const Cell originalState;  // needed to restore the cell after moving or releasing-button
     // saving the whole cell is overkill; only the modified/necessary components should be copied
@@ -98,7 +98,7 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
             for (int dist{1}; dist <= radialDist; ++dist)
             {
                 const float adjStrength = {((mode==Push)? strength : -strength)*DIFFUSIONSCALING[dist]};
-                const CellPtrArray adjacent {fieldptr->GetCellNeighbors(cellptr->UUID, dist)};
+                const std::vector<Cell*> adjacent {fieldptr->GetCellNeighbors(cellptr->UUID, dist)};
                 for (Cell* const cellptr: adjacent)
                 {
                     if (savedState.contains(cellptr->UUID)) {
@@ -254,12 +254,12 @@ bool Mouse_T::UpdateHovered()
     // finding indecies for new hoveredCell  // TODO: do this better
     unsigned int xi = x/SPATIAL_RESOLUTION;
     unsigned int yi = y/SPATIAL_RESOLUTION;
-    if ((xi > DiffusionField::maxIX) || (yi > DiffusionField::maxIY)) {
+    if ((xi > Cell::maxIX) || (yi > Cell::maxIY)) {
         std::cerr << "bad indecies calculated: ";
         std::cerr << xi << ", " << yi << '\n';
         return false;
     }
-    assert((xi <= DiffusionField::maxIX) && (yi <= DiffusionField::maxIY) && "index of hovered-cell out of range");
+    assert((xi <= Cell::maxIX) && (yi <= Cell::maxIY) && "index of hovered-cell out of range");
     
     hoveredCell = fieldptr->cellmatrix.at(xi).at(yi);
     if (savedState.contains(hoveredCell->UUID))

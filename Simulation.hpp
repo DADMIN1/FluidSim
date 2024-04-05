@@ -7,22 +7,23 @@
 #include <unordered_set>
 #include <map>
 
+
 // holds info about a particle that has crossed into a new cell
 struct Transition_T { const unsigned int particleID, oldCellID, newcellID; };
 using TransitionList = std::vector<Transition_T>;
 
 using UUID_Map_T = std::map<unsigned int, std::unordered_set<unsigned int>>;
+using IDset_T = std::unordered_set<unsigned int>;
 
 struct CellDelta_T 
 {
-    std::unordered_set<unsigned int> particleIDs{};
+    IDset_T particleIDs{};
     float density {0.0};
     //sf::Vector2f momentum{0.0, 0.0};
 };
 struct CellDelta_Dual_T { CellDelta_T positive, negative; };
 using DeltaMap_T = std::map<unsigned int, CellDelta_Dual_T>; // maps cellID -> celldeltas
 
-using IDset_T = std::unordered_set<unsigned int>;
 
 
 class Simulation

@@ -30,7 +30,6 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     float strength {96.0};  // for push/pull modes
     int radialDist {defaultRD};  // orthogonal distance of adjacent cells included in effect
     
-    using Cell = DiffusionField::Cell;
     const DiffusionField* const fieldptr; // &fluid.DiffusionField
     Cell* hoveredCell {nullptr};
     
