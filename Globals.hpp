@@ -7,7 +7,7 @@ constexpr int BOXWIDTH {1000}, BOXHEIGHT {1000}; // internal resolution (default
 //constexpr float DEFAULTRADIUS {float(BOXWIDTH/NUMCOLUMNS) / 2.0f};
 constexpr float DEFAULTRADIUS {8.0f}; // of particles (sf::CircleShape)
 constexpr int DEFAULTPOINTCOUNT {20}; // number of points used to draw each circle (particles)
-constexpr unsigned int SPATIAL_RESOLUTION {30};  // units/pixels per grid-cell for calculating diffusion/collision
+constexpr unsigned int SPATIAL_RESOLUTION {20};  // units/pixels per grid-cell for calculating diffusion/collision
 
 static_assert((DEFAULTRADIUS > 0.0), "Radius must be greater than 0");
 static_assert((DEFAULTPOINTCOUNT > 1), "Pointcount must be greater than ");
@@ -26,13 +26,9 @@ constexpr float INITIALOFFSETY {(INITIALSPACINGY/2.0f) - DEFAULTRADIUS};
 
 // diffusion stuff
 constexpr int radialdist_limit{5}; // highest radial_distance implemented by GetNeighbors
-constexpr int DIFFUSION_RADIUS{5}; // range in orthogonal-distance (grid-cells) used for diffusion/density calculations
-                                            // (radius of 0 means only current cell is considered)
+constexpr int DIFFUSION_RADIUS{2}; // range in orthogonal-distance (grid-cells) used for diffusion/density calculations
+                                   // (radius of 0 means only current cell is considered)
 static_assert((DIFFUSION_RADIUS <= radialdist_limit), "Diffusion-radius is too big");
-
-constexpr float DIFFUSION_SCALING{1.0 / float(DIFFUSION_RADIUS + 1)}; // diffusion-strength needs to decrease with distance, and must be scaled with radius
-// TODO: scaling function that always totals to 1.0 regardless of radius (use trig functions)
-
 
 
 

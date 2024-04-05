@@ -82,9 +82,10 @@ int main(int argc, char** argv)
     
     PrintKeybinds();
     
-#if DYNAMICFRAMEDELAY
+    #if DYNAMICFRAMEDELAY
     sf::Clock frametimer{};
     #endif
+    
     // frameloop
     while (mainwindow.isOpen())
     {
@@ -265,7 +266,8 @@ int main(int argc, char** argv)
         #endif
         
     }
-    std::cout << "Exact overlaps: " << exactOverlapCounter << '\n';
+    
+    PrintSpeedcapInfo();
     
     return 0;
 }

@@ -27,7 +27,7 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     } mode {Disabled};
     
     sf::RenderWindow& window;
-    float strength {127.0};  // for push/pull modes
+    float strength {96.0};  // for push/pull modes
     int radialDist {defaultRD};  // orthogonal distance of adjacent cells included in effect
     
     using Cell = DiffusionField::Cell;

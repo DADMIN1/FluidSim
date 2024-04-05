@@ -22,6 +22,8 @@ struct CellDelta_T
 struct CellDelta_Dual_T { CellDelta_T positive, negative; };
 using DeltaMap_T = std::map<unsigned int, CellDelta_Dual_T>; // maps cellID -> celldeltas
 
+using IDset_T = std::unordered_set<unsigned int>;
+
 
 class Simulation
 {
@@ -33,6 +35,7 @@ class Simulation
     bool useTransparency {false};  // slow-moving particles are more transparent
     bool isPaused{false};
     
+    // TODO: scale these based on density
     float momentumTransfer{0.20}; // percentage of velocity transferred to cell (and lost) by particle
     float momentumDistribution{0.75}; // percentage of cell's total momentum distributed to local particles per timestep
     
@@ -41,10 +44,14 @@ class Simulation
     TransitionList FindCellTransitions() const;
     void HandleTransitions(const TransitionList& transitions);
     void UpdateParticles();
+    void LocalDiffusion(const IDset_T& particleset); // diffusion within a single cell
+    void NonLocalDiffusion(const IDset_T& originset, const IDset_T& adjacentset); // diffusion across cells
+    IDset_T BuildAdjacentSet(const std::size_t cellID, const IDset_T& excluded);
     
     public:
     bool Initialize();
     void Update();
+    void Step(); // TODO: implement this
     
     // mouse needs to access this pointer to lookup cell (given an X/Y coord)
     DiffusionField* GetDiffusionFieldPtr() { return &diffusionField; }  //TODO: get rid of this

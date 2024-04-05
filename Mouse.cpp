@@ -97,8 +97,8 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
             }
             for (int dist{1}; dist <= radialDist; ++dist)
             {
-                const float adjStrength = {((mode==Push)? strength : -strength)/(1.75f*dist)};
-                const CellRef_T adjacent {fieldptr->GetCellNeighbors(cellptr->UUID, dist)};
+                const float adjStrength = {((mode==Push)? strength : -strength)*DIFFUSIONSCALING[dist]};
+                const CellPtrArray adjacent {fieldptr->GetCellNeighbors(cellptr->UUID, dist)};
                 for (Cell* const cellptr: adjacent)
                 {
                     if (savedState.contains(cellptr->UUID)) {

@@ -5,10 +5,57 @@
 //#include <numeric>
 #include <cmath>
 #include <cassert>
+#include <array>    // required only for speedcap_counter/Stats
+#include <iostream> // required only for speedcap_counter/Stats
 
 #include <SFML/Graphics/CircleShape.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/System/Time.hpp>
+
+
+// counts how many times the speedcaps were broken
+static std::array<std::size_t, 4> speedcap_counter{0,0,0,0};
+// counts the number of times two particles shared EXACTLY the same position (in CalcLocalForce)
+static int exactOverlapCounter{0};
+
+void PrintSpeedcapInfo()
+{
+    std::cout << '\n';
+    std::cout << "speedcap_x: \t"
+        << "soft: " << speedcap_counter[0] << " | "
+        << "hard: " << speedcap_counter[2] << '\n';
+    std::cout << "speedcap_y: \t"
+        << "soft: " << speedcap_counter[1] << " | "
+        << "hard: " << speedcap_counter[3] << '\n';
+    std::cout << '\n';
+    
+    std::cout << "Exact overlaps: " << exactOverlapCounter << '\n';
+    return;
+}
+
+
+void Fluid::ApplySpeedcap(sf::Vector2f& velocity)
+{
+    // TODO: figure out something better for the softcap
+    if      (std::abs(velocity.x) > speedcap_hard) [[unlikely]] { velocity.x  = 0.0f; ++speedcap_counter[2]; }
+    else if (std::abs(velocity.x) > speedcap_soft) [[unlikely]] { velocity.x *= 0.5f; ++speedcap_counter[0]; }
+    if      (std::abs(velocity.y) > speedcap_hard) [[unlikely]] { velocity.y  = 0.0f; ++speedcap_counter[3]; }
+    else if (std::abs(velocity.y) > speedcap_soft) [[unlikely]] { velocity.y *= 0.5f; ++speedcap_counter[1]; }
+    // do NOT return in the if-statements (or you might be left with the other axis still invalid)
+    return;
+    
+    // TODO: figure out why the hardcap implemented below doesn't work (sometimes)
+    /* const auto startVel = velocity;
+    const sf::Vector2f softcap_delta = (velocity-sf::Vector2f{speedcap_soft,speedcap_soft})/2.0f;
+    const sf::Vector2f hardcap_delta = (velocity-sf::Vector2f{speedcap_hard,speedcap_hard});
+    
+    if      (std::abs(velocity.x) > speedcap_hard) { velocity.x -= hardcap_delta.x; assert((std::abs(velocity.x) < speedcap_hard       ) && "bad caps"); }
+    else if (std::abs(velocity.x) > speedcap_soft) { velocity.x -= softcap_delta.x; assert((std::abs(velocity.x) < std::abs(startVel.x)) && "bad caps"); }
+    if      (std::abs(velocity.y) > speedcap_hard) { velocity.y -= hardcap_delta.y; assert((std::abs(velocity.y) < speedcap_hard       ) && "bad caps"); }
+    else if (std::abs(velocity.y) > speedcap_soft) { velocity.y -= softcap_delta.y; assert((std::abs(velocity.y) < std::abs(startVel.y)) && "bad caps"); }
+    
+    return; */
+}
 
 
 void Fluid::Particle::UpdateColor(const bool useTransparency)
@@ -73,20 +120,20 @@ float Fluid::Particle::Distance(const Particle& lh, const Particle& rh)
     return std::sqrt((diffx*diffx) + (diffy*diffy));
 }
 
-// the distance between two opposite corners of a cell (pythagorean theorem)
-static constexpr float intracellDistMax{std::sqrt(SPATIAL_RESOLUTION*SPATIAL_RESOLUTION*2)};
-
-int exactOverlapCounter{0};
 
 // calculates diffusion-force between particles within the same cell
 sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Particle& rh) const
 {
+    // the distance between two opposite corners of a cell (pythagorean theorem)
+    constexpr float intracellDistMax{std::sqrt(SPATIAL_RESOLUTION*SPATIAL_RESOLUTION*2)};
+    constexpr float maxdist = intracellDistMax*(radialdist_limit+1);
+    
     const auto [diffx, diffy] = lh.getPosition() - rh.getPosition();
     const float totalDistance = std::sqrt((diffx*diffx) + (diffy*diffy));
-    if (totalDistance == 0) { ++exactOverlapCounter; return {0,0}; }  // TODO: should return random direction, ideally
+    if (totalDistance == 0) [[unlikely]] { ++exactOverlapCounter; return {0,0}; }  // TODO: should return random direction, ideally
     
     // mapping to output range of: 0 to PI/4 (cosine hits zero at PI/4)
-    const float normalized = (totalDistance/intracellDistMax) * (M_PI/4);
+    const float normalized = (totalDistance/maxdist) * (M_PI/4);
     const float cosine_cubed = std::cos(normalized)*std::cos(normalized)*std::cos(normalized);
     const float magnitude = cosine_cubed * fdensity * timestepRatio;
     
@@ -97,62 +144,46 @@ sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Parti
     return directionalRatio*magnitude;
 }
 
+
 void Fluid::UpdatePositions()
 {
     for (Particle& particle: particles) 
     {
-        /* particle.velocity -= { 
-            (particle.velocity.x>0.0? 1.0f : -1.0f) * viscosity, 
-            (particle.velocity.y>0.0? 1.0f : -1.0f) * viscosity,
-        }; */
-        
-        if (particle.velocity.x > vcap) {
-            particle.velocity.x -= viscosity*timestepRatio;
-        }
-        else if (particle.velocity.x < -vcap) {
-            particle.velocity.x += viscosity*timestepRatio;
-        }
-        if (particle.velocity.y > vcap) {
-            particle.velocity.y -= viscosity*timestepRatio;
-        }
-        else if (particle.velocity.y < -vcap) {
-            particle.velocity.y += viscosity*timestepRatio;
-        }
+        ApplyViscosity(particle.velocity);
+        ApplySpeedcap(particle.velocity);
         
         sf::Vector2f nextPosition = particle.getPosition();
         nextPosition.x += particle.velocity.x * timestepRatio;
         nextPosition.y += particle.velocity.y * timestepRatio;
         
+        // TODO: refactor bounding-box checks into a seperate function
         //  keeping all particles within bounding box
         // we must not allow position == limit in this function;
         // otherwise, when we look up the related cell, it'll index past the end of the cellmatrix
-        if (nextPosition.y >= BOXHEIGHT) {
+        if (nextPosition.y > BOXHEIGHT) {
             nextPosition.y = BOXHEIGHT-DEFAULTRADIUS;
             particle.velocity.y *= (-1.0 + bounceDampening);
-            particle.velocity.y -= 0.001f;  // forcing particles with 0 velocity away from the edge
-            assert(particle.velocity.y <= 0 && "y-velocity should be negative");
         }
-        else if (nextPosition.y <= 0) {
+        else if (nextPosition.y < 0) {
             nextPosition.y = -1*nextPosition.y;
             particle.velocity.y *= (-1.0 + bounceDampening);
-            particle.velocity.y += 0.001f;  // forcing particles with 0 velocity away from the edge
-            assert(particle.velocity.y >= 0 && "y-velocity should be positive");
         }
         
-        if (nextPosition.x >= BOXWIDTH) {
+        if (nextPosition.x > BOXWIDTH) {
             nextPosition.x = BOXWIDTH-DEFAULTRADIUS;
             particle.velocity.x *= (-1.0 + bounceDampening);
-            particle.velocity.x -= 0.001f;   // forcing particles with 0 velocity away from the edge
-            assert(particle.velocity.x <= 0 && "x-velocity should be negative");
         }
-        else if (nextPosition.x <= 0) {
+        else if (nextPosition.x < 0) {
             nextPosition.x = -1*nextPosition.x;
             particle.velocity.x *= (-1.0 + bounceDampening);
-            particle.velocity.x += 0.001f;   // forcing particles with 0 velocity away from the edge
-            assert(particle.velocity.x >= 0 && "x-velocity should be positive");
         }
+        
+        assert((nextPosition.x >= 0) && (nextPosition.y >= 0) && "negative nextPosition!");
+        assert((nextPosition.x <= BOXWIDTH) && (nextPosition.y <= BOXHEIGHT) && "OOB nextPosition!");
         
         particle.setPosition(nextPosition);
     }
+    
+    return;
 }
 

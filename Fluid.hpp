@@ -26,16 +26,18 @@ const sf::Time sleepDelay {sf::microseconds((1000000*delaycompN)/(framerateCap*d
 extern float timestepRatio;  // normalizing timesteps to make physics independent of frame-rate
 //TODO: refactor all the framerate-related stuff out of this file
 
-// counts the number of times two particles shared EXACTLY the same position (in CalcLocalForce)
-extern int exactOverlapCounter;
+
+void PrintSpeedcapInfo();
+
 
 class Fluid
 {
-    float gravity {0.325};
+    float gravity {0.275};
     float bounceDampening {0.25};
-    float viscosity {0.005};
+    float viscosity {0.00175};
     float fdensity {0.0125};  // controls 'force' of diffusion
-    float vcap {7.5};
+    float speedcap_soft {50.0};
+    float speedcap_hard {100.0};
     
     class Particle : public sf::CircleShape
     {
@@ -64,19 +66,33 @@ class Fluid
 
     sf::RenderTexture particle_texture;
     std::vector<Particle> particles;
-    
+
+    void ApplyViscosity(sf::Vector2f& velocity) {
+        velocity *= (1.0f - (viscosity * timestepRatio));
+    }
+
     public:
     friend class Simulation;
     
     bool Initialize();
     void UpdatePositions();
+    void ApplySpeedcap(sf::Vector2f& velocity); // modifies passed ref
     
     void ApplyGravity() {
         for (Particle& particle : particles) {
             particle.velocity.y += gravity*timestepRatio;
         }
     }
-
+    
+    // can't be static because it references viscosity
+    // currently unused
+    sf::Vector2f CalcViscosity(sf::Vector2f velocity)
+    {
+        return velocity * (1.0f-(viscosity*timestepRatio));
+        //sf::Vector2f delta = velocity*viscosity*timestepRatio;
+        //return velocity-delta;
+    }
+    
     void Freeze() // sets all velocities to 0
     {
         for (Particle& particle: particles) {

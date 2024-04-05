@@ -10,46 +10,73 @@
 #include "Globals.hpp"
 
 
-constexpr static std::array<std::array<float, BOXHEIGHT/SPATIAL_RESOLUTION>, BOXWIDTH/SPATIAL_RESOLUTION> DensityGrid{};  // holds 'densities' for each cell
-// TODO: move global definitions to another file
-// TODO: replace DensityGrid with DiffusionField
-
-consteval float DiffusionStrength(const unsigned int radial_distance) // radial-distance is number of cells away from particle
-{
-    // can't use static_assert (until std23?) because radial_distance doesn't count as constexpr, apparently.
-    assert((radial_distance <= DIFFUSION_RADIUS) && "DiffusionStrength called for cell beyond radius of effect");
-    // TODO: generate static lookup-arrays for diffusion strength based on radius and resolution
-    // TODO: scaling function that always totals to 1.0 regardless of radius (use trig functions)
-    return 1.0 - DIFFUSION_SCALING*(radial_distance);
-}
-
-// TODO: implement as a template function (wouldn't that result in a million instantiations?)
-//const float* CellLookup(const float positionX, const float positionY);  // pointer into DensityGrid at the correct cell for a given (particle) position
-inline const float* CellLookup(const float positionX, const float positionY)
-{ return &DensityGrid[int(positionX/SPATIAL_RESOLUTION)][int(positionY/SPATIAL_RESOLUTION)]; }
-// Doesn't this fail at the max height/width? Need to modify Fluid.Update
-
-/* consteval int CalcBaseNCount(int radial_distance) {
-    return radial_distance;
-} */
 // std::size_t so they can be used for array sizing
-constexpr static std::size_t NeighborCountsAtDist[] = {0, 4, 8, 16, 20};  // number of neighbors at a given radial distance
-constexpr static int BaseNeighborCounts[] = {0, 4, 12, 28, 48};  // number of neighbors (cumulative) for a given radial distance
-int CalcBaseNCount(int radial_distance);  // returns the relative coords of neighbors at radial_distance
+constexpr std::size_t NeighborCountsAtDist[] = {0, 4, 8, 12, 16, 20};  // number of neighbors at a given radial distance
+
+template <int RD>  // radial_distance
+constexpr int BaseNeighborCount() { return NeighborCountsAtDist[RD] + BaseNeighborCount<RD-1> (); }
+// returns number of neighbor-cells; important for sizing arrays (in GetNeighborCells)
+// normally the result is independent of position, but if either coordinate is within radial-distance of the edge, we need to prevent out-of-bounds lookups
+
+template<> constexpr int BaseNeighborCount<0>() { return 0; }
+
+static_assert(BaseNeighborCount<1>() == 4);
+static_assert(BaseNeighborCount<2>() == 12);
+static_assert(BaseNeighborCount<3>() == 24);
+
+constexpr int BaseNeighborCounts[] = {0, 4, 12, 24, 40, 60};  // number of neighbors (cumulative) for a given radial distance
 
 // X/Y indexes are parameters because we need to specialize for cells within DIFFUSION_RADIUS of the edge
-template <int RD, int X, int Y>  // radial_distance, X/Y index into DensityGrid
-constexpr int GetNeighborCount() { return BaseNeighborCounts[RD]; }  // returns number of neighbor-cells; important for sizing arrays (in GetNeighborCells)
-// normally the result is independent of position, but if either coordinate is within radial-distance of the edge, we need to prevent out-of-bounds lookups
+/* template<int RD, int X, int Y> // radial_distance, X/Y index into CellMatrix
+constexpr int ComplexNeighborCount() { return BaseNeighborCount<RD>(); } */
+
+int CalcBaseNCount(int radial_distance);  // returns the relative coords of neighbors at radial_distance
+
 
 template <int RD, int X, int Y>  // radial_distance, X/Y index into DensityGrid
 class NeighborCells {
-    static constexpr int Ncount = GetNeighborCount<RD, X, Y>();
+    static constexpr int Ncount = BaseNeighborCount<RD, X, Y>();
     constexpr std::array<float*, Ncount> GetNeighborCells();
 };
 
+// DIFFUSIONSCALING //
 
-using Coordlist = std::vector<std::pair<int, int>>;
+// TODO: scaling function that always totals to 1.0 regardless of radius (use trig functions)
+constexpr float GetNextFloat(const float x, const int orthodist)
+{
+    //float ratio = float(orthodist) / float(1.0 + DIFFUSION_RADIUS - orthodist);
+    return x - (1.0 / float(NeighborCountsAtDist[orthodist]));
+    //return x * (float(DIFFUSION_RADIUS - orthodist) / float(DIFFUSION_RADIUS));
+}
+
+consteval std::array<float, radialdist_limit+1> CreateDiffusionScale()
+{
+    float x = 1.0f;
+    int orthodist = 0;
+    
+    std::array<float, radialdist_limit+1> diffusionScaling{
+        (1.0f),
+        (x = GetNextFloat(x, ++orthodist), x),
+        (x = GetNextFloat(x, ++orthodist), x),
+        (x = GetNextFloat(x, ++orthodist), x),
+        (x = GetNextFloat(x, ++orthodist), x),
+        (x = GetNextFloat(x, ++orthodist), x),
+    };
+    return diffusionScaling;
+}
+
+constexpr auto DIFFUSIONSCALING = CreateDiffusionScale();
+
+static_assert(DIFFUSIONSCALING[0] == 1.0);
+static_assert((DIFFUSIONSCALING[1] > 0.0) && (DIFFUSIONSCALING[1] < 1.0));
+static_assert((DIFFUSIONSCALING[2] > 0.0) && (DIFFUSIONSCALING[2] < 1.0));
+
+
+// END DIFFUSIONSCALING //
+
+
+using CoordlistRel = std::vector<std::pair<int, int>>;
+using CoordlistAbs = std::vector<std::pair<int, int>>;
 using DoubleCoord = std::pair<std::pair<int, int>, std::pair<int, int>>;
 
 
@@ -63,7 +90,7 @@ class DiffusionField
     
     // TODO: make a version with const(expr) indecies and IDs
     class Cell: public sf::RectangleShape {
-        static constexpr float colorscaling {24.0}; // density required for all-white color;
+        static constexpr float colorscaling {64.0}; // density required for all-white color;
         unsigned int IX, IY, UUID; // UUID is the array index of Cell
         sf::Vector2f diffusionVec{0.0, 0.0}; // force calculated from the density of nearby cells
         sf::Vector2f momentum{0.0, 0.0}; // stored velocity imparted by particles, distributed to local particles
@@ -84,8 +111,8 @@ class DiffusionField
         IX{X}, IY{Y}, UUID{UUID}
         {
             setFillColor(sf::Color::Transparent);
-            setOutlineColor(sf::Color(0xFFFFFF80));  // half-transparent white
-            setOutlineThickness(1);
+            setOutlineColor(sf::Color(0xFFFFFF40));  // mostly-transparent white
+            setOutlineThickness(0.5);
             setPosition(sf::Vector2f{float(X*SPATIAL_RESOLUTION), float(Y*SPATIAL_RESOLUTION)});
         }
         
@@ -117,11 +144,12 @@ class DiffusionField
     CellMatrix cellmatrix;
     
     // finds cells at a single distance
-    const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID) const;
+    std::vector<Cell*> GetCellNeighbors(const std::size_t UUID) const;
     // finds cells at every distance up to (and including) current DIFFUSION_RADIUS
-    const std::vector<Cell*> GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist) const;
-    const std::vector<DoubleCoord> GetAdjacentPlus(const std::size_t UUID) const; // returns pairs of absolute and relative coords
-    const sf::Vector2f CalcDiffusionVec(std::size_t UUID) const;
+    std::vector<Cell*> GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist) const;
+    std::vector<DoubleCoord> GetAdjacentPlus(const std::size_t UUID) const; // returns pairs of absolute and relative coords
+    sf::Vector2f CalcDiffusionVec(std::size_t UUID) const;
+    
     
     bool Initialize()  // returns success/fail
     {
@@ -143,6 +171,7 @@ class DiffusionField
     
     void PrintAllCells() const;
     
+    // TODO: rewrite draw calls, seperate out the sprite-creation
     sf::Sprite Draw() 
     {
         cellgrid_texture.clear(sf::Color::Transparent);
@@ -161,7 +190,7 @@ class DiffusionField
     }
 };
 
-using CellRef_T = std::vector<DiffusionField::Cell*>;
+using CellPtrArray = std::vector<DiffusionField::Cell*>;
 
 //template <std::size_t RD, std::size_t X, std::size_t Y>  // radial_distance, X/Y index into DensityGrid
 //constexpr void UpdateDiffusion(RD, X, Y);  // updates the counts for cells in diffusion delta-map (for neighbors of radial_distance RD)
