@@ -42,6 +42,7 @@ bool Simulation::Initialize()
 TransitionList Simulation::FindCellTransitions() const
 {
     TransitionList transitions;
+    
     for (const Fluid::Particle& particle: fluid.particles) {
         const auto& oldcell = diffusionField.cells.at(particle.cellID);
         if (oldcell.getGlobalBounds().contains(particle.getPosition())) continue;
@@ -63,7 +64,7 @@ void Simulation::HandleTransitions(const TransitionList& transitions)
     for (const auto& trec: transitions)
     {
         auto& deltaN = deltamap[trec.oldCellID].negative;
-        auto& deltaP = deltamap[trec.newcellID].positive;
+        auto& deltaP = deltamap[trec.newCellID].positive;
         deltaN.particleIDs.emplace(trec.particleID);
         deltaP.particleIDs.emplace(trec.particleID);
         deltaN.density -= 1.0;

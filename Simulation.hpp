@@ -9,7 +9,21 @@
 
 
 // holds info about a particle that has crossed into a new cell
-struct Transition_T { const unsigned int particleID, oldCellID, newcellID; };
+struct Transition_T {
+    const unsigned int particleID, oldCellID, newCellID; 
+    /*bool operator==(const Transition_T& other) const {
+        return particleID == other.particleID;
+    };*/
+    enum Tag { particle, oldCell, newCell, };
+    bool operator==(const std::pair<unsigned int, Tag>&& comp) const {
+        const auto& [ID, tag] = comp;
+        switch (tag) {
+            case particle : return particleID == ID;
+            case oldCell  : return oldCellID  == ID;
+            case newCell  : return newCellID  == ID;
+        }
+    }
+};
 using TransitionList = std::vector<Transition_T>;
 
 using UUID_Map_T = std::map<unsigned int, std::unordered_set<unsigned int>>;
@@ -23,7 +37,25 @@ struct CellDelta_T
 };
 struct CellDelta_Dual_T { CellDelta_T positive, negative; };
 using DeltaMap_T = std::map<unsigned int, CellDelta_Dual_T>; // maps cellID -> celldeltas
-
+// TODO: replace DeltaMap_T with DeltaMap
+struct DeltaMap
+{
+    std::map<unsigned int, CellDelta_T> positive;
+    std::map<unsigned int, CellDelta_T> negative;
+    DeltaMap(TransitionList&& list)
+    {
+        for (const auto& [particleID, oldCellID, newCellID]: list)
+        {
+            //positive.emplace(newCellID, particleID, 0.0);
+            //negative.emplace(oldCellID, particleID, 0.0);
+            positive[newCellID].particleIDs.emplace(particleID);
+            negative[oldCellID].particleIDs.emplace(particleID);
+            
+        }
+        for (auto& D: positive) { D.second.density = D.second.particleIDs.size(); }
+        for (auto& D: negative) { D.second.density = -D.second.particleIDs.size(); }
+    }
+};
 
 
 class Simulation
