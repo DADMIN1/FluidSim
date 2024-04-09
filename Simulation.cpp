@@ -81,10 +81,13 @@ void Simulation::HandleTransitions(const TransitionList& transitions)
         for (const int particleID: deltas.positive.particleIDs) 
         {
             Fluid::Particle& particle = fluid.particles.at(particleID);
+            Cell& oldCell = diffusionField.cells[particle.cellID];
             particle.cellID = cellID;
             const sf::Vector2f momentumDelta = particle.velocity * momentumTransfer;
             particle.velocity -= momentumDelta;
-            diffusionField.cells[cellID].momentum += momentumDelta;
+            const sf::Vector2f momentumSmoothing = (oldCell.momentum-diffusionField.cells[cellID].momentum)*(momentumTransfer/2.0f);
+            oldCell.momentum -= momentumSmoothing;
+            diffusionField.cells[cellID].momentum += momentumDelta + momentumSmoothing;
             // TODO: rewrite momentum calculations to account for density and viscosity
             // and momentum should be applied/calculated every frame?
         }
