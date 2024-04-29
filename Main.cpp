@@ -8,6 +8,7 @@
 #include "Mouse.hpp"
 #include "Gradient.hpp"
 //#include "ValarrayTest.hpp"
+#include "Threading.hpp"
 
 
 // inspired by Sebastian Lague
@@ -60,6 +61,12 @@ int main(int argc, char** argv)
     
     
     //EmbedMacroTest();
+    
+    ThreadManager threadManager{};
+    threadManager.PrintThreadcount();
+    threadManager.ContainerDivTestMT();
+    
+    return 0;
     
     // Title-bar is implied (for Style::Close)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing

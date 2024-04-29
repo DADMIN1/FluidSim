@@ -5,4 +5,5 @@ fluidsym_dbg
 *.o
 build/
 *.d
+.gitconfig
 

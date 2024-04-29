@@ -1,6 +1,6 @@
 MAKEFLAGS += -j8
 CXX := g++-12
-LDFLAGS := -lsfml-system -lsfml-graphics -lsfml-window
+LDFLAGS := -lsfml-system -lsfml-graphics -lsfml-window -lpthread
 
 # If the command-line args contained 'debug' as a target;
 ifeq (debug, $(filter debug, $(MAKECMDGOALS)))
@@ -19,6 +19,8 @@ CXXFLAGS := -std=c++23 -O1 -pipe -Wall -Wextra -Wpedantic -Wfatal-errors
 # -fmax-errors=1  or  -Wfatal-errors ???
 endif
 
+# TODO: -fvisibility-ms-compat  (although manpage says -fvisibility=hidden is preferred??)
+# TODO: profiling
 # TODO: add a 'release' build with more optimization and '-DNDEBUG'
 # DNDEBUG flag disables assert statements
 
