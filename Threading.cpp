@@ -6,8 +6,8 @@
 
 
 void ThreadManager::PrintThreadcount() {
-    std::cout << "\nreported threadcount: " << reportedThreadcount << '\n';
-    std::cout << "using threadcount: " << THREAD_COUNT << '\n' << '\n';
+    std::cout << "\nreported threadcount: " << this->THREAD_COUNT << '\n';
+    std::cout << "using threadcount: " << ::THREAD_COUNT << '\n' << '\n';
 }
 
 
@@ -39,7 +39,7 @@ void ThreadManager::ContainerDivTestMT()
     for (int x{0}; x < arrsize; ++x) { testcontainer[x] = x; }
     
     auto dividetest = DivideContainer(testcontainer);
-    std::array<std::future<void>, THREAD_COUNT> deferredcalls;
+    std::array<std::future<void>, ::THREAD_COUNT> deferredcalls;
     //std::shared_future<void> endf;
     auto nextslot = deferredcalls.rbegin();
     
@@ -55,7 +55,7 @@ void ThreadManager::ContainerDivTestMT()
             return;
         };
         
-        //LaunchThread(lambdaprint, p);
+        // *nextslot++ = std::async(std::launch::deferred, lambdaprint);
         *nextslot++ = std::async(std::launch::async, lambdaprint);
     }
     //for (const auto& result: deferredcalls) { result.wait(); }

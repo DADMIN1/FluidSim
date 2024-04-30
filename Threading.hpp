@@ -2,38 +2,38 @@
 #define FLUIDSIM_THREADING_INCLUDED
 
 #include <thread>
+#include <future>
 #include <array>
 #include <tuple> // std::pair
 
 
-static constexpr int THREAD_COUNT {4};
+static constexpr int THREAD_COUNT {8};
 
 class ThreadManager
 {
-    std::array<std::jthread, THREAD_COUNT> threads;
-    int nextavailable {0};
+    const unsigned int THREAD_COUNT; // count reported by hardware
+    // two problems with using this:
+    // 1) not constexpr; can't be used to size arrays
+    // 2) object instance is not globally defined
     
     public:
-    const unsigned int reportedThreadcount;
     void PrintThreadcount();
     void ContainerDivTest(); // iterates over the result of DivideContainer
     void ContainerDivTestMT();
     
-    template<typename FunctionT, typename... Args>
-    void LaunchThread(FunctionT&& function, Args&&... args)
-    {
-        std::jthread& task = threads[nextavailable++];
-        task = std::jthread(function, args...);
-        //task.join();
-        
-        return;
-    }
-    
-    ThreadManager(): reportedThreadcount{std::thread::hardware_concurrency()}
+    ThreadManager(): THREAD_COUNT{std::thread::hardware_concurrency()}
     {
         
     }
 };
+
+
+// overload for containers that don't have '+' for their iterators
+// (required for DivideContainer start/end)
+auto operator+(auto map_iter, auto offset) {
+    while (offset > 0) { ++map_iter; --offset; }
+    return map_iter;
+}
 
 
 template<typename T>
@@ -52,6 +52,7 @@ auto DivideContainer(T& container)
     }
     return segments;
 }
+
 
 template<typename T>
 auto DivideContainer(const T& container) // for const containers

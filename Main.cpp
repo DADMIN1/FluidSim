@@ -64,9 +64,6 @@ int main(int argc, char** argv)
     
     ThreadManager threadManager{};
     threadManager.PrintThreadcount();
-    threadManager.ContainerDivTestMT();
-    
-    return 0;
     
     // Title-bar is implied (for Style::Close)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing

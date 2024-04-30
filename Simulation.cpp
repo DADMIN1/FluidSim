@@ -1,5 +1,7 @@
 #include "Simulation.hpp"
 
+#include "Threading.hpp"
+
 #include <iostream>
 #include <tuple>
 #include <cassert>
@@ -209,46 +211,61 @@ void Simulation::NonLocalDiffusion(const IDset_T& originset, const IDset_T& adja
 // assumes that density-updates were already performed on ALL cells (and momentum-calculations)
 void Simulation::UpdateParticles()
 {
-    // need to prevent redundant combinations when building the particleset for LocalDiffusion
-    std::unordered_set<unsigned int> excludedIDs{};
-    
-    // only recalculate diffusionVec for occupied cells
-    for (auto& [cellID, particleset]: particleMap)
-    { // VERY IMPORTANT: particleset should NOT be a reference if you merge with it
-        assert((particleset.size() > 0) && "empty particleset!");
+    auto segmented_particlemap = DivideContainer(particleMap);
+    auto lambda = [this](auto segment) 
+    {
+        // need to prevent redundant combinations when building the particleset for LocalDiffusion
+        std::unordered_set<unsigned int> excludedIDs{};
         
-        Cell& cell = diffusionField.cells.at(cellID);
-        cell.diffusionVec = diffusionField.CalcDiffusionVec(cellID) * timestepRatio * fluid.fdensity;
-        // TODO: repurpose diffusionVec to redistribute/smooth momentum between cells
-        
-        // fluid.ApplySpeedcap(cell.momentum);
-        const sf::Vector2f momentumDistributed = cell.momentum * momentumDistribution * timestepRatio;
-        const sf::Vector2f momentumPerParticle = momentumDistributed / float(particleset.size());
-        cell.momentum -= momentumDistributed;
-        
-        // distributing momentum and applying diffusionVec
-        for (unsigned int particleID: particleset) {
-            Fluid::Particle& particle = fluid.particles.at(particleID);
-            particle.velocity += cell.diffusionVec + momentumPerParticle;
+        // only recalculate diffusionVec for occupied cells
+        for (auto iter{segment.first}; iter != segment.second; ++iter)
+        {
+            auto& [cellID, particleset] = *iter;
+            // VERY IMPORTANT: particleset should NOT be a reference if you merge with it
+            assert((particleset.size() > 0) && "empty particleset!");
+            
+            Cell& cell = diffusionField.cells.at(cellID);
+            cell.diffusionVec = diffusionField.CalcDiffusionVec(cellID) * timestepRatio * fluid.fdensity;
+            // TODO: repurpose diffusionVec to redistribute/smooth momentum between cells
+            
+            // fluid.ApplySpeedcap(cell.momentum);
+            const sf::Vector2f momentumDistributed = cell.momentum * momentumDistribution * timestepRatio;
+            const sf::Vector2f momentumPerParticle = momentumDistributed / float(particleset.size());
+            cell.momentum -= momentumDistributed;
+            
+            // distributing momentum and applying diffusionVec
+            for (unsigned int particleID: particleset) {
+                Fluid::Particle& particle = fluid.particles.at(particleID);
+                particle.velocity += cell.diffusionVec + momentumPerParticle;
+            }
+            // unfortunately, we have to handle diffusionVec and momentum in a seperate loop;
+            // because they're only meant to apply to the current cell's particles.
+            // that also means it must be done BEFORE merging the particlesets
+            
+            // TODO: split the cell-related updates into a seperate function?
+            
+            const std::size_t originalsize = particleset.size();
+            IDset_T nonlocalParticles = BuildAdjacentSet(cellID, excludedIDs);
+            //particleset.merge(nonlocalParticles);  // the other merge order might be more effecient?
+            // VERY important that particleset isn't a reference here (if you merge); if it is, then every cell will end up-
+            // - holding duplicates of all the particles from each cell in it's diffusion-radius.
+            // then each cell will propagate their duplicates on every frame - segfault almost immediately.
+            
+            assert((particleMap[cellID].size() == originalsize) && "set in particleMap should not change size!!!!");
+            LocalDiffusion(particleset);
+            NonLocalDiffusion(particleset, nonlocalParticles);
+            excludedIDs.emplace(cellID);
         }
-        // unfortunately, we have to handle diffusionVec and momentum in a seperate loop;
-        // because they're only meant to apply to the current cell's particles.
-        // that also means it must be done BEFORE merging the particlesets
-        
-        // TODO: split the cell-related updates into a seperate function?
-        
-        const std::size_t originalsize = particleset.size();
-        IDset_T nonlocalParticles = BuildAdjacentSet(cellID, excludedIDs);
-        //particleset.merge(nonlocalParticles);  // the other merge order might be more effecient?
-        // VERY important that particleset isn't a reference here (if you merge); if it is, then every cell will end up-
-        // - holding duplicates of all the particles from each cell in it's diffusion-radius.
-        // then each cell will propagate their duplicates on every frame - segfault almost immediately.
-        
-        assert((particleMap[cellID].size() == originalsize) && "set in particleMap should not change size!!!!");
-        LocalDiffusion(particleset);
-        NonLocalDiffusion(particleset, nonlocalParticles);
-        excludedIDs.emplace(cellID);
+    };
+    
+    // TODO: fix the particle-banding caused by multithreading (excludedIDs is thread-local)
+    
+    std::array<std::future<void>, THREAD_COUNT> threads;
+    assert((segmented_particlemap.size() == threads.size()) && "mismatched sizes between particlemap and threads");
+    for (std::size_t index{0}; index < threads.size(); ++index) {
+        threads[index] = std::async(std::launch::async, lambda, segmented_particlemap[index]);
     }
+    for (auto& handle: threads) { handle.wait(); }
     
     return;
 }
@@ -257,11 +274,11 @@ void Simulation::UpdateParticles()
 void Simulation::Update()
 {
     if (isPaused) { return; }
-    if (hasGravity) { fluid.ApplyGravity(); }
+    if (hasGravity) { fluid.ApplyGravity(); } // TODO: multithreading
     
-    fluid.UpdatePositions();
-    auto transitions = FindCellTransitions();
-    HandleTransitions(transitions);
+    fluid.UpdatePositions();                  // TODO: multithreading
+    auto transitions = FindCellTransitions(); // TODO: multithreading
+    HandleTransitions(transitions);           // TODO: multithreading
     UpdateParticles();
     //fluid.UpdatePositions();  // seems like doing this last might give slightly better performance?
     
