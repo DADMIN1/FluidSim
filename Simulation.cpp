@@ -7,6 +7,7 @@
 #include <cassert>
 
 
+// helper function because sets don't have an inverse-merge
 std::size_t NegativeMerge(std::unordered_set<unsigned int>& source, const std::unordered_set<unsigned int>& toRemove)
 {
     std::size_t numErased{0};
@@ -59,28 +60,77 @@ TransitionList Simulation::FindCellTransitions() const
     return transitions;
 }
 
-
-void Simulation::HandleTransitions(const TransitionList& transitions)
+// multithreaded version
+DeltaMap Simulation::FindCellTransitions(const auto& particles_slice) const
 {
-    DeltaMap_T deltamap{};
-    for (const auto& trec: transitions)
-    {
-        auto& deltaN = deltamap[trec.oldCellID].negative;
-        auto& deltaP = deltamap[trec.newCellID].positive;
-        deltaN.particleIDs.emplace(trec.particleID);
-        deltaP.particleIDs.emplace(trec.particleID);
-        deltaN.density -= 1.0;
-        deltaP.density += 1.0;
-    }
+    DeltaMap dmap;
     
-    for (auto& [cellID, deltas]: deltamap)
+    for (auto iter{particles_slice.first}; iter < particles_slice.second; ++iter) {
+        const Fluid::Particle& particle = *iter;
+        const Cell& oldcell = diffusionField.cells.at(particle.cellID);
+        if (oldcell.getGlobalBounds().contains(particle.getPosition())) continue;
+        else {
+            const auto& [x, y] = particle.getPosition();
+            const unsigned int xi = x / SPATIAL_RESOLUTION;
+            const unsigned int yi = y / SPATIAL_RESOLUTION;
+            assert((xi <= Cell::maxIX) && (yi <= Cell::maxIY) && "out-of-bounds index");
+            const Cell& newcell = *diffusionField.cellmatrix.at(xi).at(yi);
+            
+            dmap.transitionlist.emplace_back(particle.UUID, oldcell.UUID, newcell.UUID);
+            CellDelta_T& oldcell_delta = dmap.cellmap[oldcell.UUID];
+            CellDelta_T& newcell_delta = dmap.cellmap[newcell.UUID];
+            oldcell_delta.particlesRemoved.emplace(particle.UUID);
+            newcell_delta.particlesAdded.emplace(particle.UUID);
+            oldcell_delta.density -= 1.0f;
+            newcell_delta.density += 1.0f;
+            //oldcell_delta.velocities -= 1.0f;
+            newcell_delta.velocities += particle.velocity * momentumTransfer;
+        }
+    }
+    return dmap;
+}
+
+
+// note: deltamap gets eaten by the '.merge' call
+void Simulation::HandleTransitions(DeltaMap&& deltamap)
+{
+    std::lock_guard<std::mutex> pmGuard(write_mutex);
+    
+    /* for (const Transition_T& transition : deltamap.transitionlist)
     {
-        // updating densities
-        const float densityDelta = deltas.positive.density + deltas.negative.density;
-        diffusionField.cells[cellID].density += densityDelta;
+        
+    } */
+    
+    for (auto&& [cellID, delta]: deltamap.cellmap)
+    {
+        Cell& cell = diffusionField.cells[cellID];
+        // delta.velocities has already been scaled by momentumTransfer
+        
+        const sf::Vector2f momentumSmoothing = { 
+            delta.velocities / float(delta.particlesAdded.size() + delta.particlesRemoved.size())
+        };
+        //cell.momentum += ((delta.velocities + momentumSmoothing) / (cell.density+1.0f));
+        cell.momentum += delta.velocities;
+        
+        for (const int particleID: delta.particlesAdded)
+        {
+            Fluid::Particle& particle = fluid.particles.at(particleID);
+            const sf::Vector2f momentumDelta = particle.velocity * momentumTransfer;
+            particle.velocity -= momentumDelta;
+            
+            //Cell& oldCell = diffusionField.cells[particle.cellID];
+            particle.cellID = cellID;
+        }
+        
+        for (const int particleID: delta.particlesRemoved)
+        {
+            Fluid::Particle& particle = fluid.particles.at(particleID);
+            particle.velocity -= momentumSmoothing;
+            //Cell& newCell = diffusionField.cells[cellID];
+        }
         
         // transferring momentum to cell and updating particle's cellID
-        for (const int particleID: deltas.positive.particleIDs) 
+        /* for (const int particleID: delta.particlesAdded) 
         {
             Fluid::Particle& particle = fluid.particles.at(particleID);
             Cell& oldCell = diffusionField.cells[particle.cellID];
@@ -92,21 +142,23 @@ void Simulation::HandleTransitions(const TransitionList& transitions)
             diffusionField.cells[cellID].momentum += momentumDelta + momentumSmoothing;
             // TODO: rewrite momentum calculations to account for density and viscosity
             // and momentum should be applied/calculated every frame?
-        }
+        } */
         
-        // fluid.ApplySpeedcap(diffusionField.cells[cellID].momentum);
-        // fluid.ApplyViscosity(diffusionField.cells[cellID].momentum);
+        // updating densities
+        diffusionField.cells[cellID].density += delta.density;
         
         // updating particleMap
-        NegativeMerge(particleMap[cellID], deltas.negative.particleIDs);
-        particleMap[cellID].merge(deltas.positive.particleIDs);
+        NegativeMerge(particleMap[cellID], delta.particlesRemoved);
+        particleMap[cellID].merge(delta.particlesAdded);
+        // assert(delta.particleIDs.empty() && "positive deltamap should be empty");
         
-        // TODO: I don't think the maps should end up with empty sets ever? figure out why
-        if (particleMap[cellID].empty()) {
+        // TODO: defer this erase or something
+        /* if (particleMap[cellID].empty()) {
             diffusionField.cells[cellID].momentum = {0.0, 0.0};
             particleMap.erase(cellID);
-        }
+        } */
     }
+    
     return;
 }
 
@@ -222,7 +274,8 @@ void Simulation::UpdateParticles()
         {
             auto& [cellID, particleset] = *iter;
             // VERY IMPORTANT: particleset should NOT be a reference if you merge with it
-            assert((particleset.size() > 0) && "empty particleset!");
+            //assert((particleset.size() > 0) && "empty particleset!");
+            if (particleset.empty()) { continue; }
             
             Cell& cell = diffusionField.cells.at(cellID);
             cell.diffusionVec = diffusionField.CalcDiffusionVec(cellID) * timestepRatio * fluid.fdensity;
@@ -274,11 +327,48 @@ void Simulation::UpdateParticles()
 void Simulation::Update()
 {
     if (isPaused) { return; }
-    if (hasGravity) { fluid.ApplyGravity(); } // TODO: multithreading
     
-    fluid.UpdatePositions();                  // TODO: multithreading
-    auto transitions = FindCellTransitions(); // TODO: multithreading
-    HandleTransitions(transitions);           // TODO: multithreading
+    /* if (hasGravity) { fluid.ApplyGravity(); }
+    fluid.UpdatePositions();  */
+    
+    std::array<std::future<DeltaMap>, THREAD_COUNT> threads;
+    auto particles_slices = DivideContainer(fluid.particles);
+    for (std::size_t index{0}; index < threads.size(); ++index) {
+        auto slice = particles_slices[index];
+        auto lambda = [this, slice](){ 
+            if (hasGravity) 
+            { fluid.ApplyGravity (slice.first, slice.second); }
+            fluid.UpdatePositions(slice.first, slice.second);
+            return FindCellTransitions(slice);
+        };
+        threads[index] = std::async(std::launch::async, lambda);
+    };
+    
+    DeltaMap transitions{};
+    for (auto& handle: threads) {
+        transitions.Combine(handle.get()); // extracts/moves elements with new keys
+    }
+    
+    HandleTransitions(std::move(transitions));
+    
+    // single-threaded versions
+    //auto transitions = FindCellTransitions();
+    //HandleTransitions(transitions);
+    
+    // TODO: rewrite HandleTransitions to handle multithreading better
+    
+    // multithreaded (seems to be slower)
+    /* std::array<std::future<void>, THREAD_COUNT> threads;
+    auto particles_slices = DivideContainer(fluid.particles);
+    for (std::size_t index{0}; index < threads.size(); ++index) {
+        auto lambda = [this](auto slice) { 
+            auto transitions = FindCellTransitions(slice);
+            HandleTransitions(transitions);
+        };
+        threads[index] = std::async(std::launch::async, lambda, particles_slices[index]);
+    };
+    for (auto& handle: threads) { handle.wait(); } */
+    
     UpdateParticles();
     //fluid.UpdatePositions();  // seems like doing this last might give slightly better performance?
     

@@ -187,3 +187,57 @@ void Fluid::UpdatePositions()
     return;
 }
 
+// multithreaded version
+void Fluid::ApplyGravity(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd)
+{
+    for (std::vector<Particle>::iterator iter{sliceStart}; iter < sliceEnd; ++iter) {
+        Particle& particle = *iter;
+        particle.velocity.y += gravity*timestepRatio;
+    }
+}
+
+
+// multithreaded version
+void Fluid::UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd)
+{
+    for (std::vector<Particle>::iterator iter{sliceStart}; iter < sliceEnd; ++iter)
+    {
+        Particle& particle = *iter;
+        ApplyViscosity(particle.velocity);
+        ApplySpeedcap(particle.velocity);
+        
+        sf::Vector2f nextPosition = particle.getPosition();
+        nextPosition.x += particle.velocity.x * timestepRatio;
+        nextPosition.y += particle.velocity.y * timestepRatio;
+        
+        // TODO: refactor bounding-box checks into a seperate function
+        //  keeping all particles within bounding box
+        // we must not allow position == limit in this function;
+        // otherwise, when we look up the related cell, it'll index past the end of the cellmatrix
+        if (nextPosition.y > BOXHEIGHT) {
+            nextPosition.y = BOXHEIGHT-DEFAULTRADIUS;
+            particle.velocity.y *= (-1.0 + bounceDampening);
+        }
+        else if (nextPosition.y < 0) {
+            nextPosition.y = -1*nextPosition.y;
+            particle.velocity.y *= (-1.0 + bounceDampening);
+        }
+        
+        if (nextPosition.x > BOXWIDTH) {
+            nextPosition.x = BOXWIDTH-DEFAULTRADIUS;
+            particle.velocity.x *= (-1.0 + bounceDampening);
+        }
+        else if (nextPosition.x < 0) {
+            nextPosition.x = -1*nextPosition.x;
+            particle.velocity.x *= (-1.0 + bounceDampening);
+        }
+        
+        assert((nextPosition.x >= 0) && (nextPosition.y >= 0) && "negative nextPosition!");
+        assert((nextPosition.x <= BOXWIDTH) && (nextPosition.y <= BOXHEIGHT) && "OOB nextPosition!");
+        
+        particle.setPosition(nextPosition);
+    }
+    
+    return;
+}
+

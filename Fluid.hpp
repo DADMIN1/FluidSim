@@ -11,7 +11,6 @@
 
 #include "Globals.hpp"
 
-
 // disable dynamic frame-delay to compensate with a hardcoded ratio instead
 #define DYNAMICFRAMEDELAY true
 constexpr int framerateCap{300};
@@ -111,6 +110,10 @@ class Fluid
         particle_texture.display();
         return sf::Sprite(particle_texture.getTexture());
     }
+    
+    // multithreaded versions of member functions
+    void ApplyGravity   (const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd);
+    void UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd);
 };
 
 

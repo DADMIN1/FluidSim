@@ -6,6 +6,7 @@
 
 #include <unordered_set>
 #include <map>
+#include <thread> // std::mutex
 
 
 // holds info about a particle that has crossed into a new cell
@@ -21,6 +22,7 @@ struct Transition_T {
             case particle : return particleID == ID;
             case oldCell  : return oldCellID  == ID;
             case newCell  : return newCellID  == ID;
+            default       : return false;
         }
     }
 };
@@ -31,29 +33,53 @@ using IDset_T = std::unordered_set<unsigned int>;
 
 struct CellDelta_T 
 {
-    IDset_T particleIDs{};
+    //const unsigned int cellUUID;
+    IDset_T particlesAdded{};
+    IDset_T particlesRemoved{};
     float density {0.0};
-    //sf::Vector2f momentum{0.0, 0.0};
+    sf::Vector2f velocities {0.0, 0.0};
 };
-struct CellDelta_Dual_T { CellDelta_T positive, negative; };
-using DeltaMap_T = std::map<unsigned int, CellDelta_Dual_T>; // maps cellID -> celldeltas
+
+
 // TODO: replace DeltaMap_T with DeltaMap
 struct DeltaMap
 {
-    std::map<unsigned int, CellDelta_T> positive;
-    std::map<unsigned int, CellDelta_T> negative;
-    DeltaMap(TransitionList&& list)
+    std::map<unsigned int, CellDelta_T> cellmap; // key is cellUUID
+    TransitionList transitionlist;
+    
+    DeltaMap() {}
+    DeltaMap(DeltaMap&& other): cellmap{std::move(other.cellmap)}, transitionlist{other.transitionlist} {}
+    DeltaMap(TransitionList&& list) : transitionlist{list}
     {
         for (const auto& [particleID, oldCellID, newCellID]: list)
         {
-            //positive.emplace(newCellID, particleID, 0.0);
-            //negative.emplace(oldCellID, particleID, 0.0);
-            positive[newCellID].particleIDs.emplace(particleID);
-            negative[oldCellID].particleIDs.emplace(particleID);
-            
+            cellmap[newCellID].particlesAdded.emplace(particleID);
+            cellmap[oldCellID].particlesRemoved.emplace(particleID);
         }
-        for (auto& D: positive) { D.second.density = D.second.particleIDs.size(); }
-        for (auto& D: negative) { D.second.density = -D.second.particleIDs.size(); }
+        for (auto& [cellID, celldelta]: cellmap) {
+            celldelta.density = celldelta.particlesAdded.size() - celldelta.particlesRemoved.size();
+        }
+        // TODO: calculate and store momentumDelta here instead of HandleTransitions()
+    }
+    
+    void Combine(DeltaMap&& other)
+    {
+        //this->transitionlist.insert(transitionlist.end(), other.transitionlist.begin(), other.transitionlist.end());
+        for (auto&& x : std::move(other.transitionlist)) {
+            transitionlist.emplace_back(x);
+        }
+        
+        // merge extracts/moves elements with new keys
+        this->cellmap.merge(other.cellmap);
+        // combine the remaining keys
+        for (auto&& [key, other_delta]: std::move(other.cellmap))
+        {
+            auto& entry = this->cellmap[key];
+            entry.particlesAdded.merge(other_delta.particlesAdded);
+            entry.particlesRemoved.merge(other_delta.particlesRemoved);
+            entry.density += other_delta.density;
+            entry.velocities += other_delta.velocities;
+        }
     }
 };
 
@@ -63,6 +89,7 @@ class Simulation
     DiffusionField diffusionField{};
     Fluid fluid{};
     UUID_Map_T particleMap{}; // mapping cellIDs to particleIDs
+    std::mutex write_mutex;
     
     bool hasGravity {false};
     bool useTransparency {false};  // slow-moving particles are more transparent
@@ -75,7 +102,8 @@ class Simulation
     // identifies Particles that have crossed a cell-boundary
     // does NOT update the Particles' cellID or the cells' density
     TransitionList FindCellTransitions() const;
-    void HandleTransitions(const TransitionList& transitions);
+    DeltaMap FindCellTransitions(const auto& particles_slice) const; // multithreaded version
+    void HandleTransitions(DeltaMap&& deltamap); // deltamap-parameter gets eaten by this function (invalidated)
     void UpdateParticles();
     void LocalDiffusion(const IDset_T& particleset); // diffusion within a single cell
     void NonLocalDiffusion(const IDset_T& originset, const IDset_T& adjacentset); // diffusion across cells
