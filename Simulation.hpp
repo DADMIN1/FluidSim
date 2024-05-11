@@ -132,8 +132,12 @@ class Simulation
     }
     void Reset(); // TODO: implement reset
     
-    sf::Sprite DrawFluid() { return fluid.Draw(useTransparency); }
-    sf::Sprite DrawGrid () { return diffusionField.Draw(); }
+    void RedrawGrid()  { diffusionField.Redraw(); }
+    void RedrawFluid() { fluid.Redraw(useTransparency); }
+    auto GetSprites() { 
+        struct Sprites{sf::Sprite gridSprite; sf::Sprite fluidSprite;};
+        return Sprites{diffusionField.GetSprite(), fluid.GetSprite()};
+    }
 };
 
 

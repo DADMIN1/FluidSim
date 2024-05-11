@@ -100,7 +100,8 @@ class Fluid
         }
     }
     
-    sf::Sprite Draw(const bool useTransparency)
+    sf::Sprite GetSprite() { return sf::Sprite(particle_texture.getTexture()); }
+    void Redraw(const bool useTransparency) 
     {
         particle_texture.clear(sf::Color::Transparent);
         for (Particle& particle: particles) {
@@ -108,7 +109,6 @@ class Fluid
             particle_texture.draw(particle);
         }
         particle_texture.display();
-        return sf::Sprite(particle_texture.getTexture());
     }
     
     // multithreaded versions of member functions

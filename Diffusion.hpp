@@ -91,8 +91,8 @@ class DiffusionField
     
     void PrintAllCells() const;
     
-    // TODO: rewrite draw calls, seperate out the sprite-creation
-    sf::Sprite Draw() 
+    sf::Sprite GetSprite() { return sf::Sprite(cellgrid_texture.getTexture()); }
+    void Redraw() 
     {
         cellgrid_texture.clear(sf::Color::Transparent);
         for (auto& cell : cells) {
@@ -100,7 +100,6 @@ class DiffusionField
             cellgrid_texture.draw(cell);
         }
         cellgrid_texture.display();
-        return sf::Sprite(cellgrid_texture.getTexture());
     }
     
     void ResetMomentum() {

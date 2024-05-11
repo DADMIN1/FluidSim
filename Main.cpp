@@ -81,6 +81,7 @@ int main(int argc, char** argv)
         std::cerr << "simulation failed to initialize!\n";
         return 1;
     }
+    auto&& [gridSprite, fluidSprite] = simulation.GetSprites();
     
     Mouse_T mouse(mainwindow, simulation.GetDiffusionFieldPtr());
     
@@ -234,7 +235,8 @@ int main(int argc, char** argv)
         // TODO: hide the gridlines in painting-mode
         // grid must be temporarily displayed when you draw in painting-mode (otherwise the effect would be invisible)
         if (shouldDrawGrid || (mouse.isPaintingMode && mouse.isActive(true))) {
-            mainwindow.draw(simulation.DrawGrid());
+            simulation.RedrawGrid();
+            mainwindow.draw(gridSprite);
         }
         else if (mouse.isActive()) // when grid is NOT drawn: always draw mouse-radius and disable cell-outline
         {  // TODO: refactor this logic to not check on every frame
@@ -247,7 +249,8 @@ int main(int argc, char** argv)
             if (mouse.isPaintingMode && mouse.shouldDisplay) mouse.DrawOutlines();
         }
         
-        mainwindow.draw(simulation.DrawFluid());
+        simulation.RedrawFluid();
+        mainwindow.draw(fluidSprite);
         
         // TODO: allow mouse to update and be redrawn even while paused
         if (mouse.shouldDisplay) {
