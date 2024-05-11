@@ -60,14 +60,14 @@ GradientWindow_T::~GradientWindow_T()  // TODO: call RenderWindow destructor??
 }
 
 
-void GradientWindow_T::Create()
+void GradientWindow_T::Create(int xposition)
 {
     // sf::Style::None
     // for some reason it's only letting me use auto here
     constexpr auto m_style = sf::Style::Close;  // Title-bar is implied (for Style::Close)
     // sf::Style::Default = Titlebar | Resize | Close
     sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "Gradient", m_style);
-    setPosition({getPosition().x+360, 360});
+    setPosition({xposition+360, 360});
     return;
 }
 

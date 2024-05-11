@@ -119,6 +119,7 @@ class Simulation
     void PrintAllCells() { diffusionField.PrintAllCells(); }
     
     bool TogglePause() { isPaused = !isPaused; return isPaused; }
+    bool SetPause(bool newState) { bool oldState = isPaused; isPaused = newState; return oldState; }
     bool ToggleGravity(bool noArg=true) // if you pass false, it always disables gravity
     { hasGravity = (noArg? (!hasGravity) : false); return hasGravity; }
     bool ToggleTransparency() { useTransparency = !useTransparency; return useTransparency; }

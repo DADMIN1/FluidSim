@@ -15,12 +15,24 @@
 #ifdef GRADIENT_T_FWDDECLARE
 struct Gradient_T;
 
+// TODO: implement gradient customization
+// TODO: figure out if custom gradients will be a derived class?
+// TODO: copy new members (segmentsize) into alternative definitions
+
 /* forward-declaring the class-members as static avoids embedding the huge array (GradientRaw) into the header.
   This also allows the (external) definition of 'GradientRaw' to be constexpr, even though the declaration isn't 
   (because specifying constexpr always requires a definition) */
   #ifdef GRADIENT_T_FWDDECLARE_STATIC
   struct Gradient_T
   {
+      static const int segmentsize {1};  // pixels. Min=1, Max=128
+      // numSegments = 1024 / segmentsize  // Min=8, Max=1024
+      // definitionPoints = []  // segment-indecies (and color?) that the gradient is interpolated from
+      /* definitionPoints alone should be enough to define the gradient?; all other segments will be interpolated from them
+        there should probably be a minimum of two definitionPoints; otherwise it will be a solid color
+        the first/last points don't need to be start/end. If they're not, then all segments before/after them will copy their color
+        definitionPoints should always be aligned to an even-numbered segment to avoid problems when increasing segmentsize
+        There should never be a problem with decreasing segmentsize (increasing resolution) */
       static const unsigned char GradientRaw[1024][3];
       static const sf::Color Lookup(const unsigned int index);
   };
@@ -64,7 +76,7 @@ class GradientWindow_T: public sf::RenderWindow
       m_gradient{gradientPtr}, ownsPtr{false}
     { Initialize(); }
     
-    void Create(); // calls sf::RenderWindow.create(...) with some arguments
+    void Create(int xposition); // calls sf::RenderWindow.create(...) with some arguments
     void FrameLoop(); // returns after gradient_window is closed
     ~GradientWindow_T();
     // gcc warns if the destructor is defined here (due to deleting an incomplete type)

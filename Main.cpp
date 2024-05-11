@@ -68,9 +68,10 @@ int main(int argc, char** argv)
     // Title-bar is implied (for Style::Close)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM", mainstyle);
-    mainwindow.setPosition({mainwindow.getPosition().x, 0});
+    mainwindow.setPosition({2600, 0}); // move to right monitor
     
     GradientWindow_T gradientWindow{};
+    gradientWindow.setPosition({mainwindow.getPosition().x, 360});
     
     hoverOutline.setFillColor(sf::Color::Transparent);
     hoverOutline.setOutlineColor(sf::Color::Cyan);
@@ -158,8 +159,13 @@ int main(int argc, char** argv)
                             if (gradientWindow.isOpen()) { gradientWindow.close(); }
                             else
                             {
-                                gradientWindow.Create();
+                                // pausing here doesn't prevent deltatime from becoming huge?
+                                //bool oldPauseState = simulation.SetPause(true);
+                                gradientWindow.Create(mainwindow.getPosition().x);
                                 gradientWindow.FrameLoop();
+                                //simulation.SetPause(oldPauseState);
+                                // resetting frametimer prevents deltatime from becoming huge and spazzing out
+                                frametimer.restart();
                             }
                         break;
                         
@@ -211,7 +217,7 @@ int main(int argc, char** argv)
                     auto [newwidth, newheight] = event.size;
                     sf::View newview {mainwindow.getView()};
                     //newview.setSize(newwidth, newheight);
-                    newview.setViewport({0, 0, float{1000.f/newwidth}, float{1000.f/newheight}});
+                    newview.setViewport({0, 0, float{float(BOXWIDTH)/newwidth}, float{float(BOXHEIGHT)/newheight}});
                     mainwindow.setView(newview);
                     
                     /* auto newviewsize = mainwindow.getView().getSize();

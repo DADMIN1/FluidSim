@@ -6,4 +6,5 @@ fluidsym_dbg
 build/
 *.d
 .gitconfig
+custom/
 
