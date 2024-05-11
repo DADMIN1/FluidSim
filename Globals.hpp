@@ -6,8 +6,8 @@ constexpr int NUMCOLUMNS {64}, NUMROWS {64}; // layout (and number) of particles
 constexpr int BOXWIDTH {1000}, BOXHEIGHT {1000}; // internal resolution (default window resolution should match)
 //constexpr float DEFAULTRADIUS {float(BOXWIDTH/NUMCOLUMNS) / 2.0f};
 constexpr float DEFAULTRADIUS {8.0f}; // of particles (sf::CircleShape)
-constexpr int DEFAULTPOINTCOUNT {20}; // number of points used to draw each circle (particles)
-constexpr unsigned int SPATIAL_RESOLUTION {20};  // units/pixels per grid-cell for calculating diffusion/collision
+constexpr int DEFAULTPOINTCOUNT {8}; // number of points used to draw each circle (particles)
+constexpr unsigned int SPATIAL_RESOLUTION {25}; // units/pixels per grid-cell for calculating diffusion/collision
 
 static_assert((DEFAULTRADIUS > 0.0), "Radius must be greater than 0");
 static_assert((DEFAULTPOINTCOUNT > 1), "Pointcount must be greater than ");

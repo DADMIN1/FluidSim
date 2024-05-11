@@ -106,11 +106,12 @@ void Simulation::HandleTransitions(DeltaMap&& deltamap)
         Cell& cell = diffusionField.cells[cellID];
         // delta.velocities has already been scaled by momentumTransfer
         
-        const sf::Vector2f momentumSmoothing = { 
-            delta.velocities / float(delta.particlesAdded.size() + delta.particlesRemoved.size())
-        };
+        // this should probably be reverted
+        float smoothingdivisor = (delta.particlesAdded.size() == delta.particlesRemoved.size())? 
+                     1.0f: float(delta.particlesAdded.size() - delta.particlesRemoved.size());
+        const sf::Vector2f momentumSmoothing = { delta.velocities / smoothingdivisor };
         //cell.momentum += ((delta.velocities + momentumSmoothing) / (cell.density+1.0f));
-        cell.momentum += delta.velocities;
+        cell.momentum += (delta.velocities + momentumSmoothing)/2.f;
         
         for (const int particleID: delta.particlesAdded)
         {
@@ -152,11 +153,12 @@ void Simulation::HandleTransitions(DeltaMap&& deltamap)
         particleMap[cellID].merge(delta.particlesAdded);
         // assert(delta.particleIDs.empty() && "positive deltamap should be empty");
         
+        // does this ever happen?
         // TODO: defer this erase or something
-        /* if (particleMap[cellID].empty()) {
+        if (particleMap[cellID].empty()) {
             diffusionField.cells[cellID].momentum = {0.0, 0.0};
             particleMap.erase(cellID);
-        } */
+        }
     }
     
     return;

@@ -61,13 +61,13 @@ void Fluid::ApplySpeedcap(sf::Vector2f& velocity)
 void Fluid::Particle::UpdateColor(const bool useTransparency)
 {
     const float speed = std::abs(velocity.x) + std::abs(velocity.y);
-    constexpr float thresholdLow{0.5f};  // speed at which gradient begins to apply
-    constexpr float thresholdHigh{32.5f};  // caps out the gradient
+    constexpr float thresholdLow{1.5f};  // speed at which gradient begins to apply
+    constexpr float thresholdHigh{33.5f};  // caps out the gradient
     constexpr float inputRange = thresholdHigh-thresholdLow;
     unsigned int speedindex;
     const unsigned int baseAlpha = (useTransparency? 0xC0 : 0xFF);
     unsigned char alpha = baseAlpha;  // eventually converted to sf::Uint8 - which is unsigned char (not int)
-    if (speed <= thresholdLow) { speedindex = 0; setScale({1.1f, 1.1f}); }
+    if (speed <= thresholdLow) { speedindex = 0; setScale({1.0f, 1.0f}); }
     else if (speed >= thresholdHigh) { speedindex = 1023; }  // size of gradient
     else {
         speedindex = (speed - thresholdLow) * (1023.f/inputRange);
@@ -76,8 +76,8 @@ void Fluid::Particle::UpdateColor(const bool useTransparency)
             alpha = baseAlpha + ((speed - thresholdLow) * ((0xFF-baseAlpha)/inputRange));
             assert(alpha < 256);
         }
-        // faster particles shrink
-        float scale = 1.1f - ((speed - thresholdLow)/inputRange);
+        // faster particles grow
+        float scale = 1.0f + ((speed - thresholdLow)/inputRange);
         setScale({scale, scale});
     }
     auto&&[r, g, b, a] = Gradient_T::Lookup(speedindex);
