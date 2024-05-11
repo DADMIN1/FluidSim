@@ -7,6 +7,10 @@
 #include <cassert>
 
 
+#ifdef PMEMPTYCOUNTER
+long long pmemptycounter{0};  // counts how many times particleMap was empty
+#endif
+
 // helper function because sets don't have an inverse-merge
 std::size_t NegativeMerge(std::unordered_set<unsigned int>& source, const std::unordered_set<unsigned int>& toRemove)
 {
@@ -106,28 +110,38 @@ void Simulation::HandleTransitions(DeltaMap&& deltamap)
         Cell& cell = diffusionField.cells[cellID];
         // delta.velocities has already been scaled by momentumTransfer
         
-        // this should probably be reverted
-        float smoothingdivisor = (delta.particlesAdded.size() == delta.particlesRemoved.size())? 
-                     1.0f: float(delta.particlesAdded.size() - delta.particlesRemoved.size());
-        const sf::Vector2f momentumSmoothing = { delta.velocities / smoothingdivisor };
-        //cell.momentum += ((delta.velocities + momentumSmoothing) / (cell.density+1.0f));
-        cell.momentum += (delta.velocities + momentumSmoothing)/2.f;
+        // updating densities
+        diffusionField.cells[cellID].density += delta.density;
         
+        // this should probably be reverted
+        // float smoothingdivisor = 1.0f + float(delta.particlesAdded.size() - delta.particlesRemoved.size());
+        float smoothingdivisor = float(delta.particlesAdded.size() + delta.particlesRemoved.size());
+        const sf::Vector2f momentumSmoothing = { delta.velocities*momentumTransfer / smoothingdivisor };
+        if (fluid.isTurbulent) cell.momentum += momentumSmoothing;
+        
+        // transferring momentum from new particles to cell
         for (const int particleID: delta.particlesAdded)
         {
             Fluid::Particle& particle = fluid.particles.at(particleID);
+            if (fluid.isTurbulent) particle.velocity += momentumSmoothing;
             const sf::Vector2f momentumDelta = particle.velocity * momentumTransfer;
             particle.velocity -= momentumDelta;
+            cell.momentum += momentumDelta;
+            //cell.momentum -= momentumSmoothing;
             
             //Cell& oldCell = diffusionField.cells[particle.cellID];
             particle.cellID = cellID;
         }
         
-        for (const int particleID: delta.particlesRemoved)
-        {
-            Fluid::Particle& particle = fluid.particles.at(particleID);
-            particle.velocity -= momentumSmoothing;
-            //Cell& newCell = diffusionField.cells[cellID];
+        if (fluid.isTurbulent) {
+            // applying momentumSmoothing to leaving particles
+            for (const int particleID: delta.particlesRemoved)
+            {
+                Fluid::Particle& particle = fluid.particles.at(particleID);
+                particle.velocity += momentumSmoothing;
+                //cell.momentum -= momentumSmoothing;
+                //Cell& newCell = diffusionField.cells[cellID];
+            }
         }
         
         // transferring momentum to cell and updating particle's cellID
@@ -145,17 +159,16 @@ void Simulation::HandleTransitions(DeltaMap&& deltamap)
             // and momentum should be applied/calculated every frame?
         } */
         
-        // updating densities
-        diffusionField.cells[cellID].density += delta.density;
-        
         // updating particleMap
         NegativeMerge(particleMap[cellID], delta.particlesRemoved);
         particleMap[cellID].merge(delta.particlesAdded);
-        // assert(delta.particleIDs.empty() && "positive deltamap should be empty");
         
-        // does this ever happen?
+        // turns out this happens a lot
         // TODO: defer this erase or something
         if (particleMap[cellID].empty()) {
+            #ifdef PMEMPTYCOUNTER
+            pmemptycounter += 1;
+            #endif
             diffusionField.cells[cellID].momentum = {0.0, 0.0};
             particleMap.erase(cellID);
         }

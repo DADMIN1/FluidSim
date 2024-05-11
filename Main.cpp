@@ -170,6 +170,10 @@ int main(int argc, char** argv)
                         break;
                         
                         case sf::Keyboard::T:
+                            std::cout << "Fluid is: " << (simulation.ToggleTurbulence()? "Turbulent":"not turbulent") << '\n';
+                        break;
+                        
+                        case sf::Keyboard::Y:
                             std::cout << "transparency " << (simulation.ToggleTransparency()? "enabled":"disabled") << '\n';
                         break;
                         
@@ -281,6 +285,8 @@ int main(int argc, char** argv)
     }
     
     PrintSpeedcapInfo();
-    
+    #ifdef PMEMPTYCOUNTER
+    std::cout << "pmemptycounter: " << pmemptycounter << '\n';
+    #endif
     return 0;
 }

@@ -24,7 +24,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{11};
+    static constexpr auto numkeybinds{12};
     std::vector<Keybind> all;
     
     #define KEY(key, description) \
@@ -41,7 +41,8 @@ struct AllKeybinds
         KEY(Tab, "toggle mouse interactions");
         KEY(P, "toggle painting-mode");
         KEY(C, "toggle cell-grid display");
-        KEY(T, "toggle particle transparency");
+        KEY(T, "toggle fluid turbulence");
+        KEY(Y, "toggle particle transparency");
         KEY(N, "print mouse position");
         KEY(F2, "open the gradient-viewing window");
         

@@ -123,6 +123,7 @@ class Simulation
     bool ToggleGravity(bool noArg=true) // if you pass false, it always disables gravity
     { hasGravity = (noArg? (!hasGravity) : false); return hasGravity; }
     bool ToggleTransparency() { useTransparency = !useTransparency; return useTransparency; }
+    bool ToggleTurbulence() { fluid.isTurbulent = !fluid.isTurbulent; return fluid.isTurbulent; }
     
     void Freeze() // sets all velocities to 0
     {
@@ -141,6 +142,10 @@ class Simulation
     }
 };
 
+//#define PMEMPTYCOUNTER
+#ifdef PMEMPTYCOUNTER
+extern long long pmemptycounter;
+#endif
 
 // TODO: implement class RenderState to manage all visuals (including mouse)
 // holds textures/sprites for each member

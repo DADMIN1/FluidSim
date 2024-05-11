@@ -15,7 +15,7 @@ DEBUGFLAG = false
 target_executable = fluidsym
 OBJECTFILE_DIR = build/objects
 #CXXFLAGS := -std=c++23 -O3 -march=native -mtune=native -pipe -Wall -Wextra -Wpedantic -DNDEBUG
-CXXFLAGS := -std=c++23 -O1 -pipe -Wall -Wextra -Wpedantic -Wfatal-errors
+CXXFLAGS := -std=c++23 -O3 -pipe -Wall -Wextra -Wpedantic -Wfatal-errors
 # -fmax-errors=1  or  -Wfatal-errors ???
 endif
 
