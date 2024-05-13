@@ -1,3 +1,4 @@
+// Only shows moving particles
 uniform sampler2D texture;
 
 void main() 

@@ -3,6 +3,9 @@
 #include <iostream>
 
 
+const Shader* Shader::current = nullptr;
+std::map<sf::Keyboard::Key, Shader*> Shader::keymap{};
+
 Shader::Shader(std::string name, sf::Shader::Type shadertype)
 : sf::Shader(), sf::RenderStates(), name{name}
 {
@@ -21,7 +24,7 @@ Shader::Shader(std::string name, sf::Shader::Type shadertype)
     
     std::string filepath = "Shaders/" + name + file_extension;
     isValid = this->loadFromFile(filepath, shadertype);
-    if (!isValid) { std::cerr << "shader failed to load file: " << file_extension; }
+    if (!isValid) { std::cerr << "shader failed to load file: " << filepath; }
     
     this->setUniform("texture", sf::Shader::CurrentTexture); // magic
     this->shader = this;
@@ -35,5 +38,38 @@ bool Shader::InvokeSwitch() const
     if (!isValid) {
         std::cerr << "could not load shader: " << name << '\n';
     }
+    current = this;
     return isValid;
 }
+
+const std::map<sf::Keyboard::Key, Shader*>& Shader::LoadAll()
+{
+    static std::size_t index{0};
+    
+    // TODO: do something better than making these 'static'
+    std::cout << "loading shaders\n";
+    static FRAGSHADER(empty);
+    static FRAGSHADER(brighter);
+    static FRAGSHADER(darker);
+    static FRAGSHADER(red);
+    static FRAGSHADER(turbulence);
+    static FRAGSHADER(cherry_blossoms);
+    
+    keymap = {
+        { sf::Keyboard::Num0, &empty },
+        { sf::Keyboard::Num1, &brighter },
+        { sf::Keyboard::Num2, &darker },
+        { sf::Keyboard::Num3, &red },
+        { sf::Keyboard::Num4, &cherry_blossoms },
+        { sf::Keyboard::Num5, &turbulence },
+    };
+    
+    //empty.InvokeSwitch();
+    /* if (!empty.InvokeSwitch()) {
+        std::cerr << "ragequitting because empty shader didn't load.\n";
+        //return 3;
+    } */
+    
+    return keymap;
+}
+

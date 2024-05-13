@@ -64,30 +64,6 @@ int main(int argc, char** argv)
     ThreadManager threadManager{};
     threadManager.PrintThreadcount();
     
-    std::cout << "loading shaders\n";
-    FRAGSHADER(empty);
-    FRAGSHADER(brighter);
-    FRAGSHADER(darker);
-    FRAGSHADER(red);
-    FRAGSHADER(turbulence);
-    FRAGSHADER(cherry_blossoms);
-    
-    Shader* currentShader{nullptr};
-    currentShader = &empty;
-    if (!empty.IsValid()) {
-        std::cerr << "ragequitting because empty shader didn't load.\n";
-        return 3;
-    }
-    
-    std::map<sf::Keyboard::Key, Shader*> shader_map {
-        { sf::Keyboard::Num0, &empty },
-        { sf::Keyboard::Num1, &brighter },
-        { sf::Keyboard::Num2, &darker },
-        { sf::Keyboard::Num3, &red },
-        { sf::Keyboard::Num4, &cherry_blossoms },
-        { sf::Keyboard::Num5, &turbulence },
-    };
-    
     // Title-bar is implied (for Style::Close)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM", mainstyle);
@@ -110,6 +86,13 @@ int main(int argc, char** argv)
     Mouse_T mouse(mainwindow, simulation.GetDiffusionFieldPtr());
     
     PrintKeybinds();
+    
+    const std::map<sf::Keyboard::Key, Shader*>& shader_map = Shader::LoadAll();
+    const Shader* empty = shader_map.cbegin()->second;
+    if (!empty->InvokeSwitch()) {
+        std::cerr << "ragequitting because empty shader didn't load.\n";
+        return 3;
+    }
     
     #if DYNAMICFRAMEDELAY
     sf::Clock frametimer{};
@@ -227,12 +210,7 @@ int main(int argc, char** argv)
                         case sf::Keyboard::Num3:
                         case sf::Keyboard::Num4:
                         case sf::Keyboard::Num5:
-                        {
-                            Shader* lastShader = currentShader;
-                            currentShader = shader_map[event.key.code];
-                            if (!currentShader->InvokeSwitch()) 
-                                currentShader = lastShader;
-                        }
+                            shader_map.at(event.key.code)->InvokeSwitch();
                         break;
                         
                         // case sf::Keyboard::_:
@@ -297,7 +275,7 @@ int main(int argc, char** argv)
         }
         
         simulation.RedrawFluid();
-        mainwindow.draw(fluidSprite, *currentShader);
+        mainwindow.draw(fluidSprite, Shader::current);
         
         // TODO: allow mouse to update and be redrawn even while paused
         if (mouse.shouldDisplay) {
