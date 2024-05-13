@@ -24,7 +24,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{12};
+    static constexpr auto numkeybinds{18};
     std::vector<Keybind> all;
     
     #define KEY(key, description) \
@@ -45,6 +45,13 @@ struct AllKeybinds
         KEY(Y, "toggle particle transparency");
         KEY(N, "print mouse position");
         KEY(F2, "open the gradient-viewing window");
+        // Shaders //
+        KEY(Num0, "Shader: 'empty'");
+        KEY(Num1, "Shader: 'brighter'");
+        KEY(Num2, "Shader: 'darker'");
+        KEY(Num3, "Shader: 'red'");
+        KEY(Num4, "Shader: 'cherry_blossoms'");
+        KEY(Num5, "Shader: 'turbulence'");
         
         keybind_F2.extrainfo = "close it with ESC, Q, or F2 again";
         

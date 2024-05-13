@@ -9,7 +9,7 @@
 #include "Gradient.hpp"
 //#include "ValarrayTest.hpp"
 #include "Threading.hpp"
-
+#include "Shader.hpp"
 
 // inspired by Sebastian Lague
 
@@ -59,11 +59,34 @@ int main(int argc, char** argv)
         << Cell::maxIX << ", " 
         << Cell::maxIY << '\n';
     
-    
     //EmbedMacroTest();
     
     ThreadManager threadManager{};
     threadManager.PrintThreadcount();
+    
+    std::cout << "loading shaders\n";
+    FRAGSHADER(empty);
+    FRAGSHADER(brighter);
+    FRAGSHADER(darker);
+    FRAGSHADER(red);
+    FRAGSHADER(turbulence);
+    FRAGSHADER(cherry_blossoms);
+    
+    Shader* currentShader{nullptr};
+    currentShader = &empty;
+    if (!empty.IsValid()) {
+        std::cerr << "ragequitting because empty shader didn't load.\n";
+        return 3;
+    }
+    
+    std::map<sf::Keyboard::Key, Shader*> shader_map {
+        { sf::Keyboard::Num0, &empty },
+        { sf::Keyboard::Num1, &brighter },
+        { sf::Keyboard::Num2, &darker },
+        { sf::Keyboard::Num3, &red },
+        { sf::Keyboard::Num4, &cherry_blossoms },
+        { sf::Keyboard::Num5, &turbulence },
+    };
     
     // Title-bar is implied (for Style::Close)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
@@ -198,6 +221,20 @@ int main(int argc, char** argv)
                         }
                         break;
                         
+                        case sf::Keyboard::Num0:
+                        case sf::Keyboard::Num1:
+                        case sf::Keyboard::Num2:
+                        case sf::Keyboard::Num3:
+                        case sf::Keyboard::Num4:
+                        case sf::Keyboard::Num5:
+                        {
+                            Shader* lastShader = currentShader;
+                            currentShader = shader_map[event.key.code];
+                            if (!currentShader->InvokeSwitch()) 
+                                currentShader = lastShader;
+                        }
+                        break;
+                        
                         // case sf::Keyboard::_:
                         // break;
                         
@@ -238,8 +275,8 @@ int main(int argc, char** argv)
             }
         }
         
+        //if (currentShader != &turbulence)
         mainwindow.clear();
-        
         simulation.Update();
         
         // TODO: hide the gridlines in painting-mode
@@ -260,7 +297,7 @@ int main(int argc, char** argv)
         }
         
         simulation.RedrawFluid();
-        mainwindow.draw(fluidSprite);
+        mainwindow.draw(fluidSprite, *currentShader);
         
         // TODO: allow mouse to update and be redrawn even while paused
         if (mouse.shouldDisplay) {
