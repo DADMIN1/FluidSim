@@ -31,13 +31,13 @@ void PrintSpeedcapInfo();
 
 class Fluid
 {
-    float gravity {0.275};
-    float bounceDampening {0.25};
-    float viscosity {0.01675};
-    float fdensity {0.01635}; // controls 'force' of diffusion
-    float speedcap_soft {50.0};
-    float speedcap_hard {100.0};
-    bool isTurbulent{false};
+    float gravity {0.295};
+    float bounceDampening {0.1915};
+    float viscosity {0.005675};
+    float fdensity {0.01975}; // controls 'force' of diffusion
+    float speedcap_soft {60.0};
+    float speedcap_hard {120.0};
+     bool isTurbulent{false};
     
     class Particle : public sf::CircleShape
     {

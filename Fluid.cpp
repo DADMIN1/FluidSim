@@ -61,8 +61,8 @@ void Fluid::ApplySpeedcap(sf::Vector2f& velocity)
 void Fluid::Particle::UpdateColor(const bool useTransparency)
 {
     const float speed = std::abs(velocity.x) + std::abs(velocity.y);
-    constexpr float thresholdLow{1.5f};  // speed at which gradient begins to apply
-    constexpr float thresholdHigh{33.5f};  // caps out the gradient
+    constexpr float thresholdLow{0.75f};  // speed at which gradient begins to apply
+    constexpr float thresholdHigh{40.75f};  // caps out the gradient
     constexpr float inputRange = thresholdHigh-thresholdLow;
     unsigned int speedindex;
     const unsigned int baseAlpha = (useTransparency? 0xC0 : 0xFF);

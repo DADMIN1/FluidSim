@@ -75,8 +75,11 @@ DeltaMap Simulation::FindCellTransitions(const auto& particles_slice) const
         if (oldcell.getGlobalBounds().contains(particle.getPosition())) continue;
         else {
             const auto& [x, y] = particle.getPosition();
-            const unsigned int xi = x / SPATIAL_RESOLUTION;
-            const unsigned int yi = y / SPATIAL_RESOLUTION;
+            unsigned int xi = x / SPATIAL_RESOLUTION;
+            unsigned int yi = y / SPATIAL_RESOLUTION;
+            // TODO: actually fix this instead of workaround
+            if (xi > Cell::maxIX) xi = Cell::maxIX;
+            if (yi > Cell::maxIY) yi = Cell::maxIY;
             assert((xi <= Cell::maxIX) && (yi <= Cell::maxIY) && "out-of-bounds index");
             const Cell& newcell = *diffusionField.cellmatrix.at(xi).at(yi);
             
@@ -109,9 +112,8 @@ void Simulation::HandleTransitions(DeltaMap&& deltamap)
     {
         Cell& cell = diffusionField.cells[cellID];
         // delta.velocities has already been scaled by momentumTransfer
-        
         // updating densities
-        diffusionField.cells[cellID].density += delta.density;
+        cell.density += delta.density;
         
         // this should probably be reverted
         // float smoothingdivisor = 1.0f + float(delta.particlesAdded.size() - delta.particlesRemoved.size());
@@ -139,7 +141,7 @@ void Simulation::HandleTransitions(DeltaMap&& deltamap)
             {
                 Fluid::Particle& particle = fluid.particles.at(particleID);
                 particle.velocity += momentumSmoothing;
-                //cell.momentum -= momentumSmoothing;
+                //cell.momentum -= momentumSmoothing*momentumDistribution;
                 //Cell& newCell = diffusionField.cells[cellID];
             }
         }
@@ -163,14 +165,26 @@ void Simulation::HandleTransitions(DeltaMap&& deltamap)
         NegativeMerge(particleMap[cellID], delta.particlesRemoved);
         particleMap[cellID].merge(delta.particlesAdded);
         
-        // turns out this happens a lot
-        // TODO: defer this erase or something
+        //if (fluid.isTurbulent) continue;
         if (particleMap[cellID].empty()) {
             #ifdef PMEMPTYCOUNTER
+            // turns out this happens a lot
             pmemptycounter += 1;
             #endif
-            diffusionField.cells[cellID].momentum = {0.0, 0.0};
-            particleMap.erase(cellID);
+            
+            // stored momentum would otherwise not decrease for empty cells
+            cell.momentum -= cell.momentum*momentumDistribution;
+            // we don't erase the cell because we want to keep decreasing the momentum
+            
+            // only erase if it's empty and has negligable momentum
+            // TODO: collect stats on this to find a good minimum
+            constexpr float small_enough = 0.01;
+            if (abs(cell.momentum.x) < small_enough 
+             && abs(cell.momentum.y) < small_enough) {
+                // TODO: defer this erase or something
+                diffusionField.cells[cellID].momentum = {0.0, 0.0};
+                particleMap.erase(cellID);
+             }
         }
     }
     

@@ -96,8 +96,8 @@ class Simulation
     bool isPaused{false};
     
     // TODO: scale these based on density
-    float momentumTransfer{0.20}; // percentage of velocity transferred to cell (and lost) by particle
-    float momentumDistribution{0.75}; // percentage of cell's total momentum distributed to local particles per timestep
+    float momentumTransfer{0.165}; // percentage of velocity transferred to cell (and lost) by particle
+    float momentumDistribution{0.25}; // percentage of cell's total momentum distributed to local particles per timestep
     
     // identifies Particles that have crossed a cell-boundary
     // does NOT update the Particles' cellID or the cells' density
