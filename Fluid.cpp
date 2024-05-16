@@ -13,6 +13,8 @@
 #include <SFML/System/Time.hpp>
 
 
+bool Fluid::isParticleScalingPositive = true;
+
 // counts how many times the speedcaps were broken
 static std::array<std::size_t, 4> speedcap_counter{0,0,0,0};
 // counts the number of times two particles shared EXACTLY the same position (in CalcLocalForce)
@@ -76,8 +78,9 @@ void Fluid::Particle::UpdateColor(const bool useTransparency)
             alpha = baseAlpha + ((speed - thresholdLow) * ((0xFF-baseAlpha)/inputRange));
             assert(alpha < 256);
         }
+        float particleScaling = ((speed - thresholdLow)/inputRange);
         // faster particles grow
-        float scale = 1.0f + ((speed - thresholdLow)/inputRange);
+        float scale = 1.0f + ((Fluid::isParticleScalingPositive)? particleScaling : -particleScaling);
         setScale({scale, scale});
     }
     auto&&[r, g, b, a] = Gradient_T::Lookup(speedindex);

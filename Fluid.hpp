@@ -39,6 +39,8 @@ class Fluid
     float speedcap_hard {120.0};
      bool isTurbulent{false};
     
+    static bool isParticleScalingPositive;
+    
     class Particle : public sf::CircleShape
     {
         const unsigned int UUID;
@@ -73,6 +75,11 @@ class Fluid
 
     public:
     friend class Simulation;
+    
+    static bool ToggleParticleScaling() { 
+        isParticleScalingPositive = !isParticleScalingPositive; 
+        return isParticleScalingPositive; 
+    }
     
     bool Initialize();
     void UpdatePositions();

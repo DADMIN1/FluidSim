@@ -183,6 +183,10 @@ int main(int argc, char** argv)
                             std::cout << "transparency " << (simulation.ToggleTransparency()? "enabled":"disabled") << '\n';
                         break;
                         
+                        case sf::Keyboard::U:
+                            std::cout << "Particle scaling is: " << (Fluid::ToggleParticleScaling()? "Positive":"Negative") << '\n';
+                        break;
+                        
                         case sf::Keyboard::N:
                         {
                             const auto [mouseX, mouseY] = sf::Mouse::getPosition(mainwindow);

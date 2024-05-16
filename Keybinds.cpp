@@ -24,7 +24,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{18};
+    static constexpr auto numkeybinds{19};
     std::vector<Keybind> all;
     
     #define KEY(key, description) \
@@ -43,6 +43,7 @@ struct AllKeybinds
         KEY(C, "toggle cell-grid display");
         KEY(T, "toggle fluid turbulence");
         KEY(Y, "toggle particle transparency");
+        KEY(U, "toggle particle-scaling direction (positive/negative)");
         KEY(N, "print mouse position");
         KEY(F2, "open the gradient-viewing window");
         // Shaders //
