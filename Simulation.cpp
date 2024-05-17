@@ -102,6 +102,8 @@ DeltaMap Simulation::FindCellTransitions(const auto& particles_slice) const
 void Simulation::HandleTransitions(DeltaMap&& deltamap)
 {
     std::lock_guard<std::mutex> pmGuard(write_mutex);
+    float rng = normalizedRNG();
+    rng += 0.95; // range 0.95-1.95
     
     /* for (const Transition_T& transition : deltamap.transitionlist)
     {
@@ -118,14 +120,14 @@ void Simulation::HandleTransitions(DeltaMap&& deltamap)
         // this should probably be reverted
         // float smoothingdivisor = 1.0f + float(delta.particlesAdded.size() - delta.particlesRemoved.size());
         float smoothingdivisor = float(delta.particlesAdded.size() + delta.particlesRemoved.size());
-        const sf::Vector2f momentumSmoothing = { delta.velocities*momentumTransfer / smoothingdivisor };
-        if (fluid.isTurbulent) cell.momentum += momentumSmoothing;
+        sf::Vector2f momentumSmoothing = { delta.velocities*momentumTransfer / smoothingdivisor };
+        if (fluid.isTurbulent) cell.momentum += momentumSmoothing * rng;
         
         // transferring momentum from new particles to cell
         for (const int particleID: delta.particlesAdded)
         {
             Fluid::Particle& particle = fluid.particles.at(particleID);
-            if (fluid.isTurbulent) particle.velocity += momentumSmoothing;
+            if (fluid.isTurbulent) particle.velocity += momentumSmoothing * rng;
             const sf::Vector2f momentumDelta = particle.velocity * momentumTransfer;
             particle.velocity -= momentumDelta;
             cell.momentum += momentumDelta;
@@ -140,7 +142,7 @@ void Simulation::HandleTransitions(DeltaMap&& deltamap)
             for (const int particleID: delta.particlesRemoved)
             {
                 Fluid::Particle& particle = fluid.particles.at(particleID);
-                particle.velocity += momentumSmoothing;
+                particle.velocity += momentumSmoothing * rng;
                 //cell.momentum -= momentumSmoothing*momentumDistribution;
                 //Cell& newCell = diffusionField.cells[cellID];
             }

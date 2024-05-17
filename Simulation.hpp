@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <map>
 #include <thread> // std::mutex
-
+#include <random>
 
 // holds info about a particle that has crossed into a new cell
 struct Transition_T {
@@ -90,6 +90,10 @@ class Simulation
     Fluid fluid{};
     UUID_Map_T particleMap{}; // mapping cellIDs to particleIDs
     std::mutex write_mutex;
+    std::random_device RNG; // TODO: savestates
+    float normalizedRNG() {
+        return RNG() / RNG.max();
+    }
     
     bool hasGravity {false};
     bool useTransparency {false};  // slow-moving particles are more transparent
