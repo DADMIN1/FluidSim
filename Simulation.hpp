@@ -98,6 +98,7 @@ class Simulation
     bool hasGravity {false};
     bool useTransparency {false};  // slow-moving particles are more transparent
     bool isPaused{false};
+    friend int main(int argc, char** argv); // only so that the turbulence render block can check 'isPaused'
     
     // TODO: scale these based on density
     float momentumTransfer{0.165}; // percentage of velocity transferred to cell (and lost) by particle

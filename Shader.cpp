@@ -5,12 +5,14 @@
 
 const Shader* Shader::current = nullptr;
 std::map<sf::Keyboard::Key, Shader*> Shader::keymap{};
+std::map<std::string, Shader*> Shader::NameLookup{};
+
 
 Shader::Shader(std::string name, sf::Shader::Type shadertype)
 : sf::Shader(), sf::RenderStates(), name{name}
 {
     if (!sf::Shader::isAvailable()) { 
-        std::cerr << "shaders unsupported!\n";
+        std::cerr << "\nshaders unsupported!\n";
         return;
     }
     
@@ -22,9 +24,9 @@ Shader::Shader(std::string name, sf::Shader::Type shadertype)
         case sf::Shader::Type::Fragment: file_extension = ".frag"; break;
     }
     
-    std::string filepath = "Shaders/" + name + file_extension;
+    std::string filepath = "./Shaders/" + name + file_extension;
     isValid = this->loadFromFile(filepath, shadertype);
-    if (!isValid) { std::cerr << "shader failed to load file: " << filepath; }
+    if (!isValid) { std::cerr << "shader failed to load file: \'" << filepath << "\' \n"; }
     
     this->setUniform("texture", sf::Shader::CurrentTexture); // magic
     this->shader = this;
@@ -32,28 +34,46 @@ Shader::Shader(std::string name, sf::Shader::Type shadertype)
     return;
 }
 
-bool Shader::InvokeSwitch() const 
+// TODO: needs customization point for shaders to define custom callbacks on switch
+bool Shader::InvokeSwitch() const
 {
-    std::cout << "setting active shader: " << name << '\n';
-    if (!isValid) {
-        std::cerr << "could not load shader: " << name << '\n';
+    if (!isValid) { std::cerr << "could not switch to invalid shader: " << name << '\n'; }
+    else if (current != this) { 
+        std::cout << "\nsetting active shader: " << name << '\n'; 
+        current = this;
     }
-    current = this;
     return isValid;
+}
+
+Shader* Shader::InvokeSwitch(std::string shadername)
+{
+    if (!NameLookup.contains(shadername)) {
+        std::cerr << "no such shader: " << shadername << '\n';
+        return nullptr;
+    }
+    Shader* nextshader = NameLookup.at(shadername);
+    if (!nextshader->InvokeSwitch()) {
+        return Shader::current->GetWritePtr(); // currentptr did not change if shader was invalid
+    }
+    return nextshader;
 }
 
 const std::map<sf::Keyboard::Key, Shader*>& Shader::LoadAll()
 {
-    static std::size_t index{0};
+    // TODO: write macro that sequentially assigns keybinds to shaders
+    // and extend FRAGSHADER macro to be variadic
     
     // TODO: do something better than making these 'static'
-    std::cout << "loading shaders\n";
+    std::cout << "\nLoading Shaders...\n";
+    #define XMACRO(name) Shader::NameLookup[#name] = &name;
     static FRAGSHADER(empty);
     static FRAGSHADER(brighter);
     static FRAGSHADER(darker);
     static FRAGSHADER(red);
-    static FRAGSHADER(turbulence);
     static FRAGSHADER(cherry_blossoms);
+    static FRAGSHADER(turbulence);
+    //static FRAGSHADER(SO_example);
+    #undef XMACRO
     
     keymap = {
         { sf::Keyboard::Num0, &empty },
@@ -62,6 +82,7 @@ const std::map<sf::Keyboard::Key, Shader*>& Shader::LoadAll()
         { sf::Keyboard::Num3, &red },
         { sf::Keyboard::Num4, &cherry_blossoms },
         { sf::Keyboard::Num5, &turbulence },
+        //{ sf::Keyboard::Num6, &SO_example },
     };
     
     //empty.InvokeSwitch();
@@ -70,6 +91,27 @@ const std::map<sf::Keyboard::Key, Shader*>& Shader::LoadAll()
         //return 3;
     } */
     
+    turbulence.uniform_vars["threshold"] = 0.5f;
+    turbulence.setUniform("threshold", 0.5f);
+    
     return keymap;
+}
+
+void Shader::ApplyUniform(std::string varName, float val) {
+    if (!uniform_vars.contains(varName)) {
+        std::cerr << "Shader: " << this->name << " does not have a variable: " << varName << '\n';
+        return;
+    }
+    std::cout << "setting uniform: '" << varName << "' = " << val << '\n';
+    uniform_vars[varName] = val;
+    this->setUniform(varName, val);
+    return;
+}
+
+void Shader::ApplyUniforms() {
+    for (const auto& [uniform, val]: uniform_vars) {
+        std::cout << "setting uniform: '" << uniform << "' = " << val << '\n';
+        this->setUniform(uniform, val);
+    }
 }
 

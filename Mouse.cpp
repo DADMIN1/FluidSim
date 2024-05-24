@@ -88,10 +88,10 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
             CellState_T& state = savedState.at(cellptr->UUID);
             state.mod.density = ((mode==Push)? strength : -strength);
             state.cellptr->density += state.mod.density;
+            hoverOutline.setPosition(hoveredCell->getPosition());
             if (isPaintingMode)
             {
                 hoverOutline.setFillColor({0x1A, 0xFF, 0x1A, 0x82});
-                hoverOutline.setPosition(hoveredCell->getPosition());
                 outlined.clear();
                 outlined.push_back(hoveredCell->getPosition());
             }

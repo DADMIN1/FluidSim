@@ -29,6 +29,7 @@ float timestepRatio{1.0/float(framerateCap/60.0)};  // normalizing timesteps to 
 extern bool shouldDrawGrid;
 bool ToggleGridDisplay();
 extern sf::RectangleShape hoverOutline;
+bool windowClearDisabled{false};  // option used by the turbulence shader
 
 
 int main(int argc, char** argv)
@@ -89,9 +90,15 @@ int main(int argc, char** argv)
     
     const std::map<sf::Keyboard::Key, Shader*>& shader_map = Shader::LoadAll();
     const Shader* empty = shader_map.cbegin()->second;
-    if (!empty->InvokeSwitch()) {
+    if (!empty->InvokeSwitch()) { 
         std::cerr << "ragequitting because empty shader didn't load.\n";
         return 3;
+    }
+    Shader* turbulence = Shader::InvokeSwitch("turbulence");
+    if (Shader::current->name == "turbulence") {
+        if(!simulation.ToggleTransparency()) simulation.ToggleTransparency();
+        if(!simulation.ToggleTurbulence()) simulation.ToggleTurbulence();
+        turbulence->setUniform("texture", fluidSprite.getTexture());
     }
     
     #if DYNAMICFRAMEDELAY
@@ -214,7 +221,41 @@ int main(int argc, char** argv)
                         case sf::Keyboard::Num3:
                         case sf::Keyboard::Num4:
                         case sf::Keyboard::Num5:
+                        //case sf::Keyboard::Num6:
+                        {
+                            std::string previous_name = Shader::current->name;
+                            //Shader* selectedShader = shader_map.at(event.key.code);
                             shader_map.at(event.key.code)->InvokeSwitch();
+                            // enable transparency and turbulence-mode automatically
+                            if (Shader::current->name == "turbulence") {
+                                if(!simulation.ToggleTransparency()) simulation.ToggleTransparency();
+                                if(!simulation.ToggleTurbulence()) simulation.ToggleTurbulence();
+                                if(previous_name == "turbulence") {
+                                    windowClearDisabled = !windowClearDisabled;
+                                    std::cout << "window clears " << (windowClearDisabled ? "enabled" : "disabled") << "\n";
+                                }
+                            }
+                            // TODO: restore previous settings for turbulence, transparency, and window-clears
+                        }
+                        break;
+                        
+                        case sf::Keyboard::Pause:
+                            windowClearDisabled = !windowClearDisabled;
+                            std::cout << "window clears " << (windowClearDisabled ? "enabled" : "disabled") << "\n";
+                        break;
+                        
+                        case sf::Keyboard::Add:
+                        case sf::Keyboard::Subtract:
+                        {
+                            if (Shader::current->name != "turbulence") {
+                                std::cerr << "turbulence is not active\n";
+                                break;
+                            }
+                            float threshold = Shader::current->uniform_vars.at("threshold");
+                            threshold += ((event.key.code==sf::Keyboard::Add)? 0.01 : -0.01);
+                            if (threshold < 0) threshold = 0.0f;
+                            Shader::current->GetWritePtr()->ApplyUniform("threshold", threshold);
+                        }
                         break;
                         
                         // case sf::Keyboard::_:
@@ -257,8 +298,31 @@ int main(int argc, char** argv)
             }
         }
         
-        //if (currentShader != &turbulence)
-        mainwindow.clear();
+        // alternate render logic for turbulence shader that skips window-clearing and the grid
+        if (Shader::current->name == "turbulence") {
+            if (simulation.isPaused || !windowClearDisabled) 
+                mainwindow.clear(sf::Color::Transparent); // always clear when paused so you can modify and observe the effects of the 'threshold' parameter
+            
+            if (mouse.isActive(true) && mouse.isPaintingMode) { 
+                mouse.DrawOutlines();
+                hoverOutline.setFillColor({0x1A, 0xFF, 0x1A, 0x82});
+                mainwindow.draw(hoverOutline); 
+            }
+            else if (mouse.shouldOutline) { hoverOutline.setFillColor(sf::Color::Transparent); mainwindow.draw(hoverOutline); }
+            if (mouse.shouldDisplay) { mainwindow.draw(mouse); }
+            
+            simulation.Update();
+            simulation.RedrawFluid();
+            mainwindow.draw(fluidSprite, turbulence);
+            
+            // unlike the normal frameloop, here the mouse-outline is drawn even if the mouse is inactive;
+            // without it, there's no visual indicator that the mouse is enabled, and no position.
+            mainwindow.display();
+            goto framedelay;
+        }
+        
+        if (!windowClearDisabled)
+        mainwindow.clear(sf::Color::Transparent);
         simulation.Update();
         
         // TODO: hide the gridlines in painting-mode
@@ -281,13 +345,13 @@ int main(int argc, char** argv)
         simulation.RedrawFluid();
         mainwindow.draw(fluidSprite, Shader::current);
         
-        // TODO: allow mouse to update and be redrawn even while paused
         if (mouse.shouldDisplay) {
             mainwindow.draw(mouse);
         }
         
         mainwindow.display();
         
+        framedelay:
         // framerate cap
         #if DYNAMICFRAMEDELAY
         const sf::Time adjustedDelay = sleepDelay - frametimer.getElapsedTime();
