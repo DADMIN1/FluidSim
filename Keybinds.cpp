@@ -90,12 +90,11 @@ struct AllKeybinds
             "    note: while this shader is active and the simulation is paused, the framebuffer will always be cleared\n" 
             "          (so that the effects of the 'threshold' parameter can be observed)\n"
             "  +/- keys modify the 'threshold' parameter\n"
-            "  activating this shader automatically enables Turbulence-mode and transparency\n";
-        // seems kind of redundant
-        //KEY(Add,      "increases 'threshold' parameter for 'turbulence' shader");
-        //KEY(Subtract, "decreases 'threshold' parameter for 'turbulence' shader");
-        // Pause-Break
-        KEY(Pause, "toggle framebuffer-clears")
+            "  activating this shader automatically enables Turbulence-mode\n";
+        /* // seems kind of redundant
+        KEY(Add,      "increases 'threshold' parameter for 'turbulence' shader");
+        KEY(Subtract, "decreases 'threshold' parameter for 'turbulence' shader"); */
+        KEY(Pause, "toggle framebuffer-clears") // Pause-Break
             -> extrainfo = "while the 'turbulence' shader is active and the simulation is paused, the framebuffer will always be cleared\n"
             " (so that the effects of the 'threshold' parameter can be observed)\n";
         trailing_newline = true;

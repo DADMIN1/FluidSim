@@ -94,12 +94,6 @@ int main(int argc, char** argv)
         std::cerr << "ragequitting because empty shader didn't load.\n";
         return 3;
     }
-    Shader* turbulence = Shader::InvokeSwitch("turbulence");
-    if (Shader::current->name == "turbulence") {
-        if(!simulation.ToggleTransparency()) simulation.ToggleTransparency();
-        if(!simulation.ToggleTurbulence()) simulation.ToggleTurbulence();
-        turbulence->setUniform("texture", fluidSprite.getTexture());
-    }
     
     #if DYNAMICFRAMEDELAY
     sf::Clock frametimer{};
@@ -221,14 +215,12 @@ int main(int argc, char** argv)
                         case sf::Keyboard::Num3:
                         case sf::Keyboard::Num4:
                         case sf::Keyboard::Num5:
-                        //case sf::Keyboard::Num6:
                         {
                             std::string previous_name = Shader::current->name;
                             //Shader* selectedShader = shader_map.at(event.key.code);
                             shader_map.at(event.key.code)->InvokeSwitch();
                             // enable transparency and turbulence-mode automatically
                             if (Shader::current->name == "turbulence") {
-                                if(!simulation.ToggleTransparency()) simulation.ToggleTransparency();
                                 if(!simulation.ToggleTurbulence()) simulation.ToggleTurbulence();
                                 if(previous_name == "turbulence") {
                                     windowClearDisabled = !windowClearDisabled;
@@ -313,7 +305,7 @@ int main(int argc, char** argv)
             
             simulation.Update();
             simulation.RedrawFluid();
-            mainwindow.draw(fluidSprite, turbulence);
+            mainwindow.draw(fluidSprite, Shader::current);
             
             // unlike the normal frameloop, here the mouse-outline is drawn even if the mouse is inactive;
             // without it, there's no visual indicator that the mouse is enabled, and no position.

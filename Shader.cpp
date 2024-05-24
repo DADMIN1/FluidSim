@@ -82,7 +82,6 @@ const std::map<sf::Keyboard::Key, Shader*>& Shader::LoadAll()
         { sf::Keyboard::Num3, &red },
         { sf::Keyboard::Num4, &cherry_blossoms },
         { sf::Keyboard::Num5, &turbulence },
-        //{ sf::Keyboard::Num6, &SO_example },
     };
     
     //empty.InvokeSwitch();
