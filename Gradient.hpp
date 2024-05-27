@@ -76,8 +76,8 @@ class GradientWindow_T: public sf::RenderWindow
       m_gradient{gradientPtr}, ownsPtr{false}
     { Initialize(); }
     
-    void Create(int xposition); // calls sf::RenderWindow.create(...) with some arguments
-    void FrameLoop(); // returns after gradient_window is closed
+    void Create(bool useVsync, int xposition); // calls sf::RenderWindow.create(...) with some arguments
+    void FrameLoop(); // performs a single round of clear/draw/display and event-processing for gradient_window
     ~GradientWindow_T();
     // gcc warns if the destructor is defined here (due to deleting an incomplete type)
     // but it's fine if the definition is provided in the .cpp file instead

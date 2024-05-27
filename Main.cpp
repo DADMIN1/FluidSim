@@ -20,7 +20,7 @@
 extern void EmbedMacroTest();  // MacroTest.cpp
 extern void PrintKeybinds();   // Keybinds.cpp
 
-
+constexpr int framerateCap{300};
 float timestepRatio{1.0/float(framerateCap/60.0)};  // normalizing timesteps to make physics independent of frame-rate
 
 
@@ -37,9 +37,6 @@ int main(int argc, char** argv)
     std::cout << "fluid sim\n";
     //assert(false && "asserts are active!");
     assert((timestepRatio > 0) && "timestep-ratio is zero!");
-    assert(sleepDelay.asMicroseconds() > 0 && "sleepDelay is zero or negative!");
-    std::cout << "sleepdelay = " << sleepDelay.asMilliseconds() << "ms\n"; 
-    std::cout << "(" << sleepDelay.asMicroseconds() << ") us\n";
     
     for (int C{0}; C < argc; ++C) {
         std::string arg {argv[C]};
@@ -69,7 +66,9 @@ int main(int argc, char** argv)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM", mainstyle);
     mainwindow.setPosition({2600, 0}); // move to right monitor
-    mainwindow.setFramerateLimit(300); // TODO: remove manual frame-delay
+    mainwindow.setFramerateLimit(framerateCap);
+    static bool usingVsync {true};
+    mainwindow.setVerticalSyncEnabled(usingVsync);
     
     assert(IMGUI_CHECKVERSION() && "ImGui version-check failed!");
     std::cout << "using imgui v" << IMGUI_VERSION << '\n';
@@ -79,6 +78,10 @@ int main(int argc, char** argv)
         std::cerr << "imgui-sfml failed to init! exiting.\n";
         return 3;
     }
+    
+    ImGuiIO& imguiIO = ImGui::GetIO(); // required for configflags and framerate
+    //imguiIO.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    //imguiIO.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
     
     GradientWindow_T gradientWindow{};
     gradientWindow.setPosition({mainwindow.getPosition().x, 360});
@@ -105,16 +108,16 @@ int main(int argc, char** argv)
         return 2;
     }
     
-    #if DYNAMICFRAMEDELAY
     sf::Clock frametimer{};
-    #endif
     
     // frameloop
     while (mainwindow.isOpen())
     {
-        #if DYNAMICFRAMEDELAY
-        frametimer.restart();
-        #endif
+        // imgui needs window and deltatime. You can pass mousePosition and displaySize instead of window
+        ImGui::SFML::Update(mainwindow, frametimer.restart()); // do this here; otherwise imgui gets a (very) wrong deltatime
+        //frametimer.restart();
+        if (gradientWindow.isOpen()) gradientWindow.FrameLoop();
+        
         sf::Event event;
         while (mainwindow.pollEvent(event))
         {
@@ -122,6 +125,7 @@ int main(int argc, char** argv)
             switch(event.type)
             {
                 case sf::Event::Closed:
+                    if (gradientWindow.isOpen()) gradientWindow.close();
                     mainwindow.close();
                 break;
                 
@@ -130,6 +134,7 @@ int main(int argc, char** argv)
                     switch (event.key.code) 
                     {
                         case sf::Keyboard::Q:
+                            if (gradientWindow.isOpen()) gradientWindow.close();
                             mainwindow.close();
                         break;
                         
@@ -177,13 +182,8 @@ int main(int argc, char** argv)
                             if (gradientWindow.isOpen()) { gradientWindow.close(); }
                             else
                             {
-                                // pausing here doesn't prevent deltatime from becoming huge?
-                                //bool oldPauseState = simulation.SetPause(true);
-                                gradientWindow.Create(mainwindow.getPosition().x);
+                                gradientWindow.Create(usingVsync, mainwindow.getPosition().x);
                                 gradientWindow.FrameLoop();
-                                //simulation.SetPause(oldPauseState);
-                                // resetting frametimer prevents deltatime from becoming huge and spazzing out
-                                frametimer.restart();
                             }
                         break;
                         
@@ -301,9 +301,36 @@ int main(int argc, char** argv)
             }
         }
         
-        // imgui needs window and deltatime. You can pass mousePosition and displaySize instead of window
-        ImGui::SFML::Update(mainwindow, frametimer.getElapsedTime());
-        ImGui::ShowDemoWindow();
+        // static bool MainWindowEnabled {true};
+        static bool DemoWindowEnabled {false};
+        
+        // bitwise-OR flags together flags ()
+        ImGuiWindowFlags mainwindow_flags { 0 
+            | ImGuiWindowFlags_NoTitleBar
+            | ImGuiWindowFlags_NoMove
+            | ImGuiWindowFlags_NoResize
+            | ImGuiWindowFlags_NoBackground //transparent
+            | ImGuiWindowFlags_NoCollapse
+            | ImGuiWindowFlags_MenuBar // adds a menubar
+        };
+        
+        // If you pass a bool* into 'Begin()', it will show an 'x' to close that menu (state written to bool).
+        // passing nullptr disables that closing button.
+        ImGui::Begin("Main", nullptr, mainwindow_flags);
+        if (ImGui::Button("Vsync Toggle")) // returns true if state has changed?
+        {
+            usingVsync = !usingVsync;
+            mainwindow.setVerticalSyncEnabled(usingVsync);
+            gradientWindow.setVerticalSyncEnabled(usingVsync);
+        }
+        ImGui::SameLine();
+        ImGui::Text("Vsync: %s", (usingVsync? "enabled" : "disabled"));
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / imguiIO.Framerate, imguiIO.Framerate);
+        
+        ImGui::Checkbox("Demo Window", &DemoWindowEnabled); // textbox state tied to the bool*
+        if(DemoWindowEnabled) ImGui::ShowDemoWindow(&DemoWindowEnabled);
+        
+        ImGui::End();
         
         // alternate render logic for turbulence shader that skips window-clearing and the grid
         if (Shader::current->name == "turbulence") {
@@ -326,7 +353,8 @@ int main(int argc, char** argv)
             // without it, there's no visual indicator that the mouse is enabled, and no position.
             ImGui::SFML::Render(mainwindow);
             mainwindow.display();
-            goto framedelay;
+            timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
+            continue;
         }
         
         if (!windowClearDisabled)
@@ -360,20 +388,7 @@ int main(int argc, char** argv)
         ImGui::SFML::Render(mainwindow);
         mainwindow.display();
         
-        framedelay:
-        // framerate cap
-        #if DYNAMICFRAMEDELAY
-        const sf::Time adjustedDelay = sleepDelay - frametimer.getElapsedTime();
-        if (adjustedDelay == sf::Time::Zero) {
-            //std::cout << "adjusted-delay is negative!: " << adjustedDelay.asMicroseconds() << "us" << '\n';
-            continue;
-        }
-        sf::sleep(adjustedDelay);
         timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
-        #else // using hardcoded delay-compensation
-        sf::sleep(sleepDelay);  // bad
-        #endif
-        
     }
     
     ImGui::SFML::Shutdown();

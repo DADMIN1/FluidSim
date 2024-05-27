@@ -31,5 +31,9 @@ constexpr int DIFFUSION_RADIUS{4}; // range in orthogonal-distance (grid-cells) 
 static_assert((DIFFUSION_RADIUS <= radialdist_limit), "Diffusion-radius is too big");
 
 
+// main.cpp
+extern float timestepRatio;  // normalizing timesteps to make physics independent of frame-rate
+
+
 
 #endif

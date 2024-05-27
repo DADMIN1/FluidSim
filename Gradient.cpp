@@ -60,13 +60,14 @@ GradientWindow_T::~GradientWindow_T()  // TODO: call RenderWindow destructor??
 }
 
 
-void GradientWindow_T::Create(int xposition)
+void GradientWindow_T::Create(bool useVsync, int xposition)
 {
     // sf::Style::None
     // for some reason it's only letting me use auto here
     constexpr auto m_style = sf::Style::Close;  // Title-bar is implied (for Style::Close)
     // sf::Style::Default = Titlebar | Resize | Close
     sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "Gradient", m_style);
+    setVerticalSyncEnabled(useVsync);
     setPosition({xposition+360, 360});
     return;
 }
@@ -80,7 +81,7 @@ void GradientWindow_T::FrameLoop()
     sf::RenderWindow::draw(m_sprite);
     sf::RenderWindow::display();
     
-    while (isOpen())
+    if (hasFocus())
     {
         sf::Event gw_event;
         while (pollEvent(gw_event)) {

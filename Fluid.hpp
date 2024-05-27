@@ -11,23 +11,6 @@
 
 #include "Globals.hpp"
 
-// disable dynamic frame-delay to compensate with a hardcoded ratio instead
-#define DYNAMICFRAMEDELAY true
-constexpr int framerateCap{300};
-#if DYNAMICFRAMEDELAY
-constexpr int delaycompN{1}, delaycompD{1};
-#else
-constexpr int delaycompN{13}, delaycompD{15}; // the sleepdelay is multiplied by 13/15 to compensate for the calculation-time per frame
-// (with framerateCap=300): 298fps actual [delay=2888us] (with compensation) vs 262fps actual [delay=3333us] (without)
-#endif
-const sf::Time sleepDelay {sf::microseconds((1000000*delaycompN)/(framerateCap*delaycompD))};
-// main.cpp
-extern float timestepRatio;  // normalizing timesteps to make physics independent of frame-rate
-//TODO: refactor all the framerate-related stuff out of this file
-
-
-void PrintSpeedcapInfo();
-
 
 class Fluid
 {
@@ -123,6 +106,9 @@ class Fluid
     void ApplyGravity   (const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd);
     void UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd);
 };
+
+
+void PrintSpeedcapInfo();
 
 
 #endif
