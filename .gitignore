@@ -7,3 +7,4 @@ build/
 *.d
 .gitconfig
 libimgui.so
+imgui.ini

@@ -4,6 +4,9 @@
 //#include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>  // defines sf::Event
 
+#include "imgui/imgui.h"
+#include "imgui/sfml/imgui-SFML.h"
+
 #include "Simulation.hpp"
 #include "Mouse.hpp"
 #include "Gradient.hpp"
@@ -11,10 +14,8 @@
 #include "Threading.hpp"
 #include "Shader.hpp"
 
-// inspired by Sebastian Lague
 
 
-// TODO: imgui
 // TODO: overlay displaying stats for hovered cell/particles
 
 extern void EmbedMacroTest();  // MacroTest.cpp
@@ -69,6 +70,16 @@ int main(int argc, char** argv)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM", mainstyle);
     mainwindow.setPosition({2600, 0}); // move to right monitor
+    mainwindow.setFramerateLimit(300); // TODO: remove manual frame-delay
+    
+    assert(IMGUI_CHECKVERSION() && "ImGui version-check failed!");
+    std::cout << "using imgui v" << IMGUI_VERSION << '\n';
+    //ImGui::CreateContext();
+    
+    if (!ImGui::SFML::Init(mainwindow)) {
+        std::cerr << "imgui-sfml failed to init! exiting.\n";
+        return 3;
+    }
     
     GradientWindow_T gradientWindow{};
     gradientWindow.setPosition({mainwindow.getPosition().x, 360});
@@ -92,7 +103,7 @@ int main(int argc, char** argv)
     const Shader* empty = shader_map.cbegin()->second;
     if (!empty->InvokeSwitch()) { 
         std::cerr << "ragequitting because empty shader didn't load.\n";
-        return 3;
+        return 2;
     }
     
     #if DYNAMICFRAMEDELAY
@@ -108,6 +119,7 @@ int main(int argc, char** argv)
         sf::Event event;
         while (mainwindow.pollEvent(event))
         {
+            ImGui::SFML::ProcessEvent(mainwindow, event);
             switch(event.type)
             {
                 case sf::Event::Closed:
@@ -290,6 +302,10 @@ int main(int argc, char** argv)
             }
         }
         
+        // imgui needs window and deltatime. You can pass mousePosition and displaySize instead of window
+        ImGui::SFML::Update(mainwindow, frametimer.getElapsedTime());
+        ImGui::ShowDemoWindow();
+        
         // alternate render logic for turbulence shader that skips window-clearing and the grid
         if (Shader::current->name == "turbulence") {
             if (simulation.isPaused || !windowClearDisabled) 
@@ -309,6 +325,7 @@ int main(int argc, char** argv)
             
             // unlike the normal frameloop, here the mouse-outline is drawn even if the mouse is inactive;
             // without it, there's no visual indicator that the mouse is enabled, and no position.
+            ImGui::SFML::Render(mainwindow);
             mainwindow.display();
             goto framedelay;
         }
@@ -341,6 +358,7 @@ int main(int argc, char** argv)
             mainwindow.draw(mouse);
         }
         
+        ImGui::SFML::Render(mainwindow);
         mainwindow.display();
         
         framedelay:
@@ -358,6 +376,8 @@ int main(int argc, char** argv)
         #endif
         
     }
+    
+    ImGui::SFML::Shutdown();
     
     PrintSpeedcapInfo();
     #ifdef PMEMPTYCOUNTER

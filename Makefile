@@ -62,7 +62,7 @@ runargs ?= $(strip ${DEFAULT_RUNARGS})
 IMGUI_DIR := ./imgui
 IMGUI_SOURCES := $(wildcard ${IMGUI_DIR}/*.cpp)
 IMGUI_SOURCES += $(wildcard ${IMGUI_DIR}/backends/*.cpp)
-IMGUI_SOURCES += $(wildcard ${IMGUI_DIR}/cpp/*.cpp)
+IMGUI_SOURCES += $(wildcard ${IMGUI_DIR}/sfml/*.cpp)
 OBJECTFILE_DIR_IMGUI = build/objects_imgui
 OBJFILES_IMGUI := $(patsubst ${IMGUI_DIR}/%.cpp,$(OBJECTFILE_DIR_IMGUI)/%.o, $(IMGUI_SOURCES))
 DEPFILES_IMGUI := $(OBJFILES_IMGUI:.o=.d)
@@ -74,7 +74,8 @@ default: ${target_executable}
 
 
 # build directories
-SUBDIRS := build/objects build/objects_dbg build/objects_imgui build/objects_imgui/backends
+SUBDIRS := build/objects build/objects_dbg
+SUBDIRS += build/objects_imgui build/objects_imgui/backends build/objects_imgui/sfml
 .PHONY: subdirs
 subdirs: $(SUBDIRS)
 $(SUBDIRS):
