@@ -4,8 +4,8 @@
 //#include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>  // defines sf::Event
 
-#include "imgui/imgui.h"
-#include "imgui/sfml/imgui-SFML.h"
+#include <imgui.h>
+#include <imgui-SFML.h>
 
 #include "Simulation.hpp"
 #include "Mouse.hpp"
@@ -13,7 +13,6 @@
 //#include "ValarrayTest.hpp"
 #include "Threading.hpp"
 #include "Shader.hpp"
-
 
 
 // TODO: overlay displaying stats for hovered cell/particles

@@ -1,6 +1,12 @@
 MAKEFLAGS += -j8
 CXX := g++-12
+# TODO: check which gcc
+CXXFLAGS := -pipe -std=c++23
+# c++23 standard isn't required for anything; 20 works fine
 LDFLAGS := -lsfml-system -lsfml-graphics -lsfml-window -lpthread
+WARNFLAGS := -Wall -Wextra -Wpedantic -fmax-errors=4
+# -fmax-errors=1  or  -Wfatal-errors ?
+# -pedantic-errors  vs -Werror=pedantic ???
 
 PROJECT_DIR := $(shell pwd)
 # If the command-line args contained 'debug' as a target;
@@ -8,17 +14,22 @@ ifeq (debug, $(filter debug, $(MAKECMDGOALS)))
 DEBUGFLAG = true
 target_executable = fluidsym_dbg
 OBJECTFILE_DIR = build/objects_dbg
-CXXFLAGS := -std=c++23 -g -Og -pipe -Wall -Wextra -Wpedantic -Wfatal-errors
-# c++23 standard isn't required for anything; 20 works fine
+CXXFLAGS += -g -Og
 # '-g' is preferrable to '-ggdb'?? '-g3' or '-ggdb3' for extra info (like macro definitions). Default level is 2
 else
 DEBUGFLAG = false
 target_executable = fluidsym
 OBJECTFILE_DIR = build/objects
-#CXXFLAGS := -std=c++23 -O3 -march=native -mtune=native -pipe -Wall -Wextra -Wpedantic -DNDEBUG
-CXXFLAGS := -std=c++23 -O3 -pipe -Wall -Wextra -Wpedantic -Wfatal-errors
-# -fmax-errors=1  or  -Wfatal-errors ???
+CXXFLAGS += -O3
 endif
+
+CXXFLAGS += -march=native -mtune=native
+#CXXFLAGS += -fsanitize=address  # super slow
+# -fstack-check -fstack-protector
+# TODO: sanitizer options, -flto
+# LTO and -fsplit-stack is only possible with gold linker?
+# -fanalyzer -fsanitize=style? -fstack-protector -fvtable-verify=std|preinit|none -fvtv
+# -Wsuggest-final-types is more effective with link-time optimization
 
 # TODO: -fvisibility-ms-compat  (although manpage says -fvisibility=hidden is preferred??)
 # TODO: profiling
@@ -30,34 +41,6 @@ OBJFILES := $(patsubst %.cpp,$(OBJECTFILE_DIR)/%.o, $(CODEFILES))
 #DEPFILES = $(patsubst %.cpp, build/deps/%.d, $(CODEFILES))
 DEPFILES := $(OBJFILES:.o=.d)
 
-# cmdline-args passed to the program (space/comma seperated)
-DEFAULT_RUNARGS := hello world three
-# using quotes (either) here causes the whole line to be passed as a single argument
-# on the command-line, you can put the whole thing in quotes(either), even the 'runargs=' part! (and it's still split correctly)
-
-# if not defined ('runargs=...' wasn't specified on cmdline)
-runargs ?= $(strip ${DEFAULT_RUNARGS})
-
-# TODO: implement lenient argument formatting (strip and split-on: commas, spaces-only, both, commas-only)
-# TODO: implement super-lenient command-line arguments (also look for '--args/arg/runargs/=' in MAKECMDGOALS; parse arglist from cmdline)
-#	this allows us to pass arguments without quotes, and format/write things more naturally
-
-# Makefiles seem to be lenient with spacing around equal-signs (passed inside quoted line); 'A=x y z', 'A= x y z', 'A =x y z'
-#	...will all define 'A' ( Makefile variable) as the list: 'x y z', regardless of the whitespace present
-# This is also true on the commandline, but only if 'runargs' and '=' are included within the quoted line
-
-
-# unnecessary; if we use '=' it'll be set as a variable??
-#ifeq ($ "args=", (findstring "args=", ${MAKECMDGOALS})
-
-# Test this
-# 
-# Command := $(firstword $(MAKECMDGOALS))
-# Arguments := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-# 
-# hello:
-#     @echo "Hello, "$(Arguments)"!";
-#
 
 IMGUI_DIR := ./imgui
 IMGUI_SOURCES := $(wildcard ${IMGUI_DIR}/*.cpp)
@@ -67,6 +50,8 @@ OBJECTFILE_DIR_IMGUI = build/objects_imgui
 OBJFILES_IMGUI := $(patsubst ${IMGUI_DIR}/%.cpp,$(OBJECTFILE_DIR_IMGUI)/%.o, $(IMGUI_SOURCES))
 DEPFILES_IMGUI := $(OBJFILES_IMGUI:.o=.d)
 IMGUI_LDFLAGS := -lglfw -lGL
+
+INCLUDE_FLAGS := -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(IMGUI_DIR)/sfml
 
 
 .PHONY: default
@@ -84,7 +69,7 @@ $(SUBDIRS):
 
 
 ${target_executable}: ${OBJFILES} libimgui.so | ${SUBDIRS}
-	${CXX} -L${PROJECT_DIR} ${CXXFLAGS} ${OBJFILES} -o $@ ${LDFLAGS} ${IMGUI_LDFLAGS} -limgui -Wl,-rpath,${PROJECT_DIR}
+	${CXX} -L${PROJECT_DIR} ${CXXFLAGS} ${OBJFILES} ${WARNFLAGS} -o $@ -limgui ${LDFLAGS} -Wl,-rpath,${PROJECT_DIR}
 # the linking MUST be done in a seperate step, because the compiler doesn't recognize "rpath" option
 # 'rpath' hardcodes the dynamic-library location into the binary; otherwise you have to set your 'DYNAMIC_LINK_PATH'(whatever it is) env-var when launching the program
 # https://www.cprogramming.com/tutorial/shared-libraries-linux-gcc.html
@@ -96,31 +81,20 @@ ${target_executable}: ${OBJFILES} libimgui.so | ${SUBDIRS}
 # this Makefile is added as a prerequisite to trigger rebuilds whenever it's modified
 
 $(OBJECTFILE_DIR)/%.o: %.cpp Makefile | ${SUBDIRS}
-	$(CXX) $(CXXFLAGS) -MMD -c $< -o $@
+	$(CXX) $(CXXFLAGS) -MMD -c $< -o $@ ${INCLUDE_FLAGS} ${WARNFLAGS}
 # The -MMD and -MP flags together create dependency-files (.d)
 # actually don't use '-MP'; it creates fake empty dependency rules for the '.hpp' files
 
-# compile all imgui object files with -fpic   # maybe -lglfw -lGL
+# compile all imgui object files with -fpic (for shared library)
 $(OBJECTFILE_DIR_IMGUI)/%.o: $(IMGUI_DIR)/%.cpp | ${SUBDIRS}
-	$(CXX) -fpic $(CXXFLAGS) -MMD -c $< -o $@ -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
+	$(CXX) -fpic $(CXXFLAGS) -MMD -c $< -o $@ ${INCLUDE_FLAGS} ${WARNFLAGS}
+# 'Makefile' should also be specified here, especially if you change CXXFLAGS.
+# But it's too annoying when it gets rebuilt unnecessarily
 
 # create the shared library for imgui
 # the name MUST be in the form "lib_.so"; otherwise the compiler won't find it with the '-l' flag
-libimgui.so: ${IMGUI_SOURCES} ${OBJFILES_IMGUI} Makefile | ${SUBDIRS}
-	$(CXX) -shared ${CXXFLAGS} ${OBJFILES_IMGUI} ${IMGUI_LDFLAGS} -o $@
-
-
-.PHONY: runargs
-runargs:
-	echo "runargs on cmdline"
-	echo ${runargs}
-
-
-.PHONY: PARSE_ARGS
-PARSE_ARGS:
-	echo "parse args"
-	echo ${runargs}
-#	newargs = ./PARSE_ARGS.bash 
+libimgui.so: ${IMGUI_SOURCES} ${OBJFILES_IMGUI} | ${SUBDIRS}
+	$(CXX) -fpic -shared ${CXXFLAGS} ${OBJFILES_IMGUI} ${WARNFLAGS} ${LDFLAGS} ${IMGUI_LDFLAGS} -o $@
 
 
 # the formatting/output options for 'time' are: '--portability' and '--verbose'; either is fine ('portability' preferred)
