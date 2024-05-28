@@ -33,7 +33,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{20};
+    static constexpr auto numkeybinds{21};
     std::vector<Keybind> all;  // TODO: array instead?
     std::vector<std::vector<Keybind*>> sections; 
     
@@ -56,7 +56,13 @@ struct AllKeybinds
         
         current_section = Keybind::Section::important;
         KEY(F1, "print these keybinds");
-        KEY(Q, "Exits the program");
+        KEY(Q,  "Exits the program");
+        KEY(F2, "open the gradient window")
+            -> extrainfo = "close it with ESC, Q, or F2 again";
+        KEY(Tilde, "open the side-panel")
+            ->extrainfo = "(while open) switches focus between side-panel and main-window\n"
+            "  - Left/Right: switch docking side of side-panel\n"
+            "  - Q/ESC: close side-panel\n";
         
         current_section = Keybind::Section::interactions;
         KEY(Space, "pause/unpause simulation");
@@ -73,8 +79,6 @@ struct AllKeybinds
         
         current_section = Keybind::Section::unspecified;
         KEY(N, "print mouse position");
-        KEY(F2, "open the gradient window")
-            -> extrainfo = "close it with ESC, Q, or F2 again";
         
         // Shaders //
         current_section = Keybind::Section::shaders;

@@ -3,7 +3,7 @@
 
 #include <SFML/Window.hpp>  // defines sf::Event
 
-// #include <iostream>
+//#include <iostream>
 
 
 // Main.cpp
@@ -35,14 +35,44 @@ bool MainGUI::Initialize()
 void MainGUI::Create()
 {
     if (isOpen()) { return; }
-    // sf::Style::None
-    // for some reason it's only letting me use auto here
-    constexpr auto m_style = sf::Style::Close;  // Title-bar is implied (for Style::Close)
+    constexpr auto m_style = sf::Style::Titlebar | sf::Style::Resize;
     // sf::Style::Default = Titlebar | Resize | Close
-    sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "Main", m_style);
+    sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "FLUIDSIM - Main GUI", m_style);
     setFramerateLimit(framerateCap);
     setVerticalSyncEnabled(usingVsync);
     clock.restart();
+    return;
+}
+
+
+void MainGUI::FollowMainWindow()
+{
+    if(!isEnabled || !mainwindowPtr || !mainwindowPtr->isOpen()) return;
+    // set height to match mainwindow
+    m_height = mainwindowPtr->getSize().y;
+    setSize({u_int(m_width), u_int(m_height)});
+    
+    // snap position to either side of mainwindow
+    auto [mwx, mwy] = mainwindowPtr->getPosition();
+    sf::Vector2i targetposition{mwx, mwy};
+    
+    if (dockSideLR) { targetposition.x += mainwindowPtr->getSize().x; } //right-side
+    else { targetposition.x -= m_width; } //left-side
+    
+    setPosition(targetposition);
+    return;
+}
+
+void MainGUI::ToggleEnabled()
+{
+    if (!sf::RenderWindow::isOpen()) {
+        MainGUI::Create();
+        isEnabled = false; // gets toggled back to true
+    }
+    isEnabled = !isEnabled;
+    sf::RenderWindow::setVisible(isEnabled);
+    if (isEnabled) FollowMainWindow();
+    
     return;
 }
 
@@ -58,8 +88,9 @@ int NumWindowsOpen() {
 
 void MainGUI::FrameLoop() 
 {
-    if (!isOpen()) { return; }
+    if (!isEnabled || !isOpen()) { return; }
     sf::RenderWindow::clear();
+    if (dockedToMain) FollowMainWindow();
     
     sf::Event event;
     while (sf::RenderWindow::pollEvent(event)) 
@@ -68,10 +99,58 @@ void MainGUI::FrameLoop()
         switch(event.type)
         {
             case sf::Event::Closed:
+                isEnabled = false;
                 sf::RenderWindow::close();
             break;
             
-            default: 
+            case sf::Event::KeyPressed:
+            {
+                switch(event.key.code)
+                {
+                    case sf::Keyboard::Q:
+                    case sf::Keyboard::Escape:
+                        ToggleEnabled();
+                    break;
+                    
+                    case sf::Keyboard::Tilde:  // just pass focus to mainwindow
+                        if (mainwindowPtr && mainwindowPtr->isOpen()) {
+                            mainwindowPtr->setVisible(false);
+                            mainwindowPtr->setVisible(true);
+                            mainwindowPtr->requestFocus();
+                        }
+                    break;
+                    
+                    case sf::Keyboard::Left:
+                    case sf::Keyboard::Right:
+                    {
+                        dockedToMain = true;
+                        dockSideLR = (event.key.code == sf::Keyboard::Right);
+                        FollowMainWindow();
+                    }
+                    break;
+                    
+                    default:
+                    break;
+                }
+            }
+            break;
+            
+            case sf::Event::Resized:
+            {
+                // don't allow resizing if docked; it can glitch out the titlebar
+                if (dockedToMain) {
+                    //setSize({m_width, m_height});
+                    FollowMainWindow();
+                    break;
+                }
+                auto [newwidth, newheight] = event.size;
+                m_width = newwidth;
+                m_height = newheight;
+            }
+            break;
+            
+            default:
+
             break;
         }
     }
@@ -82,7 +161,15 @@ void MainGUI::FrameLoop()
     // passing nullptr disables that closing button.
     ImGui::Begin("Main", nullptr, window_flags);
     ImGui::SetWindowPos({0, 75}); // leave space at the top for Nvidia's FPS/Vsync indicators
-    ImGui::SetWindowSize({420, 200});
+    ImGui::SetWindowSize({m_width, 200});
+    
+    // focus indicator
+    ImGui::Separator();
+    ImGui::Text("Focus: ");
+    ImGui::SameLine();
+    if (hasFocus()) ImGui::TextColored({0, 255, 0, 255}, "Side-Panel"    );
+    else            ImGui::TextColored({255, 0, 0, 255}, "Primary-Window");
+    ImGui::Separator();
     
     // the framerate is reported as divided among each window, so we compensate
     float framerate = ImGui::GetIO().Framerate * NumWindowsOpen();
@@ -97,18 +184,36 @@ void MainGUI::FrameLoop()
     }
     ImGui::SameLine();
     ImGui::Text("%s", (usingVsync? "Enabled" : "Disabled"));
-    ImGui::End();
     
+    // docking controls
+    ImGui::Checkbox("Docked:", &dockedToMain);
+    ImGui::SameLine();
+    ImGui::Text("%s ", (dockSideLR? "Right" : "Left"));
+    if (dockedToMain) {
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!dockSideLR);
+        if(ImGui::Button("L")) { dockSideLR = false; FollowMainWindow(); }
+        ImGui::EndDisabled();
+        
+        ImGui::BeginDisabled(dockSideLR);
+        ImGui::SameLine();
+        if(ImGui::Button("R")) { dockSideLR = true; FollowMainWindow(); }
+        ImGui::EndDisabled();
+    }
+    ImGui::Separator();
+    ImGui::End(); // Top half (Main)
+    
+    // Demo window
     ImGui::Begin("DemoToggle", nullptr, window_flags^ImGuiWindowFlags_MenuBar); // take away menubar
     ImGui::SetWindowPos({0, 275});
-    ImGui::SetWindowSize({420, 725});
+    ImGui::SetWindowSize({m_width, 725});
     if(ImGui::Button("Demo Window"))  // returns true if state has changed
         showDemoWindow = !showDemoWindow;
     if(showDemoWindow)
     {
         ImGui::ShowDemoWindow(&showDemoWindow);
         ImGui::SetWindowPos("Dear ImGui Demo", {0, 315});
-        ImGui::SetWindowSize("Dear ImGui Demo", {420, 685});
+        ImGui::SetWindowSize("Dear ImGui Demo", {m_width, 685});
     }
     ImGui::End();
     

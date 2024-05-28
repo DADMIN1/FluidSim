@@ -1,7 +1,10 @@
 #ifndef FLUIDSYM_MAINGUI_INCLUDED
 #define FLUIDSYM_MAINGUI_INCLUDED
 
+#include "Globals.hpp" // windowheight
+
 #include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Window/WindowStyle.hpp>
 
 #include <imgui.h>
 #include <imgui-SFML.h>
@@ -10,8 +13,8 @@
 // TODO: prevent auto-rewriting 'imgui.ini' on exit
 class MainGUI: public sf::RenderWindow
 {
-    int m_width  {420};
-    int m_height {1000};
+    float m_width  {255}; // ImVec2 (used by SetWindowSize/Position) only holds floats
+    float m_height {BOXHEIGHT};
     bool showDemoWindow {false};
     
     // bitwise-OR flags together flags (into zero)
@@ -30,10 +33,14 @@ class MainGUI: public sf::RenderWindow
     
     public:
     const bool initErrorFlag;
-    bool showMainGUI {true};
+    bool isEnabled {true};
+    bool dockedToMain{true}; // keeps GUI docked left/right of mainwindow
+    bool dockSideLR{true};   // false=Left, true=Right
     bool Initialize();
     void Create(); // calls sf::RenderWindow.create(...) with some arguments
     void FrameLoop(); // performs a single round of clear/draw/display and event-processing for gradient_window
+    void ToggleEnabled();
+    void FollowMainWindow(); // updates window position/height to match main
     
     // constructors do not actually create the window; call '.create()' later
     MainGUI(): sf::RenderWindow(), 

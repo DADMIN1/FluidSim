@@ -95,6 +95,11 @@ int main(int argc, char** argv)
     }
     mainGUI.Create();
     
+    // this is the only method to take back focus from the new window; 'requestFocus()' just gets ignored
+    mainwindow.setVisible(false);
+    mainwindow.setVisible(true);
+    mainwindow.requestFocus();
+    
     hoverOutline.setFillColor(sf::Color::Transparent);
     hoverOutline.setOutlineColor(sf::Color::Cyan);
     hoverOutline.setOutlineThickness(2.5f);
@@ -195,6 +200,16 @@ int main(int argc, char** argv)
                                 gradientWindow.Create(usingVsync, mainwindow.getPosition().x);
                                 gradientWindow.FrameLoop();
                             }
+                        break;
+                        
+                        case sf::Keyboard::Tilde:
+                            // just pass focus to mainGUI if it's already open
+                            if (mainGUI.isEnabled) {
+                                mainGUI.setVisible(false);
+                                mainGUI.setVisible(true);
+                                mainGUI.requestFocus();
+                            }
+                            else mainGUI.ToggleEnabled();
                         break;
                         
                         case sf::Keyboard::T:
