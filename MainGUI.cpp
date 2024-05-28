@@ -49,9 +49,10 @@ bool MainGUI::Initialize()
     //m_context = ImGui::CreateContext();
     //ImGui::SetCurrentContext(m_context);
     
-    //ImGuiIO& imguiIO = ImGui::GetIO(); // required for configflags and framerate
+    ImGuiIO& imguiIO = ImGui::GetIO(); // required for configflags and framerate
     //imguiIO.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     //imguiIO.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
+    imguiIO.IniFilename = NULL; // disable autosaving of the 'imgui.ini' config file (just stores window states)
     return false;
 }
 

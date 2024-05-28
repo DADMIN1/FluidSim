@@ -14,7 +14,6 @@
 #include <imgui-SFML.h>
 
 
-// TODO: prevent auto-rewriting 'imgui.ini' on exit
 class MainGUI: public sf::RenderWindow
 {
     float m_width  {360}; // ImVec2 (used by SetWindowSize/Position) only holds floats
