@@ -76,6 +76,17 @@ void MainGUI::ToggleEnabled()
     return;
 }
 
+// indicates which window has focus
+void MainGUI::DrawFocusIndicator()
+{
+    ImGui::Separator();
+    ImGui::Text("Focus: ");
+    ImGui::SameLine();
+    if (hasFocus()) ImGui::TextColored({0, 255, 0, 255}, "Side-Panel"    );
+    else            ImGui::TextColored({255, 0, 0, 255}, "Primary-Window");
+    ImGui::Separator();
+    return;
+}
 
 // the framerate is reported as divided among each window
 int NumWindowsOpen() {
@@ -85,13 +96,49 @@ int NumWindowsOpen() {
     return total;
 }
 
-
-void MainGUI::FrameLoop() 
+void MainGUI::DrawFPS_Section() // FPS display and VSync
 {
-    if (!isEnabled || !isOpen()) { return; }
-    sf::RenderWindow::clear();
-    if (dockedToMain) FollowMainWindow();
+    // the framerate is reported as divided among each window, so we compensate
+    float framerate = ImGui::GetIO().Framerate * NumWindowsOpen();
+    ImGui::Text("%.1f FPS (%.3f ms/frame)", framerate, 1000.0f/framerate);
     
+    if (ImGui::Checkbox("VSync:", &usingVsync)) // returns true if state has changed
+    {
+        //std::cout << "vsync toggle event!\n";
+        if (mainwindowPtr) mainwindowPtr->setVerticalSyncEnabled(usingVsync);
+        if (gradientWindowPtr) gradientWindowPtr->setVerticalSyncEnabled(usingVsync);
+        setVerticalSyncEnabled(usingVsync);
+    }
+    ImGui::SameLine();
+    ImGui::Text("%s", (usingVsync? "Enabled" : "Disabled"));
+    return;
+}
+
+void MainGUI::DrawDockingControls() // status and switches
+{
+    // docking controls
+    ImGui::Checkbox("Docked:", &dockedToMain);
+    ImGui::SameLine();
+    ImGui::Text("%s ", (dockSideLR? "Right" : "Left"));
+    if (dockedToMain) {
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!dockSideLR);
+        if(ImGui::Button("L")) { dockSideLR = false; FollowMainWindow(); }
+        ImGui::EndDisabled();
+        
+        ImGui::BeginDisabled(dockSideLR);
+        ImGui::SameLine();
+        if(ImGui::Button("R")) { dockSideLR = true; FollowMainWindow(); }
+        ImGui::EndDisabled();
+    }
+    ImGui::Separator();
+    return;
+}
+
+
+void MainGUI::HandleWindowEvents()
+{
+    // event handling
     sf::Event event;
     while (sf::RenderWindow::pollEvent(event)) 
     {
@@ -150,72 +197,60 @@ void MainGUI::FrameLoop()
             break;
             
             default:
-
             break;
         }
     }
     
+    return;
+}
+
+
+void MainGUI::FrameLoop() 
+{
+    if (!isEnabled || !isOpen()) { return; }
+    sf::RenderWindow::clear();
+    if (dockedToMain) FollowMainWindow();
+    
+    HandleWindowEvents();
+    
+    // IMGUI
     ImGui::SFML::Update(*this, clock.restart());
+    constexpr int mainsection_top = 75;
+    constexpr int mainsection_height = 200;
+    constexpr int bottomsection_top = mainsection_top + mainsection_height;
+    constexpr int bottomsection_size = BOXHEIGHT - bottomsection_top; // take the rest of the window
+    constexpr int demowindow_offset = 40; // manual padding to push it beneath 'Demo Window' button
     
     // If you pass a bool* into 'Begin()', it will show an 'x' to close that menu (state written to bool).
     // passing nullptr disables that closing button.
     ImGui::Begin("Main", nullptr, window_flags);
-    ImGui::SetWindowPos({0, 75}); // leave space at the top for Nvidia's FPS/Vsync indicators
-    ImGui::SetWindowSize({m_width, 200});
+    ImGui::SetWindowPos({0, mainsection_top}); // leave space at the top for Nvidia's FPS/Vsync indicators
+    ImGui::SetWindowSize({m_width, mainsection_height});
     
-    // focus indicator
-    ImGui::Separator();
-    ImGui::Text("Focus: ");
-    ImGui::SameLine();
-    if (hasFocus()) ImGui::TextColored({0, 255, 0, 255}, "Side-Panel"    );
-    else            ImGui::TextColored({255, 0, 0, 255}, "Primary-Window");
-    ImGui::Separator();
+    DrawFocusIndicator();
+    DrawFPS_Section();
+    DrawDockingControls();
     
-    // the framerate is reported as divided among each window, so we compensate
-    float framerate = ImGui::GetIO().Framerate * NumWindowsOpen();
-    ImGui::Text("%.1f FPS (%.3f ms/frame)", framerate, 1000.0f/framerate);
-    
-    if (ImGui::Checkbox("VSync:", &usingVsync)) // returns true if state has changed
-    {
-        //std::cout << "vsync toggle event!\n";
-        if (mainwindowPtr) mainwindowPtr->setVerticalSyncEnabled(usingVsync);
-        if (gradientWindowPtr) gradientWindowPtr->setVerticalSyncEnabled(usingVsync);
-        setVerticalSyncEnabled(usingVsync);
-    }
-    ImGui::SameLine();
-    ImGui::Text("%s", (usingVsync? "Enabled" : "Disabled"));
-    
-    // docking controls
-    ImGui::Checkbox("Docked:", &dockedToMain);
-    ImGui::SameLine();
-    ImGui::Text("%s ", (dockSideLR? "Right" : "Left"));
-    if (dockedToMain) {
-        ImGui::SameLine();
-        ImGui::BeginDisabled(!dockSideLR);
-        if(ImGui::Button("L")) { dockSideLR = false; FollowMainWindow(); }
-        ImGui::EndDisabled();
-        
-        ImGui::BeginDisabled(dockSideLR);
-        ImGui::SameLine();
-        if(ImGui::Button("R")) { dockSideLR = true; FollowMainWindow(); }
-        ImGui::EndDisabled();
-    }
-    ImGui::Separator();
     ImGui::End(); // Top half (Main)
     
-    // Demo window
+    // Demo-Window Toggle Button
     ImGui::Begin("DemoToggle", nullptr, window_flags^ImGuiWindowFlags_MenuBar); // take away menubar
-    ImGui::SetWindowPos({0, 275});
-    ImGui::SetWindowSize({m_width, 725});
-    if(ImGui::Button("Demo Window"))  // returns true if state has changed
-        showDemoWindow = !showDemoWindow;
+    ImGui::SetWindowPos({0, bottomsection_top});
+    ImGui::SetWindowSize({m_width, demowindow_offset});
+    
+    // ImGui::Separator();
+    if(ImGui::Button("Demo Window")) showDemoWindow = !showDemoWindow;
+    // ImGui::Separator();
+    
+    // Demo window
     if(showDemoWindow)
     {
         ImGui::ShowDemoWindow(&showDemoWindow);
-        ImGui::SetWindowPos("Dear ImGui Demo", {0, 315});
-        ImGui::SetWindowSize("Dear ImGui Demo", {m_width, 685});
+        ImGui::SetWindowPos("Dear ImGui Demo", {0, bottomsection_top + demowindow_offset}); // selecting window by name
+        ImGui::SetWindowSize("Dear ImGui Demo", {m_width, bottomsection_size - demowindow_offset});
     }
-    ImGui::End();
+    
+    ImGui::End(); // Bottom half (Demo Window)
     
     ImGui::SFML::Render(*this);
     sf::RenderWindow::display();

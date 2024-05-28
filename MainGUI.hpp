@@ -31,6 +31,13 @@ class MainGUI: public sf::RenderWindow
     ImGuiContext* m_context;
     //ImGuiIO& imguiIO;  // you're not supposed to store this?
     
+    void HandleWindowEvents();
+    
+    // internal draw functions
+    void DrawFocusIndicator();
+    void DrawFPS_Section(); // FPS display and VSync
+    void DrawDockingControls(); // status and switches
+    
     public:
     const bool initErrorFlag;
     bool isEnabled {true};
