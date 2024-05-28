@@ -60,25 +60,27 @@ void Fluid::ApplySpeedcap(sf::Vector2f& velocity)
 }
 
 
+float Fluid::gradient_thresholdLow{0.75f};  // speed at which gradient begins to apply
+float Fluid::gradient_thresholdHigh{40.75f};  // caps out the gradient
+
+
 void Fluid::Particle::UpdateColor(const bool useTransparency)
 {
     const float speed = std::abs(velocity.x) + std::abs(velocity.y);
-    constexpr float thresholdLow{0.75f};  // speed at which gradient begins to apply
-    constexpr float thresholdHigh{40.75f};  // caps out the gradient
-    constexpr float inputRange = thresholdHigh-thresholdLow;
+    float inputRange = gradient_thresholdHigh-gradient_thresholdLow;
     unsigned int speedindex;
     const unsigned int baseAlpha = (useTransparency? 0xC0 : 0xFF);
     unsigned char alpha = baseAlpha;  // eventually converted to sf::Uint8 - which is unsigned char (not int)
-    if (speed <= thresholdLow) { speedindex = 0; setScale({1.0f, 1.0f}); }
-    else if (speed >= thresholdHigh) { speedindex = 1023; }  // size of gradient
+    if (speed <= gradient_thresholdLow) { speedindex = 0; setScale({1.0f, 1.0f}); }
+    else if (speed >= gradient_thresholdHigh) { speedindex = 1023; }  // size of gradient
     else {
-        speedindex = (speed - thresholdLow) * (1023.f/inputRange);
+        speedindex = (speed - gradient_thresholdLow) * (1023.f/inputRange);
         assert(speedindex <= 1023);
         if (useTransparency) {
-            alpha = baseAlpha + ((speed - thresholdLow) * ((0xFF-baseAlpha)/inputRange));
+            alpha = baseAlpha + ((speed - gradient_thresholdLow) * ((0xFF-baseAlpha)/inputRange));
             assert(alpha < 256);
         }
-        float particleScaling = ((speed - thresholdLow)/inputRange);
+        float particleScaling = ((speed - gradient_thresholdLow)/inputRange);
         // faster particles grow
         float scale = 1.0f + ((Fluid::isParticleScalingPositive)? particleScaling : -particleScaling);
         setScale({scale, scale});
@@ -135,16 +137,17 @@ sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Parti
     const float totalDistance = std::sqrt((diffx*diffx) + (diffy*diffy));
     if (totalDistance == 0) [[unlikely]] { ++exactOverlapCounter; return {0,0}; }  // TODO: should return random direction, ideally
     
-    // mapping to output range of: 0 to PI/4 (cosine hits zero at PI/4)
-    const float normalized = (totalDistance/maxdist) * (M_PI/4);
+    // mapping to output range of: 0 to PI/2 (cosine hits zero at PI/2)
+    const float normalized = (totalDistance/maxdist) * (M_PI/2);
     const float cosine_cubed = std::cos(normalized)*std::cos(normalized)*std::cos(normalized);
-    const float magnitude = cosine_cubed * fdensity * timestepRatio;
+    //const float cosine_squared = std::cos(normalized)*std::cos(normalized);
+    const float magnitude = cosine_cubed * fdensity;
     
     // TODO: division by zero here if diffx AND diffy both equal zero
     const float denominator = (std::abs(diffx) + std::abs(diffy));
     const sf::Vector2f directionalRatio {diffx/denominator, diffy/denominator};
     
-    return directionalRatio*magnitude;
+    return directionalRatio*magnitude*timestepRatio;
 }
 
 

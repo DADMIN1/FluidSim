@@ -347,11 +347,16 @@ void MainGUI::DrawFluidParams(float& next_height)
     #define MIN(f) -f
     sliderflags ^= ImGuiSliderFlags_Logarithmic; // negating logarithmic flag
     FP(bounceDampening, 2, 2.0f); // values past one don't actually make sense (or negatives)
-    
+        
     #undef MIN
     #undef FP
     // TODO: disable gravity if it's not enabled; or auto-enable gravity
     // TODO: button to reset defaults
+    
+    numlines += 3;
+    ImGui::SeparatorText("Gradient Speed-Thresholds");
+    ImGui::SliderFloat("Min", &Fluid::gradient_thresholdLow, 0.0f, 50.f, "%.2f", sliderflags);
+    ImGui::SliderFloat("Max", &Fluid::gradient_thresholdHigh, 0.f, 75.f, "%.2f", sliderflags);
     
     numlines += 1;
     ImGui::Separator();

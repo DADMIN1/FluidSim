@@ -22,11 +22,13 @@ class Fluid
     float speedcap_hard{200.0};
      bool isTurbulent{false};
     
-    static bool isParticleScalingPositive;
-    
     friend class Simulation;
     friend class MainGUI;
     friend struct FluidParameters; //defined in MainGUI
+    
+    static bool isParticleScalingPositive;
+    static float gradient_thresholdLow;   // speed at which gradient begins to apply
+    static float gradient_thresholdHigh;  // speed that caps out the gradient
     
     class Particle : public sf::CircleShape
     {
@@ -34,9 +36,11 @@ class Fluid
         unsigned int cellID{0};
         sf::Vector2f velocity {0.0, 0.0};
         
-        public:
         friend class Fluid;
         friend class Simulation;
+        friend class MainGUI;
+        
+        public:
         void UpdateColor(const bool useTransparency);
         
         Particle(const unsigned int ID, float radius=DEFAULTRADIUS, std::size_t pointcount=DEFAULTPOINTCOUNT) 
