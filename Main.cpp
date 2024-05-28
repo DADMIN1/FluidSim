@@ -109,6 +109,8 @@ int main(int argc, char** argv)
         std::cerr << "simulation failed to initialize!\n";
         return 1;
     }
+    mainGUI.SetFluidPtr(simulation.fluid);
+    
     auto&& [gridSprite, fluidSprite] = simulation.GetSprites();
     
     Mouse_T mouse(mainwindow, simulation.GetDiffusionFieldPtr());

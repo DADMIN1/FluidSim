@@ -15,14 +15,18 @@
 class Fluid
 {
     float gravity {0.295};
-    float bounceDampening {0.1915};
     float viscosity {0.005675};
     float fdensity {0.01975}; // controls 'force' of diffusion
-    float speedcap_soft {60.0};
-    float speedcap_hard {120.0};
+    float bounceDampening {0.1915};
+    float speedcap_soft{100.0};
+    float speedcap_hard{200.0};
      bool isTurbulent{false};
     
     static bool isParticleScalingPositive;
+    
+    friend class Simulation;
+    friend class MainGUI;
+    friend struct FluidParameters; //defined in MainGUI
     
     class Particle : public sf::CircleShape
     {
@@ -55,10 +59,8 @@ class Fluid
     void ApplyViscosity(sf::Vector2f& velocity) {
         velocity *= (1.0f - (viscosity * timestepRatio));
     }
-
-    public:
-    friend class Simulation;
     
+    public:
     static bool ToggleParticleScaling() { 
         isParticleScalingPositive = !isParticleScalingPositive; 
         return isParticleScalingPositive; 

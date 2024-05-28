@@ -79,7 +79,6 @@ void MainGUI::ToggleEnabled()
 // indicates which window has focus
 void MainGUI::DrawFocusIndicator()
 {
-    ImGui::Separator();
     ImGui::Text("Focus: ");
     ImGui::SameLine();
     if (hasFocus()) ImGui::TextColored({0, 255, 0, 255}, "Side-Panel"    );
@@ -101,6 +100,7 @@ void MainGUI::DrawFPS_Section() // FPS display and VSync
     // the framerate is reported as divided among each window, so we compensate
     float framerate = ImGui::GetIO().Framerate * NumWindowsOpen();
     ImGui::Text("%.1f FPS (%.3f ms/frame)", framerate, 1000.0f/framerate);
+    ImGui::Separator();
     
     if (ImGui::Checkbox("VSync:", &usingVsync)) // returns true if state has changed
     {
@@ -205,6 +205,57 @@ void MainGUI::HandleWindowEvents()
 }
 
 
+void MainGUI::DrawFluidParameters(float& next_height)
+{
+    if (!fluidptr) return;  // TODO: give some kind of indicator that it's been invalidated
+    //ImGui::Separator();
+    ImGui::Begin("Fluid Parameters", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
+    ImGui::SetWindowPos({0, next_height});
+    int numlines = 1;
+    
+    auto sliderflags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic | \
+                           ImGuiSliderFlags_NoInput | ImGuiSliderFlags_NoRoundToFormat;
+    // input is disabled because it's also activated with 'Tab' (normally Ctrl+click);
+    // which you're likely to hit accidentally when trying to activate mouse
+    
+    // VSliderFloat also exists, but it requires it's size to be specified (for some reason)
+    #define FP(field, precision, max) ++numlines; \
+        ImGui::SliderFloat(#field, &fluidptr->field, MIN(max), max, #field": %."#precision"f", sliderflags);
+    
+    // set min == -max
+    #define MIN(f) -f
+    FP(gravity,   3, 3.0f);
+    FP(viscosity, 6, 0.5f); // negative values are a lot like 'turbulence' mode
+    #undef MIN
+    #define MIN(f) 0.001f   // fdensity should not go below zero
+    FP(fdensity,  6, 0.5f);
+    #undef MIN
+    #define MIN(f) -f
+    sliderflags ^= ImGuiSliderFlags_Logarithmic; // negating logarithmic flag
+    FP(bounceDampening, 2, 2.0f); // values past one don't actually make sense (or negatives)
+    
+    #undef MIN
+    #undef FP
+    // TODO: disable gravity if it's not enabled; or auto-enable gravity
+    // TODO: button to reset defaults
+    
+    numlines += 1;
+    ImGui::Separator();
+    ImGui::Text("Turbulence:"); ImGui::SameLine();
+    if (fluidptr->realptr->isTurbulent) 
+         ImGui::TextColored({255, 0, 8, 255}, "Enabled" );
+    else ImGui::TextColored({0, 64, 255, 255}, "Disabled");
+    ImGui::Separator();
+    
+    // for some reason this can't autosize correctly. // Note: titlebar also takes ~25 pixels
+    ImGui::SetWindowSize({m_width, 25.0f*numlines});
+    next_height += 25.0f*numlines;
+    ImGui::End();
+    //ImGui::Separator();
+    return;
+}
+
+
 void MainGUI::FrameLoop() 
 {
     if (!isEnabled || !isOpen()) { return; }
@@ -215,41 +266,44 @@ void MainGUI::FrameLoop()
     
     // IMGUI
     ImGui::SFML::Update(*this, clock.restart());
-    constexpr int mainsection_top = 75;
-    constexpr int mainsection_height = 200;
-    constexpr int bottomsection_top = mainsection_top + mainsection_height;
-    constexpr int bottomsection_size = BOXHEIGHT - bottomsection_top; // take the rest of the window
-    constexpr int demowindow_offset = 40; // manual padding to push it beneath 'Demo Window' button
+    
+    float next_height = 75.f; // leave space at the top for Nvidia's FPS/Vsync indicators
     
     // If you pass a bool* into 'Begin()', it will show an 'x' to close that menu (state written to bool).
     // passing nullptr disables that closing button.
     ImGui::Begin("Main", nullptr, window_flags);
-    ImGui::SetWindowPos({0, mainsection_top}); // leave space at the top for Nvidia's FPS/Vsync indicators
-    ImGui::SetWindowSize({m_width, mainsection_height});
-    
+    ImGui::SetWindowPos({0, next_height});
     DrawFocusIndicator();
     DrawFPS_Section();
     DrawDockingControls();
+    ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
+    next_height += ImGui::GetWindowHeight(); // 'GetWindowHeight' returns height of current section
+    ImGui::End(); // Top section (Main)
     
-    ImGui::End(); // Top half (Main)
+    DrawFluidParameters(next_height);
     
     // Demo-Window Toggle Button
-    ImGui::Begin("DemoToggle", nullptr, window_flags^ImGuiWindowFlags_MenuBar); // take away menubar
-    ImGui::SetWindowPos({0, bottomsection_top});
-    ImGui::SetWindowSize({m_width, demowindow_offset});
+    ImGui::Begin("DemoToggle", nullptr, subwindow_flags);
+    ImGui::SetWindowPos({0, next_height});
     
-    // ImGui::Separator();
+    //ImGui::Separator();
     if(ImGui::Button("Demo Window")) showDemoWindow = !showDemoWindow;
-    // ImGui::Separator();
+    //ImGui::Separator();
     
-    // Demo window
+    ImGui::SetWindowSize({m_width, ImGui::GetWindowHeight()});
+    next_height += ImGui::GetWindowHeight();
+    
+    // Actual Demo Window
     if(showDemoWindow)
     {
+        // cannot make this a child window; it just refuses to behave correctly
+        //ImGui::BeginChild("DemoWindow", {m_width, remaining_height}, 0, 0);
         ImGui::ShowDemoWindow(&showDemoWindow);
-        ImGui::SetWindowPos("Dear ImGui Demo", {0, bottomsection_top + demowindow_offset}); // selecting window by name
-        ImGui::SetWindowSize("Dear ImGui Demo", {m_width, bottomsection_size - demowindow_offset});
+        ImGui::SetWindowPos("Dear ImGui Demo", {0, next_height}); // selecting window by name
+        ImGui::SetWindowSize("Dear ImGui Demo", {m_width, m_height-next_height});
+        
+        //ImGui::EndChild(); //demowindow
     }
-    
     ImGui::End(); // Bottom half (Demo Window)
     
     ImGui::SFML::Render(*this);
