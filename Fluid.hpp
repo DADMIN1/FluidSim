@@ -56,10 +56,11 @@ class Fluid
     // calculates diffusion-force between particles within the same cell
     sf::Vector2f CalcLocalForce(const Particle& lh, const Particle& rh) const;
     // unfortunately, it can't be static because it uses 'fdensity'
-
+    
     sf::RenderTexture particle_texture;
     std::vector<Particle> particles;
-
+    
+    void ApplySpeedcap(sf::Vector2f& velocity); // modifies passed ref
     void ApplyViscosity(sf::Vector2f& velocity) {
         velocity *= (1.0f - (viscosity * timestepRatio));
     }
@@ -72,22 +73,6 @@ class Fluid
     
     bool Initialize();
     void UpdatePositions();
-    void ApplySpeedcap(sf::Vector2f& velocity); // modifies passed ref
-    
-    void ApplyGravity() {
-        for (Particle& particle : particles) {
-            particle.velocity.y += gravity*timestepRatio;
-        }
-    }
-    
-    // can't be static because it references viscosity
-    // currently unused
-    sf::Vector2f CalcViscosity(sf::Vector2f velocity)
-    {
-        return velocity * (1.0f-(viscosity*timestepRatio));
-        //sf::Vector2f delta = velocity*viscosity*timestepRatio;
-        //return velocity-delta;
-    }
     
     void Freeze() // sets all velocities to 0
     {
@@ -108,9 +93,8 @@ class Fluid
         particle_texture.display();
     }
     
-    // multithreaded versions of member functions
-    void ApplyGravity   (const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd);
-    void UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd);
+    // multithreaded version
+    void UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd, bool hasGravity);
 };
 
 

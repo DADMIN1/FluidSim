@@ -359,17 +359,12 @@ void Simulation::Update()
 {
     if (isPaused) { return; }
     
-    /* if (hasGravity) { fluid.ApplyGravity(); }
-    fluid.UpdatePositions();  */
-    
     std::array<std::future<DeltaMap>, THREAD_COUNT> threads;
     auto particles_slices = DivideContainer(fluid.particles);
     for (std::size_t index{0}; index < threads.size(); ++index) {
         auto slice = particles_slices[index];
         auto lambda = [this, slice](){ 
-            if (hasGravity) 
-            { fluid.ApplyGravity (slice.first, slice.second); }
-            fluid.UpdatePositions(slice.first, slice.second);
+            fluid.UpdatePositions(slice.first, slice.second, hasGravity);
             return FindCellTransitions(slice);
         };
         threads[index] = std::async(std::launch::async, lambda);
