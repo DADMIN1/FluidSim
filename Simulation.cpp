@@ -190,14 +190,21 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
 }
 
 
-IDset_T Simulation::BuildAdjacentSet(const std::size_t cellID, const IDset_T& excluded)
+IDset_T Simulation::BuildAdjacentSet(const std::size_t cellID /*, const IDset_T& excluded */)
 {
     std::unordered_set<unsigned int> localParticles{};
     const std::vector<Cell*> adjacentCells = diffusionField.GetCellNeighbors(cellID);
     
     for (const auto* const cellptr: adjacentCells)
     {
-        if (particleMap.contains(cellptr->UUID) && !excluded.contains(cellptr->UUID))
+        // This check causes gaps/banding between sections (along the divisions between threads)
+            //if (particleMap.contains(cellptr->UUID) && !excluded.contains(cellptr->UUID))
+        // Inverting the second check causes pillars to appear instead
+            //if (excluded.contains(cellptr->UUID))
+        // Simply not checking the excluded set seems to be correct? I don't understand why
+            //if (particleMap.contains(cellptr->UUID))
+            //if (particleMap.contains(cellptr->UUID) || excluded.contains(cellptr->UUID)) // also seems to work, but probably incorrect
+        if (particleMap.contains(cellptr->UUID))
         {
             std::unordered_set<unsigned int> pmapCopy{particleMap[cellptr->UUID]};
             
@@ -290,11 +297,12 @@ void Simulation::NonLocalDiffusion(const IDset_T& originset, const IDset_T& adja
 // assumes that density-updates were already performed on ALL cells (and momentum-calculations)
 void Simulation::UpdateParticles()
 {
+    // TODO: figure out how to share an 'excludedIDs' set between threads
     auto segmented_particlemap = DivideContainer(particleMap);
     auto lambda = [this](auto segment) 
     {
         // need to prevent redundant combinations when building the particleset for LocalDiffusion
-        std::unordered_set<unsigned int> excludedIDs{};
+        //std::unordered_set<unsigned int> excludedIDs{};
         
         // only recalculate diffusionVec for occupied cells
         for (auto iter{segment.first}; iter != segment.second; ++iter)
@@ -325,7 +333,7 @@ void Simulation::UpdateParticles()
             // TODO: split the cell-related updates into a seperate function?
             
             const std::size_t originalsize = particleset.size();
-            IDset_T nonlocalParticles = BuildAdjacentSet(cellID, excludedIDs);
+            IDset_T nonlocalParticles = BuildAdjacentSet(cellID /* , excludedIDs */);
             //particleset.merge(nonlocalParticles);  // the other merge order might be more effecient?
             // VERY important that particleset isn't a reference here (if you merge); if it is, then every cell will end up-
             // - holding duplicates of all the particles from each cell in it's diffusion-radius.
@@ -334,11 +342,9 @@ void Simulation::UpdateParticles()
             assert((particleMap[cellID].size() == originalsize) && "set in particleMap should not change size!!!!");
             LocalDiffusion(particleset);
             NonLocalDiffusion(particleset, nonlocalParticles);
-            excludedIDs.emplace(cellID);
+            //excludedIDs.emplace(cellID);
         }
     };
-    
-    // TODO: fix the particle-banding caused by multithreading (excludedIDs is thread-local)
     
     std::array<std::future<void>, THREAD_COUNT> threads;
     assert((segmented_particlemap.size() == threads.size()) && "mismatched sizes between particlemap and threads");
