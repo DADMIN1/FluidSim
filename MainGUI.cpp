@@ -3,14 +3,37 @@
 
 #include <SFML/Window.hpp>  // defines sf::Event
 
-//#include <iostream>
-
 
 // Main.cpp
 extern bool usingVsync;
 constexpr int framerateCap{300}; // const/constexpr makes 'extern' fail, so this is duplicated here
 extern sf::RenderWindow* mainwindowPtr;
 extern GradientWindow_T* gradientWindowPtr;
+
+
+// bitwise-OR flags together flags (into zero)
+constexpr ImGuiWindowFlags window_flags { 0 
+    //| ImGuiWindowFlags_NoTitleBar
+    | ImGuiWindowFlags_NoMove
+    | ImGuiWindowFlags_NoResize
+    // | ImGuiWindowFlags_NoBackground //transparent
+    | ImGuiWindowFlags_NoCollapse
+    //| ImGuiWindowFlags_MenuBar // adds a menubar
+    //| ImGuiWindowFlags_AlwaysAutoResize  // doesn't allow manual resizing (of width)
+};
+constexpr ImGuiWindowFlags subwindow_flags { 0
+    | ImGuiWindowFlags_NoTitleBar
+    | ImGuiWindowFlags_NoMove
+    | ImGuiWindowFlags_NoResize
+    | ImGuiWindowFlags_NoCollapse
+    | ImGuiWindowFlags_NoScrollbar
+};
+constexpr ImGuiChildFlags child_flags { 0
+    //| ImGuiChildFlags_ResizeY
+    | ImGuiChildFlags_AutoResizeY
+    //| ImGuiChildFlags_AutoResizeX
+    | ImGuiChildFlags_AlwaysAutoResize
+};
 
 
 bool MainGUI::Initialize()
@@ -35,7 +58,7 @@ bool MainGUI::Initialize()
 void MainGUI::Create()
 {
     if (isOpen()) { return; }
-    constexpr auto m_style = sf::Style::Titlebar | sf::Style::Resize;
+    constexpr auto m_style = sf::Style::Titlebar | sf::Style::Resize | sf::Style::Close;
     // sf::Style::Default = Titlebar | Resize | Close
     sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "FLUIDSIM - Main GUI", m_style);
     setFramerateLimit(framerateCap);
@@ -204,10 +227,100 @@ void MainGUI::HandleWindowEvents()
     return;
 }
 
-
-void MainGUI::DrawFluidParameters(float& next_height)
+/* 
+void MainGUI::SimulParameters::MakeSliderFloats()
 {
-    if (!fluidptr) return;  // TODO: give some kind of indicator that it's been invalidated
+    auto sliderflags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic | \
+                           ImGuiSliderFlags_NoInput | ImGuiSliderFlags_NoRoundToFormat;
+    
+    #define ALLSLIDERS() XMACRO(momentumTransfer) XMACRO(momentumDistribution)
+    
+    #define FMTSTRING(field) #field": %."precision()"f"
+    
+    #define XMACRO(field) ImGui::SliderFloat(#field, &this->field, \
+        0.f, 1.f, FMTSTRING(field), sliderflags);
+    
+    #define precision() "3"
+    
+    ALLSLIDERS();
+    
+    #undef ALL
+    #undef FMTSTRING
+    #undef XMACRO
+    #undef precision
+    ImGui::SliderFloat("momentumTransfer",     &this->momentumTransfer,     0.f, 1.f, "momentumTransfer"": %.""3""f",     sliderflags);
+    ImGui::SliderFloat("momentumDistribution", &this->momentumDistribution, 0.f, 1.f, "momentumDistribution"": %.""3""f", sliderflags);
+    
+    const float min = 0.0f;
+    const float max = 1.0f;
+    float v[2] = {this->momentumTransfer, this->momentumDistribution};
+    ImGui::SliderFloat2( "SimulationParams", v, min, max, "%.3f", ImGuiSliderFlags_NoRoundToFormat );
+    
+    return;
+} */
+
+
+// SLIDER MACROS //
+// #define ALLSLIDERS()
+#define FMTSTRING(field) #field ": %." precision() "f"
+// FMTSTRING gets concatenated into a single string. ('name: %.3f')
+// the spaces are actually necessary; C++11 requires a space between literal and string macro
+
+#define XMACRO(field) ImGui::SliderFloat(#field, &pstruct()->REAL(field), \
+    min, max, FMTSTRING(field), sliderflags);
+
+// use the slider macros by defining input macros like this: 
+/* 
+    #define ALLSLIDERS() XMACRO(Transfer) XMACRO(Distribution)
+    #define pstruct() simulParams
+    #define REAL(field) field
+    #define precision() "3" 
+*/
+
+
+void MainGUI::DrawSimulParams(float& next_height)
+{
+    auto sliderflags = ImGuiSliderFlags_NoRoundToFormat | \
+      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
+    
+    ImGui::Begin("Simulation Parameters", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
+    ImGui::SetWindowPos({0, next_height});
+    ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
+    
+    // unfortunately negative timescales don't work properly
+    ImGui::SliderFloat("Timescale", &timestepMultiplier, 0.001f, 2.0f, "%.3fx", sliderflags);
+    ImGui::SeparatorText("Momentum");
+    
+    // you can define these as normal variables, but 'precision' just cannot
+    float min = 0.0f;
+    float max = 1.0f;
+    
+    #define pstruct() simulParams
+    #define REAL(fieldname) momentum##fieldname
+    #define precision() "3"
+    #define ALLSLIDERS() XMACRO(Transfer) XMACRO(Distribution)
+    ALLSLIDERS();
+    //ImGui::SliderFloat("Transfer",     &simulParams->momentumTransfer,     min, max, "Transfer: %.3f",     sliderflags); 
+    //ImGui::SliderFloat("Distribution", &simulParams->momentumDistribution, min, max, "Distribution: %.3f", sliderflags);
+    #undef pstruct
+    #undef REAL
+    #undef precision
+    #undef ALLSLIDERS
+    
+    //next_height += 50.f;
+    next_height += ImGui::GetWindowHeight(); // 'GetWindowHeight' returns height of current section
+    ImGui::End();
+}
+
+
+#undef FMTSTRING
+#undef XMACRO
+//TODO: reimplement 'DrawFluidParams' with Slider-Macros?
+
+
+void MainGUI::DrawFluidParams(float& next_height)
+{
+    if (!fluidParams) return;  // TODO: give some kind of indicator that it's been invalidated
     //ImGui::Separator();
     ImGui::Begin("Fluid Parameters", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
     ImGui::SetWindowPos({0, next_height});
@@ -220,7 +333,7 @@ void MainGUI::DrawFluidParameters(float& next_height)
     
     // VSliderFloat also exists, but it requires it's size to be specified (for some reason)
     #define FP(field, precision, max) ++numlines; \
-        ImGui::SliderFloat(#field, &fluidptr->field, MIN(max), max, #field": %."#precision"f", sliderflags);
+        ImGui::SliderFloat(#field, &fluidParams->field, MIN(max), max, #field": %."#precision"f", sliderflags);
     
     // set min == -max
     #define MIN(f) -f
@@ -242,7 +355,7 @@ void MainGUI::DrawFluidParameters(float& next_height)
     numlines += 1;
     ImGui::Separator();
     ImGui::Text("Turbulence:"); ImGui::SameLine();
-    if (fluidptr->realptr->isTurbulent) 
+    if (fluidParams->realptr->isTurbulent) 
          ImGui::TextColored({255, 0, 8, 255}, "Enabled" );
     else ImGui::TextColored({0, 64, 255, 255}, "Disabled");
     ImGui::Separator();
@@ -280,7 +393,9 @@ void MainGUI::FrameLoop()
     next_height += ImGui::GetWindowHeight(); // 'GetWindowHeight' returns height of current section
     ImGui::End(); // Top section (Main)
     
-    DrawFluidParameters(next_height);
+    // Simulation Parameters
+    DrawSimulParams(next_height);
+    DrawFluidParams(next_height);
     
     // Demo-Window Toggle Button
     ImGui::Begin("DemoToggle", nullptr, subwindow_flags);

@@ -2,12 +2,12 @@
 #define FLUIDSIM_GLOBALS_HPP_INCLUDED
 
 
-constexpr int NUMCOLUMNS {64}, NUMROWS {64}; // layout (and number) of particles spawned during init
+constexpr int NUMCOLUMNS {50}, NUMROWS {50}; // layout (and number) of particles spawned during init
 constexpr int BOXWIDTH {1000}, BOXHEIGHT {1000}; // internal resolution (default window resolution should match)
 //constexpr float DEFAULTRADIUS {float(BOXWIDTH/NUMCOLUMNS) / 2.0f};
 constexpr float DEFAULTRADIUS {10.0f}; // size of particles (sf::CircleShape)
 constexpr int DEFAULTPOINTCOUNT {8}; // number of points used to draw each circle (particles)
-constexpr unsigned int SPATIAL_RESOLUTION {20}; // units/pixels per grid-cell for calculating diffusion/collision
+constexpr unsigned int SPATIAL_RESOLUTION {25}; // units/pixels per grid-cell for calculating diffusion/collision
 
 static_assert((DEFAULTRADIUS > 0.0), "Radius must be greater than 0");
 static_assert((DEFAULTPOINTCOUNT > 1), "Pointcount must be greater than ");
@@ -33,7 +33,7 @@ static_assert((DIFFUSION_RADIUS <= radialdist_limit), "Diffusion-radius is too b
 
 // main.cpp
 extern float timestepRatio;  // normalizing timesteps to make physics independent of frame-rate
-
+extern float timestepMultiplier;
 
 
 #endif

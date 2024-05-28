@@ -114,6 +114,9 @@ class Simulation
     void NonLocalDiffusion(const IDset_T& originset, const IDset_T& adjacentset); // diffusion across cells
     IDset_T BuildAdjacentSet(const std::size_t cellID, const IDset_T& excluded);
     
+    friend class MainGUI;
+    friend struct SimulParameters; // MainGUI
+    
     public:
     bool Initialize();
     void Update();

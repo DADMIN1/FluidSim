@@ -20,7 +20,7 @@ extern void PrintKeybinds();   // Keybinds.cpp
 
 constexpr int framerateCap{300}; // duplicated in 'MainGUI.cpp'
 float timestepRatio{1.0f/float(framerateCap/60.0f)};  // normalizing timesteps to make physics independent of frame-rate
-
+float timestepMultiplier {1.0f};
 
 // TODO: refactor these elsewhere
 // Mouse.cpp
@@ -109,7 +109,8 @@ int main(int argc, char** argv)
         std::cerr << "simulation failed to initialize!\n";
         return 1;
     }
-    mainGUI.SetFluidPtr(simulation.fluid);
+    mainGUI.SetFluidParams(&simulation.fluid);
+    mainGUI.SetSimulationParams(&simulation);
     
     auto&& [gridSprite, fluidSprite] = simulation.GetSprites();
     
@@ -350,6 +351,7 @@ int main(int argc, char** argv)
             // without it, there's no visual indicator that the mouse is enabled, and no position.
             mainwindow.display();
             timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
+            timestepRatio *= timestepMultiplier;
             continue;
         }
         
@@ -383,6 +385,7 @@ int main(int argc, char** argv)
         
         mainwindow.display();
         timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
+        timestepRatio *= timestepMultiplier;
     }
     
     ImGui::SFML::Shutdown();  // destroys ALL! contexts
