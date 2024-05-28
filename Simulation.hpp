@@ -46,8 +46,12 @@ struct DeltaMap
 {
     std::map<unsigned int, CellDelta_T> cellmap; // key is cellUUID
     TransitionList transitionlist;
+    /* auto begin() { return cellmap.begin(); }
+    auto end()   { return cellmap.end();   } */
+    // loses info about transitionlist, but that's fine because it's unused
     
     DeltaMap() {}
+    /* DeltaMap(decltype(cellmap.begin()) B, decltype(cellmap.end()) E): cellmap(B, E) {} */
     DeltaMap(DeltaMap&& other): cellmap{std::move(other.cellmap)}, transitionlist{other.transitionlist} {}
     DeltaMap(TransitionList&& list) : transitionlist{list}
     {
@@ -108,7 +112,7 @@ class Simulation
     // does NOT update the Particles' cellID or the cells' density
     TransitionList FindCellTransitions() const;
     DeltaMap FindCellTransitions(const auto& particles_slice) const; // multithreaded version
-    void HandleTransitions(DeltaMap&& deltamap); // deltamap-parameter gets eaten by this function (invalidated)
+    void HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap); // cellmap-parameter gets eaten by this function (invalidated)
     void UpdateParticles();
     void LocalDiffusion(const IDset_T& particleset); // diffusion within a single cell
     void NonLocalDiffusion(const IDset_T& originset, const IDset_T& adjacentset); // diffusion across cells

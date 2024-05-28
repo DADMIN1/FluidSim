@@ -98,19 +98,15 @@ DeltaMap Simulation::FindCellTransitions(const auto& particles_slice) const
 }
 
 
-// note: deltamap gets eaten by the '.merge' call
-void Simulation::HandleTransitions(DeltaMap&& deltamap)
+// note: cellmap gets eaten by the '.merge' call
+void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap)
 {
     std::lock_guard<std::mutex> pmGuard(write_mutex);
     float rng = normalizedRNG();
     rng += 0.95; // range 0.95-1.95
     
-    /* for (const Transition_T& transition : deltamap.transitionlist)
-    {
-        
-    } */
-    
-    for (auto&& [cellID, delta]: deltamap.cellmap)
+    // 'auto&&' is definitely correct here; ~100 FPS difference (300->400)
+    for (auto&& [cellID, delta]: cellmap)
     {
         Cell& cell = diffusionField.cells[cellID];
         // delta.velocities has already been scaled by momentumTransfer
@@ -375,28 +371,19 @@ void Simulation::Update()
         transitions.Combine(handle.get()); // extracts/moves elements with new keys
     }
     
-    HandleTransitions(std::move(transitions));
-    
-    // single-threaded versions
-    //auto transitions = FindCellTransitions();
-    //HandleTransitions(transitions);
-    
     // TODO: rewrite HandleTransitions to handle multithreading better
-    
-    // multithreaded (seems to be slower)
-    /* std::array<std::future<void>, THREAD_COUNT> threads;
-    auto particles_slices = DivideContainer(fluid.particles);
-    for (std::size_t index{0}; index < threads.size(); ++index) {
-        auto lambda = [this](auto slice) { 
-            auto transitions = FindCellTransitions(slice);
-            HandleTransitions(transitions);
+    std::array<std::future<void>, THREAD_COUNT> transition_threads;
+    auto transition_slices = DivideContainer(transitions.cellmap);
+    for (std::size_t index{0}; index < transition_threads.size(); ++index) {
+        auto slice = transition_slices[index];
+        auto lambda = [this, slice]() { 
+            HandleTransitions({slice.first, slice.second});
         };
-        threads[index] = std::async(std::launch::async, lambda, particles_slices[index]);
+        transition_threads[index] = std::async(std::launch::async, lambda);
     };
-    for (auto& handle: threads) { handle.wait(); } */
+    for (auto& handle: transition_threads) { handle.wait(); }
     
     UpdateParticles();
-    //fluid.UpdatePositions();  // seems like doing this last might give slightly better performance?
     
     return;
 }
