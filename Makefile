@@ -1,7 +1,19 @@
-MAKEFLAGS += -j8
+MAKEFLAGS += -j8 --output-sync=target --warn-undefined-variables
+
+# testing for specific gcc versions (specifically, testing if '--version' prints a non-empty string)
+# stderr redirected otherwise it prints 'make: g++-13: No such file or directory'
+ifneq ($(shell g++-12 --version 2>/dev/null),)
 CXX := g++-12
-# TODO: check which gcc
-CXXFLAGS := -pipe -std=c++23
+else ifneq ($(shell g++-13 --version 2>/dev/null),)
+CXX := g++-13
+# if the 'CXX' variable is already set, use that
+else ifdef CXX
+CXX := ${CXX}
+else  # otherwise fallback to default gcc
+CXX := g++
+endif
+
+CXXFLAGS := -pipe -std=c++23 -fdiagnostics-color=always
 # c++23 standard isn't required for anything; 20 works fine
 LDFLAGS := -lsfml-system -lsfml-graphics -lsfml-window -lpthread
 WARNFLAGS := -Wall -Wextra -Wpedantic -fmax-errors=4
