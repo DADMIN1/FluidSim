@@ -5,22 +5,26 @@
 #include <cassert>
 
 #include <SFML/Graphics/RectangleShape.hpp>
+
+
 // TODO: refactor this out of Mouse.cpp/hpp completely; it can go in main.
 sf::RectangleShape hoverOutline{sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}};
 
 static std::vector<sf::Vector2f> outlined{};
-void Mouse_T::DrawOutlines() const
+void Mouse_T::DrawOutlines()
 {
     sf::RectangleShape outline{sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}};
     // outline.setFillColor(sf::Color::Transparent);
     outline.setFillColor({0x00, 0x00, 0x00, 0x42});
     outline.setOutlineColor({0x00, 0x99, 0x9A, 0xCD});
     outline.setOutlineThickness(SPATIAL_RESOLUTION/-5.0);
-
+    
+    cellOverlay.clear(sf::Color::Transparent);
     for (sf::Vector2f& position: outlined) {
         outline.setPosition(position);
-        window.draw(outline);
+        cellOverlay.draw(outline);
     }
+    cellOverlay.display();
 }
 
 // TODO: refactor this elsewhere
@@ -30,6 +34,7 @@ bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGr
 
 struct CellState_T
 {
+    std::size_t UUID;
     Cell* const cellptr;
     const Cell originalState;  // needed to restore the cell after moving or releasing-button
     // saving the whole cell is overkill; only the modified/necessary components should be copied
@@ -38,36 +43,77 @@ struct CellState_T
     {
         float density {0.0};
         // sf::Color outlineColor;
-        // sf::Color fillColor;  // problem: Cell.UpdateColor will overwrite fillColor every frame
-        // sf::RectangleShape overlay;
+        // sf::Color fillColor;
+        sf::RectangleShape overlay;
     } mod;
     
-    CellState_T(Cell* const ptr): cellptr{ptr}, originalState{*ptr}
+    CellState_T(const CellState_T& other): 
+    UUID{other.UUID},
+    cellptr {other.cellptr}, 
+    originalState {*other.cellptr},
+    mod {other.mod}
+    { 
+        mod.density = other.mod.density; 
+        mod.overlay.setFillColor(sf::Color::Transparent);
+        mod.overlay.setOutlineColor(sf::Color::Transparent);
+        mod.overlay.setFillColor(sf::Color::Red);
+    }
+    
+    CellState_T(const std::size_t ID, Cell* const ptr): UUID{ID}, cellptr{ptr}, originalState{*ptr}
     {
+        mod.overlay = originalState; // Cell inherits from RectangleShape
+        mod.overlay.setFillColor(sf::Color::Transparent);
+        mod.overlay.setOutlineColor(sf::Color::Transparent);
+        mod.overlay.setFillColor(sf::Color::Red);
         // TODO: initialize mod here or in ModifyCell?
         // example of pointer-to-member
         /* float Cell::* mcptr = &Cell::density;
         const float& epicmem = cellptr->*mcptr; */
     }
+    
+    /* ~CellState_T()
+    {
+        if (mod.density != 0)
+        std::cout << "destroyed: " << UUID << " " << mod.density << '\n';
+        //cellptr = originalState;
+    } */
+    
 };
 
 // TODO: reserve based on neighbor counts?
 static std::unordered_map<std::size_t, CellState_T> savedState {};
+static std::unordered_map<std::size_t, CellState_T> preservedOverlays{};
+
+
+void Mouse_T::ClearPreservedOverlays() { 
+    for (auto& [id, state]: preservedOverlays) {
+        fieldptr->cells[id].density -= state.mod.density;
+    }
+    preservedOverlays.clear();
+    return;
+}
+
+void Mouse_T::RedrawOverlay()
+{
+    cellOverlay.clear();
+    for (auto& [key, state]: savedState) {
+        state.mod.overlay.setFillColor({127, 00, 00, 127});
+        cellOverlay.draw(state.mod.overlay);
+    }
+    for (auto& [key, state]: preservedOverlays) {
+        state.mod.overlay.setFillColor({00, 127, 00, 127});
+        cellOverlay.draw(state.mod.overlay);
+    }
+    cellOverlay.display();
+}
 
 
 auto Mouse_T::StoreCell(Cell* const cellptr)
 {
     const std::size_t ID = cellptr->UUID;
-    //savedState[cellptr->UUID] = CellState_T(cellptr); // can't do because some members are const
-    if (savedState.contains(ID))
-    {
-        std::cerr << "savedState already contains ID: " << ID;
-    }
-    const auto result = savedState.emplace(ID, cellptr);
-    assert((result.first->first == ID) && "inserted IDs don't match!!");
-    assert(result.second && "Cell-state was not saved! (entry already exists)");
-    // std::cout << "stored: " << ID << '\n';
-    return result.first;
+    if (savedState.contains(ID)) { return &savedState.at(ID); }
+    const auto result = savedState.emplace(ID, CellState_T(ID, cellptr));
+    return &result.first->second;
 }
 
 
@@ -105,7 +151,7 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
                         RestoreCell(cellptr->UUID);
                     }
                     auto entry = StoreCell(cellptr);
-                    entry->second.mod.density = adjStrength;
+                    entry->mod.density = adjStrength;
                     cellptr->density += adjStrength;
                     outlined.push_back(cellptr->getPosition());
                 }
@@ -132,13 +178,20 @@ void Mouse_T::RestoreCell(const std::size_t cellID)
     
     // accounting for any external changes made to density (not from Mouse) since it was stored
     const float densityAdjustment = (state.cellptr->density - state.mod.density) - state.originalState.density;
+    
+    if (preservedOverlays.contains(cellID)) {
+        auto& preserved = preservedOverlays.at(cellID);
+        preserved.mod.density -= densityAdjustment;
+        return;
+    }
+    
     *state.cellptr = state.originalState;
     state.cellptr->density += densityAdjustment;
-    // std::cout << "Restored: " << cellID << '\n';
+    
     return;
 }
 
-void Mouse_T::InvalidateHover()
+void Mouse_T::InvalidateHover(bool preserve)
 {
     std::vector<std::size_t> ids{};
     ids.reserve(savedState.size());
@@ -153,6 +206,16 @@ void Mouse_T::InvalidateHover()
     {
         const CellState_T state = savedState.extract(id).mapped();
         const float densityAdjustment = (state.cellptr->density - state.mod.density) - state.originalState.density;
+        
+        if (preserve) {
+            if (preservedOverlays.contains(id)) {
+                preservedOverlays.at(id).mod.density -= densityAdjustment;
+            } else {
+                preservedOverlays.emplace(id, state);
+            }
+            continue;
+        }
+        
         *state.cellptr = state.originalState;
         state.cellptr->density += densityAdjustment;
     }
@@ -169,15 +232,16 @@ void Mouse_T::SwitchMode(const Mode nextmode)
 {
     if (mode == nextmode) { return; }
     // handling transition from current mode
-    // InvalidateHover();
+    InvalidateHover();
     if ((mode == None) || (mode == Disabled)) {
         // these modes shouldn't store any mods, so no need to restore hoveredCell
         shouldDisplay = false;
     } else {
+        //if (isPaintingMode) InvalidateHover(true); // preserve any painted lines
         // we need to restore hoveredCell, otherwise it won't revert on mouse-release
         // because ModifyCell doesn't undo existing mods, and None-mode doesn't handle mods at all
         // also we'll lose information about which mode the mods were set with (the current one)
-        InvalidateHover();
+        //InvalidateHover();
     }
     
     mode = nextmode;
@@ -276,10 +340,10 @@ void Mouse_T::HandleEvent(const sf::Event& event)
     switch(event.type)
     {
         // not currently passed by mainwindow
-        case sf::Event::MouseLeft:  // mouse left the window
+        /* case sf::Event::MouseLeft:  // mouse left the window
             std::cerr << "mouseleft!\n";
             InvalidateHover();
-        break;
+        break; */
         
         case sf::Event::MouseWheelScrolled:
         {
@@ -340,7 +404,14 @@ void Mouse_T::HandleEvent(const sf::Event& event)
             {
                 case 0: //Left-click
                 {
-                    if (mode != None) { break; } // only allow one button at a time
+                    if (mode != None) { 
+                        if(isPaintingMode && (mode == Pull)) {
+                            InvalidateHover(true); // lock-in painted cells (preserve)
+                            SwitchMode(None); // avoids a bug by clearing saveState (don't ask)
+                            // FALLTHROUGH //
+                        } else
+                        break; // only allow one button at a time
+                    }
                     SwitchMode(Push);
                     setOutlineColor(sf::Color::Cyan);
                     if (!shouldDrawGrid)
@@ -350,11 +421,24 @@ void Mouse_T::HandleEvent(const sf::Event& event)
                 
                 case 1: //Right-click
                 {
-                    if (mode != None) { break; } // only allow one button at a time
+                    if (mode != None) { 
+                        if(isPaintingMode && (mode == Push)) {
+                            InvalidateHover(true); // lock-in painted cells (preserve)
+                            SwitchMode(None);
+                            // FALLTHROUGH //
+                        } else
+                        break; // only allow one button at a time
+                    }
                     SwitchMode(Pull);
                     setOutlineColor(sf::Color::Magenta);
                     if (!shouldDrawGrid)
                         setFillColor({0xFF, 0x00, 0x77, 0x32});
+                }
+                break;
+                
+                case 3: case 4: //side-buttons
+                {
+                    ClearPreservedOverlays();
                 }
                 break;
                 

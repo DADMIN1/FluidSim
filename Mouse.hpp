@@ -13,6 +13,7 @@ static constexpr float defaultRadius{(defaultRD + 0.65) * 0.65 * SPATIAL_RESOLUT
 static constexpr int defaultPointCount{128};  // larger numbers don't seem to do anything
 
 
+// TODO: multi-layered, stacked overlays
 // Provides mouse-related interactions for the simulation
 class Mouse_T: private sf::Mouse, public sf::CircleShape
 {
@@ -30,8 +31,9 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     float strength {96.0};  // for push/pull modes
     int radialDist {defaultRD};  // orthogonal distance of adjacent cells included in effect
     
-    const DiffusionField* const fieldptr; // &fluid.DiffusionField
+    DiffusionField* fieldptr; // &fluid.DiffusionField
     Cell* hoveredCell {nullptr};
+    sf::RenderTexture cellOverlay; // for painting-mode
     
     //static void sf::Mouse::setPosition(const sf::Vector2i& position);
     //static void sf::Mouse::setPosition(const Vector2i& position, const Window& relativeTo);
@@ -51,10 +53,14 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
         setOrigin(getRadius(), getRadius());
         setOutlineColor(sf::Color::Cyan);
         setFillColor(sf::Color::Transparent);
+        auto [w, h] = theWindow.getSize();
+        cellOverlay.create(w, h);
     }
     
+    sf::Sprite GetCellOverlaySprite() { return sf::Sprite{cellOverlay.getTexture()}; }
+    
     void HandleEvent(const sf::Event&);
-    void InvalidateHover(); // restores current hoveredCell and all modified cells
+    void InvalidateHover(bool preserve=false); // restores current hoveredCell and all modified cells
     void SwitchMode(const Mode);
     
     // checks if mouse is enabled, optionally checks if any effect is being applied (hasEffect=true)
@@ -92,7 +98,9 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
         // implement some kind of timer to temporarily reveal the radius
     }
     
-    void DrawOutlines() const;  // for painting mode, outlines every cell around mouse
+    void DrawOutlines();  // for painting mode, outlines every cell around mouse
+    void RedrawOverlay(); // also for painting mode; overlay of 
+    void ClearPreservedOverlays(); // for painting-mode
     
     // TODO: should these even be member functions?
     private:

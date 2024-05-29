@@ -33,7 +33,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{21};
+    static constexpr auto numkeybinds{22};
     std::vector<Keybind> all;  // TODO: array instead?
     std::vector<std::vector<Keybind*>> sections; 
     
@@ -63,20 +63,20 @@ struct AllKeybinds
             ->extrainfo = "(while open) switches focus between side-panel and main-window\n"
             "  - Left/Right: switch docking side of side-panel\n"
             "  - Q/ESC: close side-panel\n";
+        KEY(Tab, "toggle mouse interactions");
         
         current_section = Keybind::Section::interactions;
         KEY(Space, "pause/unpause simulation");
         KEY(BackSpace, "freeze particles")
             -> extrainfo = "all velocities are zeroed. (it also pauses the simulation)";
         KEY(G, "toggle gravity");
-        KEY(Tab, "toggle mouse interactions");
         KEY(P, "toggle painting-mode");
+        KEY(K, "clear painted cells (painting mode)");
         KEY(C, "toggle cell-grid display");
         KEY(T, "toggle turbulence-mode")
             -> extrainfo = "modifies physics calculations to encourage perpetual motion";
         KEY(Y, "toggle particle transparency");
         KEY(U, "toggle particle-scaling direction (positive/negative)");
-        
         current_section = Keybind::Section::unspecified;
         KEY(N, "print mouse position");
         
@@ -107,14 +107,16 @@ struct AllKeybinds
             "  Mouse-interactions: (hold)\n"
             "      Left-Click  = Push (increases density)\n"
             "      Right-Click = Pull (negative density)\n"
-            "    ScrollWheel resizes effect radius\n";
+            "    ScrollWheel resizes effect radius\n"
+            "    Side-buttons clear any painted areas (in painting mode)\n";
         // just abusing string concatenation for more visually-intuitive formatting
         
         keybind_P.extrainfo = "in painting-mode, mouse-interactions stay active over traveled areas\n"
-                            "  (until mouse-button is released)";
+                            "     (until mouse-button is released)\n"
+                            "  - While actively painting, clicking the opposite mouse-button will lock the painted cells.\n"
+                            "  - Use the mouse's side-buttons to clear any locked cells. (Or hit 'K')";
         
         //keybind_D.extrainfo = "the cell-grid visualizes the local density of small regions";
-        keybind_C.extrainfo = "the cell-grid will always be (temporarily) displayed when drawing in painting-mode";
         
     }
     #undef KEY

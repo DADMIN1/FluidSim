@@ -65,6 +65,8 @@ int main(int argc, char** argv)
     
     ThreadManager threadManager{};
     threadManager.PrintThreadcount();
+    /* threadManager.ContainerDivTest();
+    threadManager.ContainerDivTestMT(); */
     
     // Title-bar is implied (for Style::Close)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
@@ -115,6 +117,7 @@ int main(int argc, char** argv)
     auto&& [gridSprite, fluidSprite] = simulation.GetSprites();
     
     Mouse_T mouse(mainwindow, simulation.GetDiffusionFieldPtr());
+    sf::Sprite cellOverlay {mouse.GetCellOverlaySprite()};
     
     PrintKeybinds();
     
@@ -236,10 +239,17 @@ int main(int argc, char** argv)
                         
                         case sf::Keyboard::P:
                         {
+                            // TODO: clear overlays if exiting painting-Mode?
                             mouse.isPaintingMode = !mouse.isPaintingMode;
                             std::cout << "Painting mode: " << ((mouse.isPaintingMode)? "enabled": "disabled") << '\n';
                         }
                         break;
+                        
+                        case sf::Keyboard::K:
+                            mouse.ClearPreservedOverlays();
+                            std::cout << "Cleared painted regions\n";
+                        break;
+                        
                         
                         case sf::Keyboard::C:
                         {
@@ -359,9 +369,7 @@ int main(int argc, char** argv)
         mainwindow.clear(sf::Color::Transparent);
         simulation.Update();
         
-        // TODO: hide the gridlines in painting-mode
-        // grid must be temporarily displayed when you draw in painting-mode (otherwise the effect would be invisible)
-        if (shouldDrawGrid || (mouse.isPaintingMode && mouse.isActive(true))) {
+        if (shouldDrawGrid/*  || (mouse.isPaintingMode && mouse.isActive(true)) */) {
             simulation.RedrawGrid();
             mainwindow.draw(gridSprite);
         }
@@ -369,6 +377,14 @@ int main(int argc, char** argv)
         {  // TODO: refactor this logic to not check on every frame
             mouse.shouldDisplay = true;
             mouse.shouldOutline = false;
+        }
+        
+        // TODO: make a 'debug' mode for the mouse that always draws this (with the red/green)
+        // TODO: make this draw the preserved overlay if there is one
+        if (mouse.isPaintingMode && mouse.isActive(true)) 
+        {
+            mouse.RedrawOverlay();
+            mainwindow.draw(cellOverlay);
         }
         
         if (mouse.shouldOutline) { 
