@@ -96,7 +96,6 @@ void MainGUI::ToggleEnabled()
     isEnabled = !isEnabled;
     sf::RenderWindow::setVisible(isEnabled);
     if (isEnabled) FollowMainWindow();
-    
     return;
 }
 
@@ -208,15 +207,13 @@ void MainGUI::HandleWindowEvents()
             
             case sf::Event::Resized:
             {
-                // don't allow resizing if docked; it can glitch out the titlebar
-                if (dockedToMain) {
-                    //setSize({m_width, m_height});
-                    FollowMainWindow();
-                    break;
-                }
                 auto [newwidth, newheight] = event.size;
                 m_width = newwidth;
                 m_height = newheight;
+                if (dockedToMain) {
+                    //setSize({m_width, m_height});
+                    FollowMainWindow();
+                }
             }
             break;
             

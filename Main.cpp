@@ -211,9 +211,22 @@ int main(int argc, char** argv)
                         case sf::Keyboard::Tilde:
                             // just pass focus to mainGUI if it's already open
                             if (mainGUI.isEnabled) {
+                                #define WINDOWMANAGERJANK
+                                // Window-Manager moves the mainGUI window on it's own just from toggling the visibility off/on (and won't give focus otherwise lmao)
+                                // so the GUI window will always need to be repositioned, even if it's not docked
+                                #ifdef WINDOWMANAGERJANK
+                                  mainGUI.FollowMainWindow();
+                                #endif
+                                
                                 mainGUI.setVisible(false);
                                 mainGUI.setVisible(true);
                                 mainGUI.requestFocus();
+                                
+                                #ifdef WINDOWMANAGERJANK
+                                  mainGUI.FollowMainWindow(); // have to do it twice because it clips into the main window the first time
+                                #endif
+                                #undef WINDOWMANAGERJANK
+                                break;
                             }
                             else mainGUI.ToggleEnabled();
                         break;
