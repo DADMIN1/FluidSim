@@ -22,18 +22,19 @@ constexpr int framerateCap{300}; // duplicated in 'MainGUI.cpp'
 float timestepRatio{1.0f/float(framerateCap/60.0f)};  // normalizing timesteps to make physics independent of frame-rate
 float timestepMultiplier {1.0f};
 
-// TODO: refactor these elsewhere
+
 // Mouse.cpp
-extern bool shouldDrawGrid;
-bool ToggleGridDisplay();
 extern sf::RectangleShape hoverOutline;
 bool windowClearDisabled{false};  // option used by the turbulence shader
-
 
 // for MainGUI.cpp (controlling VSync)
 sf::RenderWindow* mainwindowPtr{nullptr};
 GradientWindow_T* gradientWindowPtr{nullptr};
 bool usingVsync {true};
+
+// cell-grid
+bool shouldDrawGrid {false};
+bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGrid; }
 
 
 int main(int argc, char** argv)
@@ -102,6 +103,7 @@ int main(int argc, char** argv)
     mainwindow.setVisible(true);
     mainwindow.requestFocus();
     
+    // TODO: refactor into mouse?
     hoverOutline.setFillColor(sf::Color::Transparent);
     hoverOutline.setOutlineColor(sf::Color::Cyan);
     hoverOutline.setOutlineThickness(2.5f);
@@ -117,7 +119,7 @@ int main(int argc, char** argv)
     auto&& [gridSprite, fluidSprite] = simulation.GetSprites();
     
     Mouse_T mouse(mainwindow, simulation.GetDiffusionFieldPtr());
-    sf::Sprite cellOverlay {mouse.GetCellOverlaySprite()};
+    auto [cellOverlay, outlineOverlay] {mouse.GetOverlaySprites()};
     
     PrintKeybinds();
     
@@ -352,14 +354,15 @@ int main(int argc, char** argv)
             }
         }
         
-        
+        // TODO: can I get rid of this now?
         // alternate render logic for turbulence shader that skips window-clearing and the grid
         if (Shader::current->name == "turbulence") {
             if (simulation.isPaused || !windowClearDisabled) 
                 mainwindow.clear(sf::Color::Transparent); // always clear when paused so you can modify and observe the effects of the 'threshold' parameter
             
             if (mouse.isActive(true) && mouse.isPaintingMode) { 
-                mouse.DrawOutlines();
+                mouse.RedrawOutlines();
+                mainwindow.draw(outlineOverlay);
                 hoverOutline.setFillColor({0x1A, 0xFF, 0x1A, 0x82});
                 mainwindow.draw(hoverOutline); 
             }
@@ -378,41 +381,40 @@ int main(int argc, char** argv)
             continue;
         }
         
+        
         if (!windowClearDisabled)
         mainwindow.clear(sf::Color::Transparent);
         simulation.Update();
         
-        if (shouldDrawGrid/*  || (mouse.isPaintingMode && mouse.isActive(true)) */) {
+        if (shouldDrawGrid || (mouse.isPaintingMode && isPaintingDebug)) {
             simulation.RedrawGrid();
             mainwindow.draw(gridSprite);
-        }
-        else if (mouse.isActive()) // when grid is NOT drawn: always draw mouse-radius and disable cell-outline
-        {  // TODO: refactor this logic to not check on every frame
-            mouse.shouldDisplay = true;
-            mouse.shouldOutline = false;
+            mouse.shouldOutline = true;
         }
         
-        // TODO: make a 'debug' mode for the mouse that always draws this (with the red/green)
-        // TODO: make this draw the preserved overlay if there is one
-        if (mouse.isPaintingMode && mouse.isActive(true)) 
-        {
-            mouse.RedrawOverlay();
-            mainwindow.draw(cellOverlay);
-        }
+        if(!mouse.isActive()) { mouse.shouldDisplay = false; mouse.shouldOutline = false; }
+        else if (mouse.isPaintingMode || isPaintingDebug) {
+            if (mouse.isActive(true) || isPaintingDebug)
+            {
+                mouse.RedrawOverlay();
+                mainwindow.draw(cellOverlay);
+                mouse.shouldOutline = true;
+                if (!isPaintingDebug)
+                mouse.shouldDisplay = false;
+            }
+            else if (mouse.isActive()) 
+                mouse.shouldOutline = !mouse.shouldDisplay;
+        } 
+        else if (mouse.isActive()) { mouse.shouldDisplay = true; }
         
-        if (mouse.shouldOutline) { 
-            mainwindow.draw(hoverOutline); 
-            if (mouse.isPaintingMode && mouse.shouldDisplay) mouse.DrawOutlines();
-        }
+        if (mouse.shouldOutline) { mouse.RedrawOutlines(); mainwindow.draw(outlineOverlay); }
+        if (mouse.shouldDisplay) { mainwindow.draw(mouse); }
+        
         
         simulation.RedrawFluid();
         mainwindow.draw(fluidSprite, Shader::current);
-        
-        if (mouse.shouldDisplay) {
-            mainwindow.draw(mouse);
-        }
-        
         mainwindow.display();
+        
         timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
         timestepRatio *= timestepMultiplier;
     }

@@ -7,29 +7,36 @@
 #include <SFML/Graphics/RectangleShape.hpp>
 
 
-// TODO: refactor this out of Mouse.cpp/hpp completely; it can go in main.
+bool isPaintingDebug{false}; // always display painted cells, color code locked/unlocked areas
 sf::RectangleShape hoverOutline{sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}};
 
 static std::vector<sf::Vector2f> outlined{};
-void Mouse_T::DrawOutlines()
+void Mouse_T::RedrawOutlines()
 {
+    outlineOverlay.clear(sf::Color::Transparent);
+    
     sf::RectangleShape outline{sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}};
-    // outline.setFillColor(sf::Color::Transparent);
     outline.setFillColor({0x00, 0x00, 0x00, 0x42});
     outline.setOutlineColor({0x00, 0x99, 0x9A, 0xCD});
     outline.setOutlineThickness(SPATIAL_RESOLUTION/-5.0);
     
-    cellOverlay.clear(sf::Color::Transparent);
-    for (sf::Vector2f& position: outlined) {
-        outline.setPosition(position);
-        cellOverlay.draw(outline);
+    // hoverOutline
+    if (isActive(true) && isPaintingMode) { 
+        for (sf::Vector2f& position: outlined) {
+            outline.setPosition(position);
+            outlineOverlay.draw(outline);
+        }
+        hoverOutline.setFillColor({0x1A, 0xFF, 0x1A, 0x82});
+        outlineOverlay.draw(hoverOutline);
     }
-    cellOverlay.display();
+    else if (isPaintingMode) { 
+        hoverOutline.setFillColor(sf::Color::Transparent);
+        outlineOverlay.draw(hoverOutline); 
+    }
+    
+    outlineOverlay.display();
+    return;
 }
-
-// TODO: refactor this elsewhere
-bool shouldDrawGrid {false};
-bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGrid; }
 
 
 struct CellState_T
@@ -53,18 +60,16 @@ struct CellState_T
     originalState {*other.cellptr},
     mod {other.mod}
     { 
-        mod.density = other.mod.density; 
-        mod.overlay.setFillColor(sf::Color::Transparent);
-        mod.overlay.setOutlineColor(sf::Color::Transparent);
-        mod.overlay.setFillColor(sf::Color::Red);
+        mod.density = other.mod.density;
+        mod.overlay.setOutlineColor(other.mod.overlay.getOutlineColor());
     }
     
     CellState_T(const std::size_t ID, Cell* const ptr): UUID{ID}, cellptr{ptr}, originalState{*ptr}
     {
         mod.overlay = originalState; // Cell inherits from RectangleShape
-        mod.overlay.setFillColor(sf::Color::Transparent);
-        mod.overlay.setOutlineColor(sf::Color::Transparent);
-        mod.overlay.setFillColor(sf::Color::Red);
+        //mod.overlay.setFillColor(sf::Color::Transparent);
+        //mod.overlay.setOutlineColor(sf::Color::Transparent);
+        
         // TODO: initialize mod here or in ModifyCell?
         // example of pointer-to-member
         /* float Cell::* mcptr = &Cell::density;
@@ -95,16 +100,17 @@ void Mouse_T::ClearPreservedOverlays() {
 
 void Mouse_T::RedrawOverlay()
 {
-    cellOverlay.clear();
+    cellOverlay.clear(sf::Color::Transparent);
     for (auto& [key, state]: savedState) {
-        state.mod.overlay.setFillColor({127, 00, 00, 127});
+        state.mod.overlay.setFillColor({sf::Color{sf::Color::Yellow.toInteger() - 0x64}});
         cellOverlay.draw(state.mod.overlay);
     }
     for (auto& [key, state]: preservedOverlays) {
-        state.mod.overlay.setFillColor({00, 127, 00, 127});
+        state.mod.overlay.setFillColor({sf::Color{sf::Color::Blue.toInteger() - 0xA0}});
         cellOverlay.draw(state.mod.overlay);
     }
     cellOverlay.display();
+    return;
 }
 
 
@@ -159,6 +165,7 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
                     entry->mod.density = adjStrength;
                     cellptr->density += adjStrength;
                     outlined.push_back(cellptr->getPosition());
+                    // TODO: inline all of the 'outline' drawing code here?
                 }
             }
         }
@@ -282,6 +289,7 @@ void Mouse_T::SwitchMode(const Mode nextmode)
         default:
             InvalidateHover();
             shouldOutline = false;
+            outlined.clear();
         break;
     }
     return;
@@ -413,13 +421,13 @@ void Mouse_T::HandleEvent(const sf::Event& event)
                         if(isPaintingMode && (mode == Pull)) {
                             InvalidateHover(true); // lock-in painted cells (preserve)
                             SwitchMode(None); // avoids a bug by clearing saveState (don't ask)
+                            setFillColor(sf::Color::Transparent);
                         }
                         break; // only allow one button at a time
                     }
                     SwitchMode(Push);
                     setOutlineColor(sf::Color::Cyan);
-                    if (!shouldDrawGrid)
-                        setFillColor({0x20, 0x77, 0x77, 0x64});
+                    setFillColor({0x20, 0x77, 0x77, 0x64});
                 }
                 break;
                 
@@ -429,13 +437,13 @@ void Mouse_T::HandleEvent(const sf::Event& event)
                         if(isPaintingMode && (mode == Push)) {
                             InvalidateHover(true); // lock-in painted cells (preserve)
                             SwitchMode(None);
+                            setFillColor(sf::Color::Transparent);
                         }
                         break; // only allow one button at a time
                     }
                     SwitchMode(Pull);
                     setOutlineColor(sf::Color::Magenta);
-                    if (!shouldDrawGrid)
-                        setFillColor({0xFF, 0x00, 0x77, 0x32});
+                    setFillColor({0xFF, 0x00, 0x77, 0x32});
                 }
                 break;
                 

@@ -11,6 +11,8 @@
 static constexpr int defaultRD{2};
 static constexpr float defaultRadius{(defaultRD + 0.65) * 0.65 * SPATIAL_RESOLUTION}; // radius of the circleshape, specifically
 static constexpr int defaultPointCount{128};  // larger numbers don't seem to do anything
+extern bool isPaintingDebug; // color-codes all cells in the overlay (always) by which container they're in
+// TODO: Grid-display should be auto-enabled when this is toggled!!!
 
 
 // TODO: multi-layered, stacked overlays
@@ -27,13 +29,14 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
         Erase, // erase particles
     } mode {Disabled};
     
-    sf::RenderWindow& window;
+    sf::RenderWindow& window; // TODO: refactor this out
     float strength {96.0};  // for push/pull modes
     int radialDist {defaultRD};  // orthogonal distance of adjacent cells included in effect
     
     DiffusionField* fieldptr; // &fluid.DiffusionField
     Cell* hoveredCell {nullptr};
-    sf::RenderTexture cellOverlay; // for painting-mode
+    sf::RenderTexture cellOverlay;    // outlines of the cells around the cursor in painting-mode
+    sf::RenderTexture outlineOverlay; // for color-coding the active/locked cells in painting mode
     
     //static void sf::Mouse::setPosition(const sf::Vector2i& position);
     //static void sf::Mouse::setPosition(const Vector2i& position, const Window& relativeTo);
@@ -41,9 +44,16 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     // is it actually necessary to even inherit from sf::Mouse?
     
     public:
-    bool shouldDisplay{false};   // controls drawing of the mouse (circle)
-    bool shouldOutline{false};   // hoveredCell-outline
-    bool isPaintingMode{false};  // mouse-interactions stay painted over traveled areas
+    friend int main(int, char**);
+    bool shouldDisplay{false}; // controls drawing of the mouse (circle)
+    bool shouldOutline{false}; // hoveredCell-outline
+    bool isPaintingMode{true}; // mouse-interactions stay painted over traveled areas
+    
+    void RedrawOutlines();  // for painting mode, outlines every cell around mouse
+    void RedrawOverlay(); // also for painting mode; overlay of 
+    void ClearPreservedOverlays(); // for painting-mode
+    
+    void HandleEvent(const sf::Event&);
     
     // Do not call the constructor for sf::Mouse (it's virtual)?
     Mouse_T(sf::RenderWindow& theWindow, DiffusionField* const mptr)
@@ -55,11 +65,17 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
         setFillColor(sf::Color::Transparent);
         auto [w, h] = theWindow.getSize();
         cellOverlay.create(w, h);
+        outlineOverlay.create(w, h);
     }
     
-    sf::Sprite GetCellOverlaySprite() { return sf::Sprite{cellOverlay.getTexture()}; }
+    auto GetOverlaySprites() { 
+        return std::pair<sf::Sprite,sf::Sprite> (
+            sf::Sprite{    cellOverlay.getTexture() },
+            sf::Sprite{ outlineOverlay.getTexture() }
+        );
+    }
     
-    void HandleEvent(const sf::Event&);
+    private:
     void InvalidateHover(bool preserve=false); // restores current hoveredCell and all modified cells
     void SwitchMode(const Mode);
     
@@ -98,12 +114,7 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
         // implement some kind of timer to temporarily reveal the radius
     }
     
-    void DrawOutlines();  // for painting mode, outlines every cell around mouse
-    void RedrawOverlay(); // also for painting mode; overlay of 
-    void ClearPreservedOverlays(); // for painting-mode
-    
     // TODO: should these even be member functions?
-    private:
     bool UpdateHovered();  // returns true if hoveredCell was found
     auto StoreCell(Cell* const cellptr);  // saves the cell's current state, returns an iterator
     void ModifyCell(const Cell* const cellptr); // modifies cell's properties based on mode
