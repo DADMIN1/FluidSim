@@ -151,6 +151,11 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
                         RestoreCell(cellptr->UUID);
                     }
                     auto entry = StoreCell(cellptr);
+                    // overwrite any painted areas, instead of merging them
+                    if (preservedOverlays.contains(cellptr->UUID)) {
+                        auto x = preservedOverlays.extract(cellptr->UUID);
+                        cellptr->density -= x.mapped().mod.density;
+                    }
                     entry->mod.density = adjStrength;
                     cellptr->density += adjStrength;
                     outlined.push_back(cellptr->getPosition());
@@ -408,8 +413,7 @@ void Mouse_T::HandleEvent(const sf::Event& event)
                         if(isPaintingMode && (mode == Pull)) {
                             InvalidateHover(true); // lock-in painted cells (preserve)
                             SwitchMode(None); // avoids a bug by clearing saveState (don't ask)
-                            // FALLTHROUGH //
-                        } else
+                        }
                         break; // only allow one button at a time
                     }
                     SwitchMode(Push);
@@ -425,8 +429,7 @@ void Mouse_T::HandleEvent(const sf::Event& event)
                         if(isPaintingMode && (mode == Push)) {
                             InvalidateHover(true); // lock-in painted cells (preserve)
                             SwitchMode(None);
-                            // FALLTHROUGH //
-                        } else
+                        }
                         break; // only allow one button at a time
                     }
                     SwitchMode(Pull);
