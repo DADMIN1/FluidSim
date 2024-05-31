@@ -1,13 +1,12 @@
 #include "Mouse.hpp"
 
-#include <iostream>
-#include <unordered_map>
-#include <cassert>
+//#include <iostream>
+//#include <cassert>
 
 #include <SFML/Graphics/RectangleShape.hpp>
 
 
-bool isPaintingDebug{false}; // always display painted cells, color code locked/unlocked areas
+bool Mouse_T::isPaintingDebug{false}; // always display painted cells, color code locked/unlocked areas
 sf::RectangleShape hoverOutline{sf::Vector2f{SPATIAL_RESOLUTION, SPATIAL_RESOLUTION}};
 
 static std::vector<sf::Vector2f> outlined{};
@@ -49,6 +48,7 @@ struct CellState_T
     struct Mod_T // stores modifications applied by the mouse-mode
     {
         float density {0.0};
+        int dist{0}; // radial dist that was used to set density
         // sf::Color outlineColor;
         // sf::Color fillColor;
         sf::RectangleShape overlay;
@@ -60,6 +60,8 @@ struct CellState_T
     originalState {*other.cellptr},
     mod {other.mod}
     { 
+        //mod.dist = ((mod.dist>other.mod.dist)? other.mod.dist : mod.dist);
+        mod.dist = other.mod.dist;
         mod.density = other.mod.density;
         mod.overlay.setOutlineColor(other.mod.overlay.getOutlineColor());
     }
@@ -86,8 +88,25 @@ struct CellState_T
 };
 
 // TODO: reserve based on neighbor counts?
-static std::unordered_map<std::size_t, CellState_T> savedState {};
-static std::unordered_map<std::size_t, CellState_T> preservedOverlays{};
+std::unordered_map<std::size_t, CellState_T> Mouse_T::savedState{};
+std::unordered_map<std::size_t, CellState_T> Mouse_T::preservedOverlays{};
+
+
+void Mouse_T::RecalculateModDensities() const 
+{
+    for (auto& [ID, cellstate]: Mouse_T::preservedOverlays) {
+        const float adjStrength = {
+            ((cellstate.mod.density>0.f)? strength : -strength) * DIFFUSIONSCALING[cellstate.mod.dist]
+            // there's a couple of assumptions here: 
+            // that the sign of the density matches the original mode (push/pull),
+            // and that both the density and the radial-dist are accurate
+        };
+        const float diffStrength = cellstate.mod.density - adjStrength;
+        cellstate.mod.density = adjStrength;
+        cellstate.cellptr->density -= diffStrength;
+    }
+    return;
+}
 
 
 void Mouse_T::ClearPreservedOverlays() { 
@@ -162,6 +181,7 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
                         auto x = preservedOverlays.extract(cellptr->UUID);
                         cellptr->density -= x.mapped().mod.density;
                     }
+                    entry->mod.dist = dist;
                     entry->mod.density = adjStrength;
                     cellptr->density += adjStrength;
                     outlined.push_back(cellptr->getPosition());
@@ -174,7 +194,7 @@ void Mouse_T::ModifyCell(const Cell* const cellptr)
         case Drag: case Fill: case Erase: 
         case Disabled:
         default:
-            assert(false && "modifycell called with unexpected mode");
+            //assert(false && "modifycell called with unexpected mode");
             break;
     }
     return;
@@ -332,11 +352,11 @@ bool Mouse_T::UpdateHovered()
     unsigned int xi = x/SPATIAL_RESOLUTION;
     unsigned int yi = y/SPATIAL_RESOLUTION;
     if ((xi > Cell::maxIX) || (yi > Cell::maxIY)) {
-        std::cerr << "bad indecies calculated: ";
-        std::cerr << xi << ", " << yi << '\n';
+        /* std::cerr << "bad indecies calculated: ";
+        std::cerr << xi << ", " << yi << '\n'; */
         return false;
     }
-    assert((xi <= Cell::maxIX) && (yi <= Cell::maxIY) && "index of hovered-cell out of range");
+    // assert((xi <= Cell::maxIX) && (yi <= Cell::maxIY) && "index of hovered-cell out of range");
     
     hoveredCell = fieldptr->cellmatrix.at(xi).at(yi);
     if (savedState.contains(hoveredCell->UUID))

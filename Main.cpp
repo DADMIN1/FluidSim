@@ -41,7 +41,6 @@ int main(int argc, char** argv)
 {
     std::cout << "fluid sim\n";
     //assert(false && "asserts are active!");
-    assert((timestepRatio > 0) && "timestep-ratio is zero!");
     
     for (int C{0}; C < argc; ++C) {
         std::string arg {argv[C]};
@@ -79,23 +78,30 @@ int main(int argc, char** argv)
     GradientWindow_T gradientWindow{};
     gradientWindow.setPosition({mainwindow.getPosition().x, 360});
     
-    assert(IMGUI_CHECKVERSION() && "ImGui version-check failed!");
-    std::cout << "using imgui v" << IMGUI_VERSION << '\n';
-    //ImGui::CreateContext();
-    
-    mainwindowPtr = & mainwindow;
+        mainwindowPtr = &mainwindow;
     gradientWindowPtr = &gradientWindow;
     
-    /* if (!ImGui::SFML::Init(mainwindow)) {
-        std::cerr << "imgui-sfml failed to init! exiting.\n";
-        return 4;
-    } */
+    Simulation simulation{};
+    if (!simulation.Initialize()) {
+        std::cerr << "simulation failed to initialize!\n";
+        return 1;
+    }
+    
+    Mouse_T mouse(mainwindow, simulation.GetDiffusionFieldPtr());
+    auto&& [gridSprite, fluidSprite] = simulation.GetSprites();
+    auto [cellOverlay, outlineOverlay] {mouse.GetOverlaySprites()};
+    
+    assert(IMGUI_CHECKVERSION() && "ImGui version-check failed!");
+    std::cout << "using imgui v" << IMGUI_VERSION << '\n';
     
     MainGUI mainGUI{};
     if (mainGUI.initErrorFlag) {
         std::cerr << "imgui-sfml failed to init! exiting.\n";
         return 3;
     }
+    mainGUI.SetupFluidParameters(&simulation.fluid);
+    mainGUI.SetupSimulParameters(&simulation);
+    mainGUI.SetupMouseParameters(&mouse);
     mainGUI.Create();
     
     // this is the only method to take back focus from the new window; 'requestFocus()' just gets ignored
@@ -107,19 +113,6 @@ int main(int argc, char** argv)
     hoverOutline.setFillColor(sf::Color::Transparent);
     hoverOutline.setOutlineColor(sf::Color::Cyan);
     hoverOutline.setOutlineThickness(2.5f);
-    
-    Simulation simulation{};
-    if (!simulation.Initialize()) {
-        std::cerr << "simulation failed to initialize!\n";
-        return 1;
-    }
-    mainGUI.SetFluidParams(&simulation.fluid);
-    mainGUI.SetSimulationParams(&simulation);
-    
-    auto&& [gridSprite, fluidSprite] = simulation.GetSprites();
-    
-    Mouse_T mouse(mainwindow, simulation.GetDiffusionFieldPtr());
-    auto [cellOverlay, outlineOverlay] {mouse.GetOverlaySprites()};
     
     PrintKeybinds();
     
@@ -386,20 +379,20 @@ int main(int argc, char** argv)
         mainwindow.clear(sf::Color::Transparent);
         simulation.Update();
         
-        if (shouldDrawGrid || (mouse.isPaintingMode && isPaintingDebug)) {
+        if (shouldDrawGrid || (mouse.isPaintingMode && mouse.isPaintingDebug)) {
             simulation.RedrawGrid();
             mainwindow.draw(gridSprite);
             mouse.shouldOutline = true;
         }
         
         if(!mouse.isActive()) { mouse.shouldDisplay = false; mouse.shouldOutline = false; }
-        else if (mouse.isPaintingMode || isPaintingDebug) {
-            if (mouse.isActive(true) || isPaintingDebug)
+        else if (mouse.isPaintingMode || mouse.isPaintingDebug) {
+            if (mouse.isActive(true) || mouse.isPaintingDebug)
             {
                 mouse.RedrawOverlay();
                 mainwindow.draw(cellOverlay);
                 mouse.shouldOutline = true;
-                if (!isPaintingDebug)
+                if (!mouse.isPaintingDebug)
                 mouse.shouldDisplay = false;
             }
             else if (mouse.isActive()) 

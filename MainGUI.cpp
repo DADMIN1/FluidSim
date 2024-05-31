@@ -10,6 +10,11 @@ constexpr int framerateCap{300}; // const/constexpr makes 'extern' fail, so this
 extern sf::RenderWindow* mainwindowPtr;
 extern GradientWindow_T* gradientWindowPtr;
 
+// Main.cpp
+// required for Mouse controls (when painting-debug is toggled)
+extern bool shouldDrawGrid;
+extern bool ToggleGridDisplay();
+
 
 // bitwise-OR flags together flags (into zero)
 constexpr ImGuiWindowFlags window_flags { 0 
@@ -270,7 +275,7 @@ void MainGUI::SimulParameters::MakeSliderFloats()
 // use the slider macros by defining input macros like this: 
 /* 
     #define ALLSLIDERS() XMACRO(Transfer) XMACRO(Distribution)
-    #define pstruct() simulParams
+    #define pstruct() SimulParams
     #define REAL(field) field
     #define precision() "3" 
 */
@@ -293,13 +298,13 @@ void MainGUI::DrawSimulParams(float& next_height)
     float min = 0.0f;
     float max = 1.0f;
     
-    #define pstruct() simulParams
+    #define pstruct() SimulParams
     #define REAL(fieldname) momentum##fieldname
     #define precision() "3"
     #define ALLSLIDERS() XMACRO(Transfer) XMACRO(Distribution)
     ALLSLIDERS();
-    //ImGui::SliderFloat("Transfer",     &simulParams->momentumTransfer,     min, max, "Transfer: %.3f",     sliderflags); 
-    //ImGui::SliderFloat("Distribution", &simulParams->momentumDistribution, min, max, "Distribution: %.3f", sliderflags);
+    //ImGui::SliderFloat("Transfer",     &SimulParams->momentumTransfer,     min, max, "Transfer: %.3f",     sliderflags); 
+    //ImGui::SliderFloat("Distribution", &SimulParams->momentumDistribution, min, max, "Distribution: %.3f", sliderflags);
     #undef pstruct
     #undef REAL
     #undef precision
@@ -318,7 +323,7 @@ void MainGUI::DrawSimulParams(float& next_height)
 
 void MainGUI::DrawFluidParams(float& next_height)
 {
-    if (!fluidParams) return;  // TODO: give some kind of indicator that it's been invalidated
+    if (!FluidParams) return;  // TODO: give some kind of indicator that it's been invalidated
     //ImGui::Separator();
     ImGui::Begin("Fluid Parameters", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
     ImGui::SetWindowPos({0, next_height});
@@ -331,7 +336,7 @@ void MainGUI::DrawFluidParams(float& next_height)
     
     // VSliderFloat also exists, but it requires it's size to be specified (for some reason)
     #define FP(field, precision, max) ++numlines; \
-        ImGui::SliderFloat(#field, &fluidParams->field, MIN(max), max, #field": %."#precision"f", sliderflags);
+        ImGui::SliderFloat(#field, &FluidParams->field, MIN(max), max, #field": %."#precision"f", sliderflags);
     
     // set min == -max
     #define MIN(f) -f
@@ -358,7 +363,7 @@ void MainGUI::DrawFluidParams(float& next_height)
     numlines += 1;
     ImGui::Separator();
     ImGui::Text("Turbulence:"); ImGui::SameLine();
-    if (fluidParams->realptr->isTurbulent) 
+    if (FluidParams->realptr->isTurbulent) 
          ImGui::TextColored({255, 0, 8, 255}, "Enabled" );
     else ImGui::TextColored({0, 64, 255, 255}, "Disabled");
     ImGui::Separator();
@@ -368,6 +373,120 @@ void MainGUI::DrawFluidParams(float& next_height)
     next_height += 25.0f*numlines;
     ImGui::End();
     //ImGui::Separator();
+    return;
+}
+
+
+void MainGUI::DrawMouseParams(float& next_height)
+{
+    auto sliderflags = ImGuiSliderFlags_NoRoundToFormat | \
+      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
+    
+    sf::Color enabledColor = {0x1A, 0xEE, 0x22, 0xFF}; // green
+    sf::Color disableColor = {0xFF, 0x20, 0x20, 0xFF}; // red
+    // creates an enabled/disabled line of text from a bool, with colors
+    [[maybe_unused]] auto BooleanText = [&, enabledColor, disableColor] (const char* label, bool B)
+    {
+        if(B) { 
+            ImGui::TextColored(enabledColor, "%s", label); 
+            ImGui::SameLine(); ImGui::Text("Enabled" ); }
+        else  {
+            ImGui::TextColored(disableColor, "%s", label);
+            ImGui::SameLine(); ImGui::TextDisabled("Disabled"); 
+            }
+    };
+    
+    // applies the colors in the opposite order
+    [[maybe_unused]] auto BooleanTextFlip = [&, enabledColor, disableColor] (const char* label, bool B)
+    {
+        if(B) { 
+            ImGui::Text("%s", label);
+            ImGui::SameLine(); ImGui::TextColored(enabledColor, "%s", "Enabled"); }
+        else  {
+            ImGui::TextDisabled("%s", label);
+            ImGui::SameLine(); ImGui::TextColored(disableColor, "Disabled"); 
+            }
+    };
+    
+    // Selects color for status text
+    auto ModeColor = [](const Mouse_T::Mode& m) -> ImVec4 {
+        switch(m) {
+            case (Mouse_T::Mode::None):     return sf::Color{0xAA, 0xAA, 0xAA, 0xCC};
+            case (Mouse_T::Mode::Push):     return sf::Color::Cyan;
+            case (Mouse_T::Mode::Pull):     return sf::Color::Magenta;
+            case (Mouse_T::Mode::Disabled): return sf::Color{0xAA, 0xAA, 0xAA, 0x77};
+            
+            default:
+            case (Mouse_T::Mode::Drag):
+            case (Mouse_T::Mode::Fill):
+            case (Mouse_T::Mode::Erase):
+            return {0xFF, 0xFF, 0xFF, 0xFF};
+        }
+    };
+    
+    sf::Color modeColor = ModeColor(this->MouseParams->mode);
+    ImGui::PushStyleColor(ImGuiCol_Border, modeColor - sf::Color{0x22222222});
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, modeColor - sf::Color{0x20202077});
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, modeColor - sf::Color{0x111111BB});
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, modeColor - sf::Color{0x222222BB});
+    ImGui::PushStyleColor(ImGuiCol_Separator, modeColor - sf::Color{0x20202020});
+    
+    ImGui::Begin("Mouse", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
+    ImGui::SetWindowPos({0, next_height});
+    ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
+    
+    ImGui::PushStyleColor(ImGuiCol_Text, modeColor);
+    const auto Statusline = std::string{"[ActiveState]: "} + std::string{MouseParams->realptr->ModeToString()};
+    ImGui::SeparatorText(Statusline.c_str());
+    //ImGui::TextColored(modeColor , "ActiveState: %s", MouseParams->realptr->ModeToString());
+    
+    ImGui::PopStyleColor(1);  // text previous text-color
+    // this style causes the text to follow the mode when it's enabled, and white when disabled
+    ImGui::PushStyleColor(ImGuiCol_Text, modeColor+sf::Color::White*modeColor);
+    
+    //const bool isDisabled = (this->MouseParams->mode == Mouse_T::Mode::Disabled);
+    const bool isEnabled = (MouseParams->isPaintingDebug 
+        || (MouseParams->isPaintingMode && MouseParams->realptr->isActive(true)));
+    
+    static std::size_t numlocked{0};
+    static std::size_t numUnlocked{0};
+    numlocked = Mouse_T::preservedOverlays.size(); // always update (in case of clears/overwrites)
+    if (isEnabled) {  // otherwise the numUnlocked keeps changing (only makes sense in debug)
+        numUnlocked = Mouse_T::savedState.size();
+    } else numUnlocked = 0; // otherwise it doesn't reset lol
+    
+    ImGui::BeginDisabled(!isEnabled);
+    
+    ImGui::Text("Painted:%lu", numlocked+numUnlocked); ImGui::SameLine();
+    ImGui::Text("unlocked:%lu", numUnlocked);          ImGui::SameLine();
+    ImGui::Text("locked:%lu", numlocked); // '%lu' == long unsigned int
+    ImGui::Separator();
+    
+    ImGui::EndDisabled();
+    
+    //BooleanText("Painting:", MouseParams->isPaintingMode ); ImGui::SameLine();
+    //BooleanText("   Debug:", MouseParams->isPaintingDebug); 
+    BooleanTextFlip("Painting:", MouseParams->isPaintingMode ); ImGui::SameLine();
+    BooleanTextFlip("   Debug:", MouseParams->isPaintingDebug); ImGui::SameLine();
+    if (ImGui::Button("Toggle")) {
+        bool newstate = MouseParams->isPaintingDebug = !MouseParams->isPaintingDebug;
+        MouseParams->isPaintingMode = newstate; // painting and grid match state
+        shouldDrawGrid = newstate;
+    }
+    ImGui::Separator();
+    ImGui::PopStyleColor(6);
+    
+    static bool shouldDrawGrid_old;
+    if(ImGui::SliderFloat("Strength", &MouseParams->strength, 1.f, 255.f, "%f", sliderflags))
+    {
+        shouldDrawGrid = true;
+        MouseParams->realptr->RecalculateModDensities();
+    }
+    if(ImGui::IsItemDeactivatedAfterEdit()) { shouldDrawGrid = shouldDrawGrid_old; } // waiting until slider is released
+    else if(!ImGui::IsItemActive()) { shouldDrawGrid_old = shouldDrawGrid; }
+    
+    next_height += ImGui::GetWindowHeight();
+    ImGui::End();
     return;
 }
 
@@ -399,6 +518,8 @@ void MainGUI::FrameLoop()
     // Simulation Parameters
     DrawSimulParams(next_height);
     DrawFluidParams(next_height);
+    DrawMouseParams(next_height);
+    // TODO: demo-window has very little space left!
     
     // Demo-Window Toggle Button
     ImGui::Begin("DemoToggle", nullptr, subwindow_flags);
