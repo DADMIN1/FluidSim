@@ -85,9 +85,11 @@ class MainGUI: public sf::RenderWindow
     // initializes a 'Parameter' struct and sets the corresponding 'Params' pointer (above)
     template <typename T, typename ParamStruct, ParamStruct* MainGUI::*structPtr> 
     void SetupParameters(T* realptr) {
+        if(!realptr) { initErrorFlag=true; return; }
         auto& memberPtr { this->*structPtr };
         if (memberPtr)  { delete memberPtr;};
         memberPtr = new ParamStruct(realptr);
+        if(!memberPtr) initErrorFlag=true; //'new' failed to allocate
     }
     
     // This macro constructs a function that simply calls an instantiation of 'SetupParameters' (derived from Classname)
@@ -111,7 +113,7 @@ class MainGUI: public sf::RenderWindow
     void DrawDockingControls(); // status and switches
     void HandleWindowEvents();
     
-    const bool initErrorFlag;
+    bool initErrorFlag{true}; //true == Error; false == Success; true by default to prevent uninitialized use
     bool isEnabled {true};
     bool dockedToMain{true}; // keeps GUI docked left/right of mainwindow
     bool dockSideLR{true};   // false=Left, true=Right
