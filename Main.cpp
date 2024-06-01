@@ -400,12 +400,11 @@ int main(int argc, char** argv)
         } 
         else if (mouse.isActive()) { mouse.shouldDisplay = true; }
         
+        simulation.RedrawFluid();
+        mainwindow.draw(fluidSprite, Shader::current);
         if (mouse.shouldOutline) { mouse.RedrawOutlines(); mainwindow.draw(outlineOverlay); }
         if (mouse.shouldDisplay) { mainwindow.draw(mouse); }
         
-        
-        simulation.RedrawFluid();
-        mainwindow.draw(fluidSprite, Shader::current);
         mainwindow.display();
         
         timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
