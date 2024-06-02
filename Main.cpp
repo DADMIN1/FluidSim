@@ -18,6 +18,10 @@
 extern void EmbedMacroTest();  // MacroTest.cpp
 extern void PrintKeybinds();   // Keybinds.cpp
 
+// MacroTest.cpp
+extern void ModuloTest();
+extern void PrintComptimeCoords();
+
 constexpr int framerateCap{300}; // duplicated in 'MainGUI.cpp'
 float timestepRatio{1.0f/float(framerateCap/60.0f)};  // normalizing timesteps to make physics independent of frame-rate
 float timestepMultiplier {1.0f};
@@ -50,18 +54,13 @@ int main(int argc, char** argv)
     // ValarrayExample();
     // ValarrayTest();
     
-    /* int targetCount = 5;
-    for (int s{1}; s <= targetCount; ++s) {
-        std::cout << "\n\n\n BaseNCount(" << s << "):\n";
-        int total = CalcBaseNCount(s);
-        std::cout << "\ntotal = " << total << "\n";
-    } */
-    
     std::cout << "max indecies: " 
         << Cell::maxIX << ", " 
         << Cell::maxIY << '\n';
     
     //EmbedMacroTest();
+    //ModuloTest();
+    //PrintComptimeCoords();
     
     ThreadManager threadManager{};
     threadManager.PrintThreadcount();
