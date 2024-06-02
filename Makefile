@@ -2,10 +2,10 @@ MAKEFLAGS += -j8 --output-sync=target --warn-undefined-variables
 
 # testing for specific gcc versions (specifically, testing if '--version' prints a non-empty string)
 # stderr redirected otherwise it prints 'make: g++-13: No such file or directory'
-ifneq ($(shell g++-12 --version 2>/dev/null),)
-CXX := g++-12
-else ifneq ($(shell g++-13 --version 2>/dev/null),)
+ifneq ($(shell g++-13 --version 2>/dev/null),)
 CXX := g++-13
+else ifneq ($(shell g++-12 --version 2>/dev/null),)
+CXX := g++-12
 # if the 'CXX' variable is already set, use that
 else ifdef CXX
 CXX := ${CXX}
@@ -16,7 +16,7 @@ endif
 CXXFLAGS := -pipe -std=c++23 -fdiagnostics-color=always
 # c++23 standard isn't required for anything; 20 works fine
 LDFLAGS := -lsfml-system -lsfml-graphics -lsfml-window -lpthread
-WARNFLAGS := -Wall -Wextra -Wpedantic -fmax-errors=4
+WARNFLAGS := -Wall -Wextra -Wpedantic -fmax-errors=1
 # -fmax-errors=1  or  -Wfatal-errors ?
 # -pedantic-errors  vs -Werror=pedantic ???
 
@@ -36,10 +36,15 @@ CXXFLAGS += -O3
 endif
 
 CXXFLAGS += -march=native -mtune=native
+LTOFLAGS := -flto=auto -fuse-linker-plugin -fno-fat-lto-objects
+# '-fno-fat-lto-objects': fat-LTO object-files have both the intermediate language and object code,
+# which makes them usable for normal, non-LTO linking. Disabling it improves compile times and file sizes
+# '-ffat-lto-objects' is the flag to enable it (which is default)
+CXXFLAGS += ${LTOFLAGS}
+
 #CXXFLAGS += -fsanitize=address  # super slow
 # -fstack-check -fstack-protector
-# TODO: sanitizer options, -flto
-# LTO and -fsplit-stack is only possible with gold linker?
+# TODO: sanitizer options
 # -fanalyzer -fsanitize=style? -fstack-protector -fvtable-verify=std|preinit|none -fvtv
 # -Wsuggest-final-types is more effective with link-time optimization
 
@@ -66,12 +71,13 @@ IMGUI_LDFLAGS := -lglfw -lGL
 INCLUDE_FLAGS := -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(IMGUI_DIR)/sfml
 
 
-.PHONY: default
-default: ${target_executable}
+PROFILING_DIR := profiling
+PROFILING_BUILD_DIR := build/profiling
+PROFILING_FLAGS := -fprofile-dir=${PROFILING_DIR} -fprofile-note=${PROFILING_DIR}
 
 
 # build directories
-SUBDIRS := build/objects build/objects_dbg
+SUBDIRS := build/objects build/objects_dbg ${PROFILING_BUILD_DIR} ${PROFILING_DIR}
 SUBDIRS += build/objects_imgui build/objects_imgui/backends build/objects_imgui/sfml
 .PHONY: subdirs
 subdirs: $(SUBDIRS)
@@ -80,6 +86,24 @@ $(SUBDIRS):
 # '--parents' also prevents errors if it already exists
 
 
+# this does the same thing as the normal recipe for .cpp->.o files, except it also dumps the optimization-info
+${PROFILING_DIR}/%.optinfo: %.cpp | ${SUBDIRS}
+	$(CXX) $(CXXFLAGS) -MMD -c $< -o $(patsubst %.cpp,$(OBJECTFILE_DIR)/%.o, $<) ${INCLUDE_FLAGS} ${WARNFLAGS} -fopt-info-all=$@
+	@echo "dumped optimization info to: $@ \n"
+
+# -fopt-info  # dumps optimization
+# -fopt-info-[option]=[filename]  # all dumps are concatenated into filename, otherwise it just prints on stderr
+# -fsave-optimization-record
+FOPTDUMPS := $(patsubst %.cpp,$(PROFILING_DIR)/%.optinfo, $(CODEFILES))
+
+# dumps optimization info for all files
+.PHONY: foptdump
+foptdump: ${FOPTDUMPS}
+	@echo "finished writing optimization info for: $? \n"
+# '$?' means all dependencies that needed updating
+
+
+.DEFAULT_GOAL := ${target_executable}
 ${target_executable}: ${OBJFILES} libimgui.so | ${SUBDIRS}
 	${CXX} -L${PROJECT_DIR} ${CXXFLAGS} ${OBJFILES} ${WARNFLAGS} -o $@ -limgui ${LDFLAGS} -Wl,-rpath,${PROJECT_DIR}
 # the linking MUST be done in a seperate step, because the compiler doesn't recognize "rpath" option

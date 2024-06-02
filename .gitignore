@@ -9,3 +9,4 @@ build/
 libimgui.so
 imgui.ini
 makefile_argparsing
+profiling/
