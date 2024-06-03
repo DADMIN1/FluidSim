@@ -3,39 +3,30 @@
 
 #include <vector>
 #include <tuple>  //std::pair
-#include <ranges> //AdjacentCells
+#include <ranges> //LocalCells
 
 #include <SFML/Graphics/RectangleShape.hpp>
 
 #include "Globals.hpp"
 
 
-// prints the relative coords of neighbors at radial_distance, and returns total count
-int CalcBaseNCount(int radial_distance);
+using DoubleCoord = std::pair<std::pair<int, int>, std::pair<int, int>>;
 
 
-// std::size_t so they can be used for array sizing
-constexpr std::size_t NeighborCountsAtDist[] = {0, 4, 8, 12, 16, 20};  // number of neighbors at a given radial distance
-
-template <int RD>  // radial_distance
-constexpr int BaseNeighborCount() { return NeighborCountsAtDist[RD] + BaseNeighborCount<RD-1> (); }
-// returns number of neighbor-cells; important for sizing arrays (in GetNeighborCells)
-// normally the result is independent of position, but if either coordinate is within radial-distance of the edge, we need to prevent out-of-bounds lookups
-
-template<> constexpr int BaseNeighborCount<0>() { return 0; }
-
-static_assert(BaseNeighborCount<1>() == 4);
-static_assert(BaseNeighborCount<2>() == 12);
-static_assert(BaseNeighborCount<3>() == 24);
-
-constexpr int BaseNeighborCounts[] = {0, 4, 12, 24, 40, 60};  // number of neighbors (cumulative) for a given radial distance
-
-
-template <int RD>  // radial_distance
+template <int RD> // radial_distance
 struct LocalCells
 {
-    static constexpr int  RadialDistance{RD};
-    static constexpr auto RelativeCoords()
+    static constexpr int RadialDistance{RD};
+    static constexpr int Basecount   {4*RD};
+    
+    // returns total (sum) count of cells WITHIN the radial distance
+    static constexpr int BasecountTotal() {
+        if constexpr (RD <= 0) { return 0; }
+        return Basecount + LocalCells<RD-1>::BasecountTotal();
+    }
+    
+    // 'Base-' variables/operations don't account for the actual cell's location (which may be an edge)
+    static constexpr auto BaseRelativeCoords()
     {
         // iota_view with negative numbers is not symmetric (endpoint is not included)
         // it's correct to add one anyway, otherwise the range of values would be RD-1        
@@ -52,22 +43,9 @@ struct LocalCells
         
         // pairs of coords inverted (negative) on one axis (and matching along the other)
         // inverting x instead of y is functionally equivalent, and 
-        constexpr auto MakeCoordPair = [](const int x, const int y) {
-            return std::pair{ std::pair{x,y}, std::pair{x,-y} };
-        };
-        
+        constexpr auto MakeCoordPair = [](const int x, const int y){ return DoubleCoord{ std::pair{x,y}, std::pair{x,-y} }; };
         constexpr auto coords = std::ranges::zip_transform_view(MakeCoordPair, xaxis, inverseRD);
         return coords;
-    }
-    
-    // 'Base-' operations don't account for the actual cell's location (which may be an edge)
-    static constexpr int Basecount() { return RelativeCoords().size(); }
-    
-    // returns total (sum) count of cells WITHIN the radial distance
-    static constexpr int BasecountTotal() {
-        if constexpr (RD < 6) //length of BaseNeighborCounts
-            return BaseNeighborCounts[RD];
-        return Basecount() + LocalCells<RD-1>::BasecountTotal();
     }
 };
 
@@ -75,9 +53,9 @@ struct LocalCells
 template<>
 struct LocalCells<0> {
     static constexpr int  RadialDistance{0};
-    static constexpr auto RelativeCoords() { return std::ranges::empty; }
-    static constexpr int  Basecount()      { return 0; }
-    static constexpr int  BasecountTotal() { return 0; }
+    static constexpr int  Basecount     {0};
+    static constexpr int  BasecountTotal()     { return 0; }
+    static constexpr auto BaseRelativeCoords() { return DoubleCoord{{0, 0}, {0, 0}}; }
 };
 
 
@@ -164,7 +142,6 @@ struct CoordRel: virtual CoordBase_T
 
 using CoordlistRel = std::vector<std::pair<int, int>>;
 using CoordlistAbs = std::vector<std::pair<int, int>>;
-using DoubleCoord = std::pair<std::pair<int, int>, std::pair<int, int>>;
 
 CoordlistRel GetNeighbors(const int radial_distance); // relative verison
 // absolute version; can be used as indecies into DiffusionField's CellMatrix

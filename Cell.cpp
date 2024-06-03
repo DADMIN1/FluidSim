@@ -8,7 +8,7 @@
 void AdjacentCellsTest()
 {
     constexpr int Rdist = 16;
-    constexpr auto coords = LocalCells<Rdist>::RelativeCoords();
+    constexpr auto coords = LocalCells<Rdist>::BaseRelativeCoords();
     std::cout << "\nradial_dist@" << Rdist << " = " << (coords.size()*2)-2 << '\n';
     // x2 for each pair of coords, minus two duplicates at start and end
     for (const auto& [firstcoord, secondcoord]: coords) {
@@ -23,7 +23,7 @@ void AdjacentCellsTest()
 }
 
 
-// returns the relative coords of neighbors at radial_distance
+// prints the relative coords of neighbors at radial_distance, and returns total count
 int CalcBaseNCount(int radial_distance) {
     if (radial_distance == 0) { return 0; }
     std::vector<std::pair<int, int>> coords{};

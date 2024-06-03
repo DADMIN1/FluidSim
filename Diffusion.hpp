@@ -16,7 +16,7 @@
 // TODO: scaling function that always totals to 1.0 regardless of radius (use trig functions)
 constexpr float GetNextFloat(const float x, const int orthodist) {
     //float ratio = float(orthodist) / float(1.0 + DIFFUSION_RADIUS - orthodist);
-    return x - (1.0 / float(NeighborCountsAtDist[orthodist]));
+    return x - (1.0 / float(4.0f*orthodist)); // formula for count (of adjacent cells) is simply 4*N
     //return x * (float(DIFFUSION_RADIUS - orthodist) / float(DIFFUSION_RADIUS));
 }
 

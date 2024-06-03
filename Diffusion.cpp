@@ -2,8 +2,6 @@
 
 #include <vector>
 #include <iostream>
-//#include <numeric>
-#include <cassert>
 
 
 void DiffusionField::PrintAllCells() const
@@ -22,7 +20,6 @@ void DiffusionField::PrintAllCells() const
 // result is for only a single distance
 std::vector<Cell*> DiffusionField::GetCellNeighbors(const std::size_t UUID, const unsigned int radialdist) const
 {
-    assert((radialdist <= radialdist_limit) && "radialdist too large");
     const Cell& cell = cells.at(UUID);
     std::vector<Cell*> reflist{};
     const CoordlistAbs coords = GetNeighbors(radialdist, cell.IX, cell.IY);
