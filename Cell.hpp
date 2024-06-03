@@ -2,7 +2,8 @@
 #define FLUIDSIM_CELL_INCLUDED
 
 #include <vector>
-#include <tuple> //std::pair
+#include <tuple>  //std::pair
+#include <ranges> //AdjacentCells
 
 #include <SFML/Graphics/RectangleShape.hpp>
 
@@ -29,15 +30,54 @@ static_assert(BaseNeighborCount<3>() == 24);
 
 constexpr int BaseNeighborCounts[] = {0, 4, 12, 24, 40, 60};  // number of neighbors (cumulative) for a given radial distance
 
-// X/Y indexes are parameters because we need to specialize for cells within DIFFUSION_RADIUS of the edge
-/* template<int RD, int X, int Y> // radial_distance, X/Y index into CellMatrix
-constexpr int ComplexNeighborCount() { return BaseNeighborCount<RD>(); } */
 
-// TODO: move all the 'finding Neighbor'-related stuff to ANOTHER file??
-template <int RD, int X, int Y>  // radial_distance, X/Y index into DensityGrid
-class NeighborCells {
-    static constexpr int Ncount = BaseNeighborCount<RD, X, Y>();
-    constexpr std::array<float*, Ncount> GetNeighborCells();
+template <int RD>  // radial_distance
+struct LocalCells
+{
+    static constexpr int  RadialDistance{RD};
+    static constexpr auto RelativeCoords()
+    {
+        // iota_view with negative numbers is not symmetric (endpoint is not included)
+        // it's correct to add one anyway, otherwise the range of values would be RD-1        
+        constexpr auto xaxis = std::ranges::iota_view{ -RD, RD+1 };
+        constexpr auto inverseRD = std::views::transform(xaxis, [](const int i) {
+            int insanemod {(RD-(i%RD))%-RD}; // don't ask
+            return 
+                (i==0)?  RD : // sets midpoint to RD instead of zero
+                ((i<0)? (RD-insanemod)%RD : insanemod);
+                //     the '%RD' here: ^ just sets the first number to 0 (instead of RD)
+        });
+        
+        static_assert(xaxis.size()  == inverseRD.size());
+        
+        // pairs of coords inverted (negative) on one axis (and matching along the other)
+        // inverting x instead of y is functionally equivalent, and 
+        constexpr auto MakeCoordPair = [](const int x, const int y) {
+            return std::pair{ std::pair{x,y}, std::pair{x,-y} };
+        };
+        
+        constexpr auto coords = std::ranges::zip_transform_view(MakeCoordPair, xaxis, inverseRD);
+        return coords;
+    }
+    
+    // 'Base-' operations don't account for the actual cell's location (which may be an edge)
+    static constexpr int Basecount() { return RelativeCoords().size(); }
+    
+    // returns total (sum) count of cells WITHIN the radial distance
+    static constexpr int BasecountTotal() {
+        if constexpr (RD < 6) //length of BaseNeighborCounts
+            return BaseNeighborCounts[RD];
+        return Basecount() + LocalCells<RD-1>::BasecountTotal();
+    }
+};
+
+
+template<>
+struct LocalCells<0> {
+    static constexpr int  RadialDistance{0};
+    static constexpr auto RelativeCoords() { return std::ranges::empty; }
+    static constexpr int  Basecount()      { return 0; }
+    static constexpr int  BasecountTotal() { return 0; }
 };
 
 

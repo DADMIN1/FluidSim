@@ -22,6 +22,10 @@ extern void PrintKeybinds();   // Keybinds.cpp
 extern void ModuloTest();
 extern void PrintComptimeCoords();
 
+
+// Cell.cpp
+extern void AdjacentCellsTest();
+
 constexpr int framerateCap{300}; // duplicated in 'MainGUI.cpp'
 float timestepRatio{1.0f/float(framerateCap/60.0f)};  // normalizing timesteps to make physics independent of frame-rate
 float timestepMultiplier {1.0f};
@@ -61,6 +65,7 @@ int main(int argc, char** argv)
     //EmbedMacroTest();
     //ModuloTest();
     //PrintComptimeCoords();
+    //AdjacentCellsTest();
     
     ThreadManager threadManager{};
     threadManager.PrintThreadcount();

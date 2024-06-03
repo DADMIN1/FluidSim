@@ -5,6 +5,24 @@
 
 
 
+void AdjacentCellsTest()
+{
+    constexpr int Rdist = 16;
+    constexpr auto coords = LocalCells<Rdist>::RelativeCoords();
+    std::cout << "\nradial_dist@" << Rdist << " = " << (coords.size()*2)-2 << '\n';
+    // x2 for each pair of coords, minus two duplicates at start and end
+    for (const auto& [firstcoord, secondcoord]: coords) {
+        for (const auto& [x, y]: {firstcoord, secondcoord}) {
+            std::cout << "\t{ " << x << " , " << y << " }\t";
+            if (y == 0) break;  // skip duplicates on either end
+        }
+        std::cout << "\n";
+    }
+    std::cout << "\n\n";
+    return;
+}
+
+
 // returns the relative coords of neighbors at radial_distance
 int CalcBaseNCount(int radial_distance) {
     if (radial_distance == 0) { return 0; }

@@ -14,7 +14,6 @@ CXX := g++
 endif
 
 CXXFLAGS := -pipe -std=c++23 -fdiagnostics-color=always
-# c++23 standard isn't required for anything; 20 works fine
 LDFLAGS := -lsfml-system -lsfml-graphics -lsfml-window -lpthread
 WARNFLAGS := -Wall -Wextra -Wpedantic -fmax-errors=1
 # -fmax-errors=1  or  -Wfatal-errors ?
