@@ -329,27 +329,46 @@ void MainGUI::DrawFluidParams(float& next_height)
     ImGui::SetWindowPos({0, next_height});
     int numlines = 1;
     
-    auto sliderflags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic | \
-                           ImGuiSliderFlags_NoInput | ImGuiSliderFlags_NoRoundToFormat;
+    sf::Color enabledColor = {0x1A, 0xEE, 0x22, 0xFF}; // green
+    sf::Color disableColor = {0xFF, 0x20, 0x20, 0xFF}; // red
+    
+    if (SimulParams->hasGravity) {
+        ImGui::Text("Gravity:");  ImGui::SameLine();
+        ImGui::TextColored(enabledColor, "Enabled");
+    } else {
+        ImGui::TextColored(sf::Color{0x5F, 0x5F, 0x5F, 0xFF}, "Gravity:");
+        ImGui::SameLine();   ImGui::TextColored(disableColor, "Disabled");
+    }
+    
+    if (SimulParams->hasXGravity) {
+        ImGui::Text("XGravity:");  ImGui::SameLine();
+        ImGui::TextColored(enabledColor, "Enabled");
+    } else {
+        ImGui::TextColored(sf::Color{0x5F, 0x5F, 0x5F, 0xFF}, "XGravity:");
+        ImGui::SameLine();   ImGui::TextColored(disableColor, "Disabled");
+    }
+    
+    auto sliderflags = ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat\
+                     | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
     // input is disabled because it's also activated with 'Tab' (normally Ctrl+click);
     // which you're likely to hit accidentally when trying to activate mouse
     
     // VSliderFloat also exists, but it requires it's size to be specified (for some reason)
     #define FP(field, precision, max) ++numlines; \
-        ImGui::SliderFloat(#field, &FluidParams->field, MIN(max), max, #field": %."#precision"f", sliderflags);
+        ImGui::SliderFloat(#field, &FluidParams->field, MIN(max), max, #field": %."#precision"f", sliderflags)
     
-    // set min == -max
-    #define MIN(f) -f
-    FP(gravity,   3, 3.0f);
-    FP(viscosity, 6, 0.5f); // negative values are a lot like 'turbulence' mode
+    #define MIN(f) -f       // set min == -max
+    if (FP(gravity,   3, 3.0f)) SimulParams->hasGravity = true; // enable gravity when interacted with
+    if (FP(xgravity,  3, 3.0f)) SimulParams->hasXGravity = true;
+        FP(viscosity, 6, 0.5f); // negative values are a lot like 'turbulence' mode
     #undef MIN
     #define MIN(f) 0.001f   // fdensity should not go below zero
-    FP(fdensity,  6, 0.5f);
+        FP(fdensity,  6, 0.5f);
     #undef MIN
     #define MIN(f) -f
-    sliderflags ^= ImGuiSliderFlags_Logarithmic; // negating logarithmic flag
-    FP(bounceDampening, 2, 2.0f); // values past one don't actually make sense (or negatives)
-        
+        sliderflags ^= ImGuiSliderFlags_Logarithmic; // negating logarithmic flag
+        FP(bounceDampening, 2, 2.0f); // values past one don't actually make sense (or negatives)
+    
     #undef MIN
     #undef FP
     // TODO: disable gravity if it's not enabled; or auto-enable gravity
@@ -364,8 +383,8 @@ void MainGUI::DrawFluidParams(float& next_height)
     ImGui::Separator();
     ImGui::Text("Turbulence:"); ImGui::SameLine();
     if (FluidParams->realptr->isTurbulent) 
-         ImGui::TextColored({255, 0, 8, 255}, "Enabled" );
-    else ImGui::TextColored({0, 64, 255, 255}, "Disabled");
+         ImGui::TextColored({0xFF, 0x00, 0x08, 0xFF}, "Enabled" );
+    else ImGui::TextColored({0x00, 0x40, 0xFF, 0xFF}, "Disabled");
     ImGui::Separator();
     
     // for some reason this can't autosize correctly. // Note: titlebar also takes ~25 pixels

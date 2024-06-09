@@ -366,7 +366,7 @@ void Simulation::Update()
     for (std::size_t index{0}; index < threads.size(); ++index) {
         auto slice = particles_slices[index];
         auto lambda = [this, slice](){ 
-            fluid.UpdatePositions(slice.first, slice.second, hasGravity);
+            fluid.UpdatePositions(slice.first, slice.second, hasGravity, hasXGravity);
             return FindCellTransitions(slice);
         };
         threads[index] = std::async(std::launch::async, lambda);

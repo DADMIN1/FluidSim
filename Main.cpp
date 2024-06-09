@@ -150,6 +150,7 @@ int main(int argc, char** argv)
                 
                 case sf::Event::KeyPressed:
                 {
+                    const bool isShiftPressed {sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)};
                     switch (event.key.code) 
                     {
                         case sf::Keyboard::Q:
@@ -159,7 +160,8 @@ int main(int argc, char** argv)
                         break;
                         
                         case sf::Keyboard::G:
-                            std::cout << "gravity " << (simulation.ToggleGravity()? "enabled":"disabled") << '\n';
+                            std::cout << (isShiftPressed?"xgravity ":"gravity ") 
+                            << (simulation.ToggleGravity(isShiftPressed)? "enabled":"disabled") << '\n';
                         break;
                         
                         case sf::Keyboard::Space:

@@ -69,7 +69,7 @@ struct AllKeybinds
         KEY(Space, "pause/unpause simulation");
         KEY(BackSpace, "freeze particles")
             -> extrainfo = "all velocities are zeroed. (it also pauses the simulation)";
-        KEY(G, "toggle gravity");
+        KEY(G, "toggle gravity \n(+Shift):  xgravity");
         KEY(P, "toggle painting-mode");
         KEY(K, "clear painted cells (painting mode)");
         KEY(C, "toggle cell-grid display");

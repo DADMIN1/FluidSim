@@ -15,6 +15,7 @@
 class Fluid
 {
     float gravity {0.295};
+    float xgravity {0.000};
     float viscosity {0.005675};
     float fdensity {0.01975}; // controls 'force' of diffusion
     float bounceDampening {0.1915};
@@ -94,7 +95,7 @@ class Fluid
     }
     
     // multithreaded version
-    void UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd, bool hasGravity);
+    void UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd, bool hasGravity, bool hasXGravity);
 };
 
 

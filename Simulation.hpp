@@ -100,6 +100,7 @@ class Simulation
     }
     
     bool hasGravity {false};
+    bool hasXGravity {false};
     bool useTransparency {false};  // slow-moving particles are more transparent
     bool isPaused{false};
     friend int main(int argc, char** argv); // only so that the turbulence render block can check 'isPaused'
@@ -132,8 +133,10 @@ class Simulation
     
     bool TogglePause() { isPaused = !isPaused; return isPaused; }
     bool SetPause(bool newState) { bool oldState = isPaused; isPaused = newState; return oldState; }
-    bool ToggleGravity(bool noArg=true) // if you pass false, it always disables gravity
-    { hasGravity = (noArg? (!hasGravity) : false); return hasGravity; }
+    bool ToggleGravity(bool xGrav, bool noArg=true) { // if you pass false, it always disables gravity
+        bool& grav = (xGrav? hasXGravity: hasGravity);
+        grav = (noArg? (!grav) : false); return grav;
+    }
     bool ToggleTransparency() { useTransparency = !useTransparency; return useTransparency; }
     bool ToggleTurbulence() { fluid.isTurbulent = !fluid.isTurbulent; return fluid.isTurbulent; }
     

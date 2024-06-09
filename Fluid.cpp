@@ -195,15 +195,17 @@ void Fluid::UpdatePositions()
 
 
 // multithreaded version
-void Fluid::UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd, bool hasGravity)
+void Fluid::UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd, bool hasGravity, bool hasXGravity)
 {
-    const float tgravity = (hasGravity? gravity : 0.f);
+    const float tgravity  = (hasGravity ?  gravity : 0.f);
+    const float txgravity = (hasXGravity? xgravity : 0.f);
     
     for (std::vector<Particle>::iterator iter{sliceStart}; iter < sliceEnd; ++iter)
     {
         Particle& particle = *iter;
         ApplyViscosity(particle.velocity);
-        particle.velocity.y += tgravity*timestepRatio; // inlining gravity calc here
+        particle.velocity.y +=  tgravity*timestepRatio; // inlining gravity calc here
+        particle.velocity.x += txgravity*timestepRatio;
         ApplySpeedcap(particle.velocity);
         
         sf::Vector2f nextPosition = particle.getPosition();

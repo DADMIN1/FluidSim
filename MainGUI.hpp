@@ -31,14 +31,16 @@ class MainGUI: public sf::RenderWindow
         friend class Fluid;
         const Fluid* realptr;
         float& gravity;
+        float& xgravity;
         float& viscosity;
         float& fdensity;
         float& bounceDampening;
         FluidParameters(Fluid* fluid): realptr{fluid},
-            gravity        {fluid->gravity  }, 
-            viscosity      {fluid->viscosity}, 
-            fdensity       {fluid->fdensity }, 
-            bounceDampening{fluid->bounceDampening}
+            gravity         {fluid->gravity  }, 
+            xgravity        {fluid->xgravity }, 
+            viscosity       {fluid->viscosity}, 
+            fdensity        {fluid->fdensity }, 
+            bounceDampening {fluid->bounceDampening}
         { ; }
     };
     
@@ -46,9 +48,13 @@ class MainGUI: public sf::RenderWindow
     {
         friend class Simulation;
         const Simulation* realptr;
+        bool& hasGravity;
+        bool& hasXGravity;
         float& momentumTransfer;
         float& momentumDistribution;
         SimulParameters(Simulation* simulation): realptr{simulation},
+            hasGravity           {simulation->hasGravity},
+            hasXGravity          {simulation->hasXGravity},
             momentumTransfer     {simulation->momentumTransfer},
             momentumDistribution {simulation->momentumDistribution}
         { ; }
