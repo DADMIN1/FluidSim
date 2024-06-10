@@ -282,7 +282,11 @@ int main(int argc, char** argv)
             
             case sf::Keyboard::Add:
             case sf::Keyboard::Subtract:
-            {
+            case sf::Keyboard::Dash:
+            case sf::Keyboard::Equal:
+                mainGUI.AdjustActiveSlider(keycode);
+            // TODO: create slider for threshold in MainGUI
+            /* {
                 if (Shader::current->name != "turbulence") {
                     std::cerr << "turbulence is not active\n";
                     break;
@@ -291,7 +295,7 @@ int main(int argc, char** argv)
                 threshold += ((keycode==sf::Keyboard::Add)? 0.01 : -0.01);
                 if (threshold < 0) threshold = 0.0f;
                 Shader::current->GetWritePtr()->ApplyUniform("threshold", threshold);
-            }
+            } */
             break;
             
             // case sf::Keyboard::_:

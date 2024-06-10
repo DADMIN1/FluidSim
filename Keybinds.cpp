@@ -33,7 +33,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{22};
+    static constexpr auto numkeybinds{23};
     std::vector<Keybind> all;  // TODO: array instead?
     std::vector<std::vector<Keybind*>> sections; 
     
@@ -78,6 +78,9 @@ struct AllKeybinds
         KEY(Y, "toggle particle transparency");
         KEY(U, "toggle particle-scaling direction (positive/negative)");
         current_section = Keybind::Section::unspecified;
+        //KEY(Subtract, "");
+        KEY(Add, "increment/decrement: 1% (+Shift: 10%)")
+            -> extrainfo = "+/- Keys control the last active slider in GUI";
         KEY(N, "print mouse position");
         
         // Shaders //
@@ -93,11 +96,8 @@ struct AllKeybinds
             -> extrainfo = "When 'turbulence' is the active shader, this key will toggle also toggle framebuffer-clears during the frame-loop\n"
             "    note: while this shader is active and the simulation is paused, the framebuffer will always be cleared\n" 
             "          (so that the effects of the 'threshold' parameter can be observed)\n"
-            "  +/- keys modify the 'threshold' parameter\n"
             "  activating this shader automatically enables Turbulence-mode\n";
-        /* // seems kind of redundant
-        KEY(Add,      "increases 'threshold' parameter for 'turbulence' shader");
-        KEY(Subtract, "decreases 'threshold' parameter for 'turbulence' shader"); */
+        
         KEY(Pause, "toggle framebuffer-clears") // Pause-Break
             -> extrainfo = "while the 'turbulence' shader is active and the simulation is paused, the framebuffer will always be cleared\n"
             " (so that the effects of the 'threshold' parameter can be observed)\n";

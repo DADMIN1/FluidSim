@@ -163,6 +163,33 @@ void MainGUI::DrawDockingControls() // status and switches
     return;
 }
 
+// TODO: enforce min/max values
+void MainGUI::AdjustActiveSlider(sf::Keyboard::Key plus_minus)
+{
+    if (!lastactiveSlider) return;
+    
+    float valueDelta = std::abs(*lastactiveSlider) * 0.01f;
+    if (valueDelta < 0.001f) valueDelta = 0.001f;
+    const bool isShiftPressed {sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)};
+    if (isShiftPressed) valueDelta *= 10.f;
+    
+    bool isPositive{false};
+    switch (plus_minus)
+    {
+        case sf::Keyboard::Add:
+        case sf::Keyboard::Equal:
+             isPositive = true;
+        [[fallthrough]];
+        case sf::Keyboard::Subtract:
+        case sf::Keyboard::Dash:
+            *lastactiveSlider += (isPositive? valueDelta : -valueDelta);
+        break;
+        
+        default: break; // shouldn't happen
+    }
+    return;
+}
+
 
 void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypresses)
 {
@@ -266,60 +293,68 @@ void MainGUI::SimulParameters::MakeSliderFloats()
 
 // SLIDER MACROS //
 // #define ALLSLIDERS()
-#define FMTSTRING(field) #field ": %." precision() "f"
+#define FMTSTRING(field) #field ": %." PRECISION() "f"
 // FMTSTRING gets concatenated into a single string. ('name: %.3f')
 // the spaces are actually necessary; C++11 requires a space between literal and string macro
 
-#define XMACRO(field) ImGui::SliderFloat(#field, &pstruct()->REAL(field), \
-    min, max, FMTSTRING(field), sliderflags);
+// local variables 'min', 'max', and 'sliderflags' are expected to exist
+#define XMACRO(field) ImGui::SliderFloat(#field, &PSTRUCT()->REAL(field), \
+    min, max, FMTSTRING(field), sliderflags)
+
+// optional arg can be additional callbacks/hooks to execute on slider interation
+#define MAKESLIDER(field, ...) if(XMACRO(field)) { \
+    lastactiveSlider = &PSTRUCT()->REAL(field);    \
+    __VA_OPT__(__VA_ARGS__;)                       \
+}
 
 // use the slider macros by defining input macros like this: 
 /* 
-    #define ALLSLIDERS() XMACRO(Transfer) XMACRO(Distribution)
-    #define pstruct() SimulParams
-    #define REAL(field) field
-    #define precision() "3" 
+    #define PSTRUCT() SimulParams
+    #define REAL(field) momentum##field
+    #define PRECISION() "3" 
+    MAKESLIDER(Transfer)
 */
+// 'XMACRO' expects local variables 'min', 'max', and 'sliderflags' to exist
+// the 'REAL' macro can be used to add a prefix to the field-name if it doesn't match the struct-member
+// (in the example, it would construct: 'SimulParams->momentumTransfer' instead: of 'SimulParams->Transfer')
+
+
 
 
 void MainGUI::DrawSimulParams(float& next_height)
 {
-    auto sliderflags = ImGuiSliderFlags_NoRoundToFormat | \
-      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
-    
     ImGui::Begin("Simulation Parameters", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
     ImGui::SetWindowPos({0, next_height});
     ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
     
+    auto sliderflags = ImGuiSliderFlags_NoRoundToFormat | \
+      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
+    
     // unfortunately negative timescales don't work properly
-    ImGui::SliderFloat("Timescale", &timestepMultiplier, 0.001f, 2.0f, "%.3fx", sliderflags);
+    if (ImGui::SliderFloat("Timescale", &timestepMultiplier, 0.001f, 2.0f, "%.3fx", sliderflags))
+        lastactiveSlider = &timestepMultiplier;
     ImGui::SeparatorText("Momentum");
     
-    // you can define these as normal variables, but 'precision' just cannot
+    #define PSTRUCT() SimulParams
+    #define REAL(fieldname) momentum##fieldname
+    #define PRECISION() "3"
+    // you can define these as normal variables, but 'PRECISION' just cannot
     float min = 0.0f;
     float max = 1.0f;
     
-    #define pstruct() SimulParams
-    #define REAL(fieldname) momentum##fieldname
-    #define precision() "3"
-    #define ALLSLIDERS() XMACRO(Transfer) XMACRO(Distribution)
-    ALLSLIDERS();
+    MAKESLIDER(Transfer) 
+    MAKESLIDER(Distribution)
     //ImGui::SliderFloat("Transfer",     &SimulParams->momentumTransfer,     min, max, "Transfer: %.3f",     sliderflags); 
     //ImGui::SliderFloat("Distribution", &SimulParams->momentumDistribution, min, max, "Distribution: %.3f", sliderflags);
-    #undef pstruct
+    
+    #undef PSTRUCT
     #undef REAL
-    #undef precision
-    #undef ALLSLIDERS
+    #undef PRECISION
     
     //next_height += 50.f;
     next_height += ImGui::GetWindowHeight(); // 'GetWindowHeight' returns height of current section
     ImGui::End();
 }
-
-
-#undef FMTSTRING
-#undef XMACRO
-//TODO: reimplement 'DrawFluidParams' with Slider-Macros?
 
 
 void MainGUI::DrawFluidParams(float& next_height)
@@ -354,25 +389,38 @@ void MainGUI::DrawFluidParams(float& next_height)
     // input is disabled because it's also activated with 'Tab' (normally Ctrl+click);
     // which you're likely to hit accidentally when trying to activate mouse
     
-    // VSliderFloat also exists, but it requires it's size to be specified (for some reason)
-    #define FP(field, precision, max) ++numlines; \
-        ImGui::SliderFloat(#field, &FluidParams->field, MIN(max), max, #field": %."#precision"f", sliderflags)
+    // you can define these as normal variables, but 'precision' just cannot
+    float min = -3.0f;
+    float max =  3.0f;
     
-    #define MIN(f) -f       // set min == -max
-    if (FP(gravity,   3, 3.0f)) SimulParams->hasGravity  = true; // enable gravity when interacted with
-    if (FP(xgravity,  3, 3.0f)) SimulParams->hasXGravity = true;
-        FP(viscosity, 6, 0.5f); // negative values are a lot like 'turbulence' mode
-    #undef MIN
-    #define MIN(f) 0.001f   // fdensity should not go below zero
-        FP(fdensity,  6, 0.5f);
-    #undef MIN
-    #define MIN(f) -f
-        sliderflags ^= ImGuiSliderFlags_Logarithmic; // negating logarithmic flag
-        FP(bounceDampening, 2, 2.0f); // values past one don't actually make sense (or negatives)
+    #define PSTRUCT() FluidParams
+    #define REAL(fieldname) fieldname
+    #define PRECISION() "3"
+    // gravity sliders //
+    MAKESLIDER(gravity , SimulParams->hasGravity  = true;);
+    MAKESLIDER(xgravity, SimulParams->hasXGravity = true;);
     
-    #undef MIN
-    #undef FP
+    // fdensity / viscosity sliders //
+    #undef PRECISION
+    #define PRECISION() "6"
+    min = -0.5f;
+    max =  0.5f;
+    MAKESLIDER(viscosity);
+    min = 0.001f; // fdensity should not go below zero
+    MAKESLIDER(fdensity);
+    
+    #undef PRECISION
+    #define PRECISION() "2"
+    min = -2.0f;
+    max =  2.0f;
+    sliderflags ^= ImGuiSliderFlags_Logarithmic; // negating logarithmic flag
+    MAKESLIDER(bounceDampening);
+    
     // TODO: button to reset defaults
+    
+    #undef PSTRUCT
+    #undef REAL
+    #undef PRECISION
     
     numlines += 3;
     ImGui::SeparatorText("Gradient Speed-Thresholds");
@@ -424,7 +472,7 @@ void MainGUI::DrawMouseParams(float& next_height)
         else  {
             ImGui::TextDisabled("%s", label);
             ImGui::SameLine(); ImGui::TextColored(disableColor, "Disabled"); 
-            }
+        }
     };
     
     // Selects color for status text
@@ -500,6 +548,7 @@ void MainGUI::DrawMouseParams(float& next_height)
     {
         shouldDrawGrid = true;
         MouseParams->realptr->RecalculateModDensities();
+        lastactiveSlider = &MouseParams->strength;
     }
     if(ImGui::IsItemDeactivatedAfterEdit()) { shouldDrawGrid = shouldDrawGrid_old; } // waiting until slider is released
     else if(!ImGui::IsItemActive()) { shouldDrawGrid_old = shouldDrawGrid; }
@@ -508,6 +557,12 @@ void MainGUI::DrawMouseParams(float& next_height)
     ImGui::End();
     return;
 }
+
+
+// SLIDER MACROS //
+#undef FMTSTRING
+#undef XMACRO
+#undef MAKESLIDER
 
 
 void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses) 

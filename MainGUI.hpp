@@ -114,6 +114,7 @@ class MainGUI: public sf::RenderWindow
     
     #undef SETUPFUNCTION
     
+    float* lastactiveSlider {nullptr};
     
     // internal draw functions
     void DrawFocusIndicator();
@@ -121,6 +122,7 @@ class MainGUI: public sf::RenderWindow
     void DrawDockingControls(); // status and switches
     void HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypresses);
     // 'unhandled_keypresses' is an output parameter
+    void AdjustActiveSlider(sf::Keyboard::Key plus_minus); // expects parameter to be keycode for '+' or '-'
     
     bool initErrorFlag{true}; //true == Error; false == Success; true by default to prevent uninitialized use
     bool isEnabled {true};
