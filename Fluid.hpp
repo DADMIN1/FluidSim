@@ -15,7 +15,7 @@
 class Fluid
 {
     float gravity {0.295};
-    float xgravity {0.000};
+    float xgravity {0.295};
     float viscosity {0.005675};
     float fdensity {0.01975}; // controls 'force' of diffusion
     float bounceDampening {0.1915};

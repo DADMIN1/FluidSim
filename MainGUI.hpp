@@ -1,6 +1,8 @@
 #ifndef FLUIDSYM_MAINGUI_INCLUDED
 #define FLUIDSYM_MAINGUI_INCLUDED
 
+#include <vector> // Frameloop parameter (unhandled_keypresses)
+
 #include "Globals.hpp" // windowheight, timestep-Ratio/Multiplier
 #include "Fluid.hpp"
 #include "Simulation.hpp"
@@ -117,7 +119,8 @@ class MainGUI: public sf::RenderWindow
     void DrawFocusIndicator();
     void DrawFPS_Section(); // FPS display and VSync
     void DrawDockingControls(); // status and switches
-    void HandleWindowEvents();
+    void HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypresses);
+    // 'unhandled_keypresses' is an output parameter
     
     bool initErrorFlag{true}; //true == Error; false == Success; true by default to prevent uninitialized use
     bool isEnabled {true};
@@ -125,7 +128,7 @@ class MainGUI: public sf::RenderWindow
     bool dockSideLR{true};   // false=Left, true=Right
     bool Initialize();
     void Create(); // calls sf::RenderWindow.create(...) with some arguments
-    void FrameLoop(); // performs a single round of clear/draw/display and event-processing for gradient_window
+    void FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses); // performs a single round of clear/draw/display and event-processing for gradient_window
     void ToggleEnabled();
     void FollowMainWindow(); // updates window position/height to match main
     

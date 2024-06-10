@@ -129,15 +129,194 @@ int main(int argc, char** argv)
     
     sf::Clock frametimer{};
     
+    auto HandleKeypress = [&](sf::Keyboard::Key keycode)
+    {
+        const bool isShiftPressed {sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)};
+        switch (keycode)
+        {
+            case sf::Keyboard::Q:
+                if (gradientWindow.isOpen()) gradientWindow.close();
+                if (mainGUI.isOpen()) mainGUI.close();
+                mainwindow.close();
+            break;
+            
+            case sf::Keyboard::G:
+                std::cout << (isShiftPressed?"xgravity ":"gravity ") 
+                << (simulation.ToggleGravity(isShiftPressed)? "enabled":"disabled") << '\n';
+            break;
+            
+            case sf::Keyboard::Space:
+                std::cout << (simulation.TogglePause()?"paused":"unpaused") << '\n';
+            break;
+            
+            case sf::Keyboard::BackSpace:
+                simulation.Freeze();
+                std::cout << "Velocities have been zeroed\n";
+            break;
+            
+            case sf::Keyboard::Tab:
+            {
+                const bool isActive = mouse.ToggleActive();
+                std::cout << "Mouse is " << (isActive? "enabled":"disabled") << '\n';
+                mainwindow.setMouseCursorVisible(!isActive);  // hide cursor when Mouse_T is displayed
+                // mainwindow.setMouseCursorGrabbed(isActive);  // for some reason this only works the first time???
+                if (isActive) {
+                    mainwindow.requestFocus();
+                    mainwindow.setMouseCursorGrabbed(true);
+                    //std::cout << "grabbed\n";
+                } else {
+                    mainwindow.setMouseCursorGrabbed(false);
+                    //std::cout << "ungrabbed\n";
+                }
+                /*  For whatever reason, trying to grab the mouse after toggling to false here doesn't work.
+                    once it's released the cursor, it can't seem to grab it again UNLESS the window is unfocused/refocused.
+                    (even though you can manually set it to true/false any number of times earlier and still get the first grab)
+                    It doesn't have to lose focus specifically; clicking the titlebar also works. Toggling the gradient-window is another easy method.
+                    In fact, it seems that changing focus ALWAYS triggers the cursor-grab, even if it's supposed to be disabled.
+                    Maybe it's just a problem with my window-manager, or the function is only meant to be called once? */
+            }
+            break;
+            
+            case sf::Keyboard::F1:
+                PrintKeybinds();
+            break;
+            
+            case sf::Keyboard::F2:
+                if (gradientWindow.isOpen()) { gradientWindow.close(); }
+                else
+                {
+                    gradientWindow.Create(usingVsync, mainwindow.getPosition().x);
+                    gradientWindow.FrameLoop();
+                }
+            break;
+            
+            case sf::Keyboard::Tilde:
+                // just pass focus to mainGUI if it's already open
+                if (mainGUI.isEnabled) {
+                    #define WINDOWMANAGERJANK
+                    // Window-Manager moves the mainGUI window on it's own just from toggling the visibility off/on (and won't give focus otherwise lmao)
+                    // so the GUI window will always need to be repositioned, even if it's not docked
+                    #ifdef WINDOWMANAGERJANK
+                        mainGUI.FollowMainWindow();
+                    #endif
+                    
+                    mainGUI.setVisible(false);
+                    mainGUI.setVisible(true);
+                    mainGUI.requestFocus();
+                    
+                    #ifdef WINDOWMANAGERJANK
+                        mainGUI.FollowMainWindow(); // have to do it twice because it clips into the main window the first time
+                    #endif
+                    #undef WINDOWMANAGERJANK
+                    break;
+                }
+                else mainGUI.ToggleEnabled();
+            break;
+            
+            case sf::Keyboard::T:
+                std::cout << "Fluid is: " << (simulation.ToggleTurbulence()? "Turbulent":"not turbulent") << '\n';
+            break;
+            
+            case sf::Keyboard::Y:
+                std::cout << "transparency " << (simulation.ToggleTransparency()? "enabled":"disabled") << '\n';
+            break;
+            
+            case sf::Keyboard::U:
+                std::cout << "Particle scaling is: " << (Fluid::ToggleParticleScaling()? "Positive":"Negative") << '\n';
+            break;
+            
+            case sf::Keyboard::N:
+            {
+                const auto [mouseX, mouseY] = sf::Mouse::getPosition(mainwindow);
+                std::cout << "Mouse@ [" << mouseX << ", " << mouseY << "] \n";
+            }
+            break;
+            
+            case sf::Keyboard::P:
+            {
+                // TODO: clear overlays if exiting painting-Mode?
+                mouse.isPaintingMode = !mouse.isPaintingMode;
+                std::cout << "Painting mode: " << ((mouse.isPaintingMode)? "enabled": "disabled") << '\n';
+            }
+            break;
+            
+            case sf::Keyboard::K:
+                mouse.ClearPreservedOverlays();
+                std::cout << "Cleared painted regions\n";
+            break;
+            
+            
+            case sf::Keyboard::C:
+            {
+                ToggleGridDisplay();
+                std::cout << "Grid-display " << ((shouldDrawGrid) ? "enabled" : "disabled") << '\n';
+            }
+            break;
+            
+            case sf::Keyboard::Num0:
+            case sf::Keyboard::Num1:
+            case sf::Keyboard::Num2:
+            case sf::Keyboard::Num3:
+            case sf::Keyboard::Num4:
+            case sf::Keyboard::Num5:
+            {
+                std::string previous_name = Shader::current->name;
+                //Shader* selectedShader = shader_map.at(event.key.code);
+                shader_map.at(keycode)->InvokeSwitch();
+                // enable transparency and turbulence-mode automatically
+                if (Shader::current->name == "turbulence") {
+                    if(!simulation.ToggleTurbulence()) simulation.ToggleTurbulence();
+                    if(previous_name == "turbulence") {
+                        windowClearDisabled = !windowClearDisabled;
+                        std::cout << "window clears " << (windowClearDisabled ? "enabled" : "disabled") << "\n";
+                    }
+                }
+                // TODO: restore previous settings for turbulence, transparency, and window-clears
+            }
+            break;
+            
+            case sf::Keyboard::Pause:
+                windowClearDisabled = !windowClearDisabled;
+                std::cout << "window clears " << (windowClearDisabled ? "enabled" : "disabled") << "\n";
+            break;
+            
+            case sf::Keyboard::Add:
+            case sf::Keyboard::Subtract:
+            {
+                if (Shader::current->name != "turbulence") {
+                    std::cerr << "turbulence is not active\n";
+                    break;
+                }
+                float threshold = Shader::current->uniform_vars.at("threshold");
+                threshold += ((keycode==sf::Keyboard::Add)? 0.01 : -0.01);
+                if (threshold < 0) threshold = 0.0f;
+                Shader::current->GetWritePtr()->ApplyUniform("threshold", threshold);
+            }
+            break;
+            
+            // case sf::Keyboard::_:
+            // break;
+            
+            default:
+            break;
+        }
+        return;
+    }; // End of HandleKeypress lambda
+    
     // frameloop
     while (mainwindow.isOpen())
     {
         // imgui needs window and deltatime. You can pass mousePosition and displaySize instead of window
         frametimer.restart();
-        if (gradientWindow.isOpen()) gradientWindow.FrameLoop();
-        if (mainGUI.isOpen()) mainGUI.FrameLoop();
-        
         sf::Event event;
+        std::vector<sf::Keyboard::Key> unhandled_keypresses{};
+        // 'unhandled_keypresses' is used as an output parameter so that it can be passed to multiple other windows
+        // and it puts the declaration in the outer scope
+        
+        if (gradientWindow.isOpen()) gradientWindow.FrameLoop();
+        if (mainGUI.isOpen()) mainGUI.FrameLoop(unhandled_keypresses);
+        for (sf::Keyboard::Key key: unhandled_keypresses) { HandleKeypress(key); }
+        
         while (mainwindow.pollEvent(event))
         {
             switch(event.type)
@@ -149,177 +328,7 @@ int main(int argc, char** argv)
                 break;
                 
                 case sf::Event::KeyPressed:
-                {
-                    const bool isShiftPressed {sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)};
-                    switch (event.key.code) 
-                    {
-                        case sf::Keyboard::Q:
-                            if (gradientWindow.isOpen()) gradientWindow.close();
-                            if (mainGUI.isOpen()) mainGUI.close();
-                            mainwindow.close();
-                        break;
-                        
-                        case sf::Keyboard::G:
-                            std::cout << (isShiftPressed?"xgravity ":"gravity ") 
-                            << (simulation.ToggleGravity(isShiftPressed)? "enabled":"disabled") << '\n';
-                        break;
-                        
-                        case sf::Keyboard::Space:
-                            std::cout << (simulation.TogglePause()?"paused":"unpaused") << '\n';
-                        break;
-                        
-                        case sf::Keyboard::BackSpace:
-                            simulation.Freeze();
-                            std::cout << "Velocities have been zeroed\n";
-                        break;
-                        
-                        case sf::Keyboard::Tab:
-                        {
-                            const bool isActive = mouse.ToggleActive();
-                            std::cout << "Mouse is " << (isActive? "enabled":"disabled") << '\n';
-                            mainwindow.setMouseCursorVisible(!isActive);  // hide cursor when Mouse_T is displayed
-                            // mainwindow.setMouseCursorGrabbed(isActive);  // for some reason this only works the first time???
-                            if (isActive) {
-                                mainwindow.requestFocus();
-                                mainwindow.setMouseCursorGrabbed(true);
-                                //std::cout << "grabbed\n";
-                            } else {
-                                mainwindow.setMouseCursorGrabbed(false);
-                                //std::cout << "ungrabbed\n";
-                            }
-                            /*  For whatever reason, trying to grab the mouse after toggling to false here doesn't work.
-                                once it's released the cursor, it can't seem to grab it again UNLESS the window is unfocused/refocused.
-                                (even though you can manually set it to true/false any number of times earlier and still get the first grab)
-                                It doesn't have to lose focus specifically; clicking the titlebar also works. Toggling the gradient-window is another easy method.
-                                In fact, it seems that changing focus ALWAYS triggers the cursor-grab, even if it's supposed to be disabled.
-                                Maybe it's just a problem with my window-manager, or the function is only meant to be called once? */
-                        }
-                        break;
-                        
-                        case sf::Keyboard::F1:
-                            PrintKeybinds();
-                        break;
-                        
-                        case sf::Keyboard::F2:
-                            if (gradientWindow.isOpen()) { gradientWindow.close(); }
-                            else
-                            {
-                                gradientWindow.Create(usingVsync, mainwindow.getPosition().x);
-                                gradientWindow.FrameLoop();
-                            }
-                        break;
-                        
-                        case sf::Keyboard::Tilde:
-                            // just pass focus to mainGUI if it's already open
-                            if (mainGUI.isEnabled) {
-                                #define WINDOWMANAGERJANK
-                                // Window-Manager moves the mainGUI window on it's own just from toggling the visibility off/on (and won't give focus otherwise lmao)
-                                // so the GUI window will always need to be repositioned, even if it's not docked
-                                #ifdef WINDOWMANAGERJANK
-                                  mainGUI.FollowMainWindow();
-                                #endif
-                                
-                                mainGUI.setVisible(false);
-                                mainGUI.setVisible(true);
-                                mainGUI.requestFocus();
-                                
-                                #ifdef WINDOWMANAGERJANK
-                                  mainGUI.FollowMainWindow(); // have to do it twice because it clips into the main window the first time
-                                #endif
-                                #undef WINDOWMANAGERJANK
-                                break;
-                            }
-                            else mainGUI.ToggleEnabled();
-                        break;
-                        
-                        case sf::Keyboard::T:
-                            std::cout << "Fluid is: " << (simulation.ToggleTurbulence()? "Turbulent":"not turbulent") << '\n';
-                        break;
-                        
-                        case sf::Keyboard::Y:
-                            std::cout << "transparency " << (simulation.ToggleTransparency()? "enabled":"disabled") << '\n';
-                        break;
-                        
-                        case sf::Keyboard::U:
-                            std::cout << "Particle scaling is: " << (Fluid::ToggleParticleScaling()? "Positive":"Negative") << '\n';
-                        break;
-                        
-                        case sf::Keyboard::N:
-                        {
-                            const auto [mouseX, mouseY] = sf::Mouse::getPosition(mainwindow);
-                            std::cout << "Mouse@ [" << mouseX << ", " << mouseY << "] \n";
-                        }
-                        break;
-                        
-                        case sf::Keyboard::P:
-                        {
-                            // TODO: clear overlays if exiting painting-Mode?
-                            mouse.isPaintingMode = !mouse.isPaintingMode;
-                            std::cout << "Painting mode: " << ((mouse.isPaintingMode)? "enabled": "disabled") << '\n';
-                        }
-                        break;
-                        
-                        case sf::Keyboard::K:
-                            mouse.ClearPreservedOverlays();
-                            std::cout << "Cleared painted regions\n";
-                        break;
-                        
-                        
-                        case sf::Keyboard::C:
-                        {
-                            ToggleGridDisplay();
-                            std::cout << "Grid-display " << ((shouldDrawGrid) ? "enabled" : "disabled") << '\n';
-                        }
-                        break;
-                        
-                        case sf::Keyboard::Num0:
-                        case sf::Keyboard::Num1:
-                        case sf::Keyboard::Num2:
-                        case sf::Keyboard::Num3:
-                        case sf::Keyboard::Num4:
-                        case sf::Keyboard::Num5:
-                        {
-                            std::string previous_name = Shader::current->name;
-                            //Shader* selectedShader = shader_map.at(event.key.code);
-                            shader_map.at(event.key.code)->InvokeSwitch();
-                            // enable transparency and turbulence-mode automatically
-                            if (Shader::current->name == "turbulence") {
-                                if(!simulation.ToggleTurbulence()) simulation.ToggleTurbulence();
-                                if(previous_name == "turbulence") {
-                                    windowClearDisabled = !windowClearDisabled;
-                                    std::cout << "window clears " << (windowClearDisabled ? "enabled" : "disabled") << "\n";
-                                }
-                            }
-                            // TODO: restore previous settings for turbulence, transparency, and window-clears
-                        }
-                        break;
-                        
-                        case sf::Keyboard::Pause:
-                            windowClearDisabled = !windowClearDisabled;
-                            std::cout << "window clears " << (windowClearDisabled ? "enabled" : "disabled") << "\n";
-                        break;
-                        
-                        case sf::Keyboard::Add:
-                        case sf::Keyboard::Subtract:
-                        {
-                            if (Shader::current->name != "turbulence") {
-                                std::cerr << "turbulence is not active\n";
-                                break;
-                            }
-                            float threshold = Shader::current->uniform_vars.at("threshold");
-                            threshold += ((event.key.code==sf::Keyboard::Add)? 0.01 : -0.01);
-                            if (threshold < 0) threshold = 0.0f;
-                            Shader::current->GetWritePtr()->ApplyUniform("threshold", threshold);
-                        }
-                        break;
-                        
-                        // case sf::Keyboard::_:
-                        // break;
-                        
-                        default:
-                        break;
-                    }
-                }
+                    HandleKeypress(event.key.code);
                 break;
                 
                 case sf::Event::MouseMoved:

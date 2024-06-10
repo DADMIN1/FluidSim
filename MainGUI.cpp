@@ -164,7 +164,7 @@ void MainGUI::DrawDockingControls() // status and switches
 }
 
 
-void MainGUI::HandleWindowEvents()
+void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypresses)
 {
     // event handling
     sf::Event event;
@@ -205,6 +205,7 @@ void MainGUI::HandleWindowEvents()
                     break;
                     
                     default:
+                        unhandled_keypresses.push_back(event.key.code);
                     break;
                 }
             }
@@ -358,7 +359,7 @@ void MainGUI::DrawFluidParams(float& next_height)
         ImGui::SliderFloat(#field, &FluidParams->field, MIN(max), max, #field": %."#precision"f", sliderflags)
     
     #define MIN(f) -f       // set min == -max
-    if (FP(gravity,   3, 3.0f)) SimulParams->hasGravity = true; // enable gravity when interacted with
+    if (FP(gravity,   3, 3.0f)) SimulParams->hasGravity  = true; // enable gravity when interacted with
     if (FP(xgravity,  3, 3.0f)) SimulParams->hasXGravity = true;
         FP(viscosity, 6, 0.5f); // negative values are a lot like 'turbulence' mode
     #undef MIN
@@ -371,7 +372,6 @@ void MainGUI::DrawFluidParams(float& next_height)
     
     #undef MIN
     #undef FP
-    // TODO: disable gravity if it's not enabled; or auto-enable gravity
     // TODO: button to reset defaults
     
     numlines += 3;
@@ -510,13 +510,13 @@ void MainGUI::DrawMouseParams(float& next_height)
 }
 
 
-void MainGUI::FrameLoop() 
+void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses) 
 {
     if (!isEnabled || !isOpen()) { return; }
     sf::RenderWindow::clear();
     if (dockedToMain) FollowMainWindow();
     
-    HandleWindowEvents();
+    HandleWindowEvents(unhandled_keypresses);
     
     // IMGUI
     ImGui::SFML::Update(*this, clock.restart());
