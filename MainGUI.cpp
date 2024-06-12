@@ -43,7 +43,7 @@ constexpr ImGuiChildFlags child_flags { 0
 
 bool MainGUI::Initialize()
 {
-    setFramerateLimit(framerateCap);
+    //setFramerateLimit(framerateCap);
     setVerticalSyncEnabled(usingVsync);
     if (!ImGui::SFML::Init(*this)) {
         // std::cerr << "imgui-sfml failed to init! exiting.\n";
@@ -67,7 +67,7 @@ void MainGUI::Create()
     constexpr auto m_style = sf::Style::Titlebar | sf::Style::Resize | sf::Style::Close;
     // sf::Style::Default = Titlebar | Resize | Close
     sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "FLUIDSIM - Main GUI", m_style);
-    setFramerateLimit(framerateCap);
+    // setFramerateLimit(framerateCap);
     setVerticalSyncEnabled(usingVsync);
     clock.restart();
     return;
@@ -167,11 +167,12 @@ void MainGUI::DrawDockingControls() // status and switches
 void MainGUI::AdjustActiveSlider(sf::Keyboard::Key plus_minus)
 {
     if (!lastactiveSlider) return;
-    
-    float valueDelta = std::abs(*lastactiveSlider) * 0.01f;
-    if (valueDelta < 0.001f) valueDelta = 0.001f;
+    constexpr float one_over_64  = 1.f/64.f;
+    constexpr float one_over_255 = 1.f/255.f;
+    float valueDelta = std::abs(*lastactiveSlider) * one_over_64;
+    if (valueDelta < one_over_255) valueDelta = one_over_255;
     const bool isShiftPressed {sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)};
-    if (isShiftPressed) valueDelta *= 10.f;
+    if (isShiftPressed) valueDelta *= 4.f;
     
     bool isPositive{false};
     switch (plus_minus)
@@ -183,6 +184,12 @@ void MainGUI::AdjustActiveSlider(sf::Keyboard::Key plus_minus)
         case sf::Keyboard::Subtract:
         case sf::Keyboard::Dash:
             *lastactiveSlider += (isPositive? valueDelta : -valueDelta);
+            if (lastactiveSliderName == "Strength")
+            {
+                //shouldDrawGrid = true;
+                MouseParams->realptr->RecalculateModDensities();
+                lastactiveSlider = &MouseParams->strength;
+            }
         break;
         
         default: break; // shouldn't happen
@@ -258,67 +265,46 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
     return;
 }
 
-/* 
-void MainGUI::SimulParameters::MakeSliderFloats()
-{
-    auto sliderflags = ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic | \
-                           ImGuiSliderFlags_NoInput | ImGuiSliderFlags_NoRoundToFormat;
-    
-    #define ALLSLIDERS() XMACRO(momentumTransfer) XMACRO(momentumDistribution)
-    
-    #define FMTSTRING(field) #field": %."precision()"f"
-    
-    #define XMACRO(field) ImGui::SliderFloat(#field, &this->field, \
-        0.f, 1.f, FMTSTRING(field), sliderflags);
-    
-    #define precision() "3"
-    
-    ALLSLIDERS();
-    
-    #undef ALL
-    #undef FMTSTRING
-    #undef XMACRO
-    #undef precision
-    ImGui::SliderFloat("momentumTransfer",     &this->momentumTransfer,     0.f, 1.f, "momentumTransfer"": %.""3""f",     sliderflags);
-    ImGui::SliderFloat("momentumDistribution", &this->momentumDistribution, 0.f, 1.f, "momentumDistribution"": %.""3""f", sliderflags);
-    
-    const float min = 0.0f;
-    const float max = 1.0f;
-    float v[2] = {this->momentumTransfer, this->momentumDistribution};
-    ImGui::SliderFloat2( "SimulationParams", v, min, max, "%.3f", ImGuiSliderFlags_NoRoundToFormat );
-    
-    return;
-} */
-
 
 // SLIDER MACROS //
-// #define ALLSLIDERS()
+
 #define FMTSTRING(field) #field ": %." PRECISION() "f"
 // FMTSTRING gets concatenated into a single string. ('name: %.3f')
 // the spaces are actually necessary; C++11 requires a space between literal and string macro
 
+#define VARIABLEPTR(input) &PSTRUCT()->PREFIX(input)
+
 // local variables 'min', 'max', and 'sliderflags' are expected to exist
-#define XMACRO(field) ImGui::SliderFloat(#field, &PSTRUCT()->REAL(field), \
-    min, max, FMTSTRING(field), sliderflags)
+#define DEFSLIDER(name, field) ImGui::SliderFloat(#name, VARIABLEPTR(field), \
+    min, max, FMTSTRING(name), sliderflags)
 
 // optional arg can be additional callbacks/hooks to execute on slider interation
-#define MAKESLIDER(field, ...) if(XMACRO(field)) { \
-    lastactiveSlider = &PSTRUCT()->REAL(field);    \
-    __VA_OPT__(__VA_ARGS__;)                       \
+#define MAKESLIDER(field, ...) if(DEFSLIDER(field, field)) { \
+    lastactiveSlider = VARIABLEPTR(field);                   \
+    lastactiveSliderName = #field;                           \
+    __VA_OPT__(__VA_ARGS__;)                                 \
 }
+
+// when the slider's displayed text shouldn't be the field
+#define MAKESLIDERNAMED(name, field, ...)  \
+    if(DEFSLIDER(name, field)) {           \
+    lastactiveSlider = VARIABLEPTR(field); \
+    lastactiveSliderName = #name;          \
+    __VA_OPT__(__VA_ARGS__;)               \
+}
+// TODO: somehow store/map the name to the callback (so that AdjustActiveSlider can call it)
+
 
 // use the slider macros by defining input macros like this: 
 /* 
+    #define PREFIX(field) momentum##field
     #define PSTRUCT() SimulParams
-    #define REAL(field) momentum##field
     #define PRECISION() "3" 
     MAKESLIDER(Transfer)
 */
-// 'XMACRO' expects local variables 'min', 'max', and 'sliderflags' to exist
-// the 'REAL' macro can be used to add a prefix to the field-name if it doesn't match the struct-member
+// 'DEFSLIDER' expects local variables 'min', 'max', and 'sliderflags' to exist
+// the 'PREFIX' macro can be used to add a prefix to the field-name if it doesn't match the struct-member
 // (in the example, it would construct: 'SimulParams->momentumTransfer' instead: of 'SimulParams->Transfer')
-
-
 
 
 void MainGUI::DrawSimulParams(float& next_height)
@@ -335,8 +321,8 @@ void MainGUI::DrawSimulParams(float& next_height)
         lastactiveSlider = &timestepMultiplier;
     ImGui::SeparatorText("Momentum");
     
+    #define PREFIX(fieldname) momentum##fieldname
     #define PSTRUCT() SimulParams
-    #define REAL(fieldname) momentum##fieldname
     #define PRECISION() "3"
     // you can define these as normal variables, but 'PRECISION' just cannot
     float min = 0.0f;
@@ -347,8 +333,8 @@ void MainGUI::DrawSimulParams(float& next_height)
     //ImGui::SliderFloat("Transfer",     &SimulParams->momentumTransfer,     min, max, "Transfer: %.3f",     sliderflags); 
     //ImGui::SliderFloat("Distribution", &SimulParams->momentumDistribution, min, max, "Distribution: %.3f", sliderflags);
     
+    #undef PREFIX
     #undef PSTRUCT
-    #undef REAL
     #undef PRECISION
     
     //next_height += 50.f;
@@ -363,11 +349,12 @@ void MainGUI::DrawFluidParams(float& next_height)
     //ImGui::Separator();
     ImGui::Begin("Fluid Parameters", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
     ImGui::SetWindowPos({0, next_height});
-    int numlines = 1;
+    int numlines = 0;
     
     sf::Color enabledColor = {0x1A, 0xEE, 0x22, 0xFF}; // green
     sf::Color disableColor = {0xFF, 0x20, 0x20, 0xFF}; // red
     
+    numlines += 2;
     if (SimulParams->hasGravity) {
         ImGui::Text("Gravity:");  ImGui::SameLine();
         ImGui::TextColored(enabledColor, "Enabled");
@@ -384,6 +371,7 @@ void MainGUI::DrawFluidParams(float& next_height)
         ImGui::SameLine();   ImGui::TextColored(disableColor, "Disabled");
     }
     
+    numlines += 5;
     auto sliderflags = ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat\
                      | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
     // input is disabled because it's also activated with 'Tab' (normally Ctrl+click);
@@ -393,39 +381,37 @@ void MainGUI::DrawFluidParams(float& next_height)
     float min = -3.0f;
     float max =  3.0f;
     
+    #define PREFIX(fieldname) fieldname
     #define PSTRUCT() FluidParams
-    #define REAL(fieldname) fieldname
     #define PRECISION() "3"
     // gravity sliders //
     MAKESLIDER(gravity , SimulParams->hasGravity  = true;);
     MAKESLIDER(xgravity, SimulParams->hasXGravity = true;);
     
     // fdensity / viscosity sliders //
-    #undef PRECISION
+    #undef  PRECISION
     #define PRECISION() "6"
-    min = -0.5f;
-    max =  0.5f;
+    min = -0.5f; max = 0.5f;
     MAKESLIDER(viscosity);
     min = 0.001f; // fdensity should not go below zero
     MAKESLIDER(fdensity);
     
-    #undef PRECISION
+    #undef  PRECISION
     #define PRECISION() "2"
-    min = -2.0f;
-    max =  2.0f;
+    min = -2.0f; max = 2.0f;
     sliderflags ^= ImGuiSliderFlags_Logarithmic; // negating logarithmic flag
     MAKESLIDER(bounceDampening);
     
     // TODO: button to reset defaults
     
-    #undef PSTRUCT
-    #undef REAL
-    #undef PRECISION
+    #undef  VARIABLEPTR
+    #define VARIABLEPTR(input) input
+    min = 0.0f; max = 50.f;
     
     numlines += 3;
     ImGui::SeparatorText("Gradient Speed-Thresholds");
-    ImGui::SliderFloat("Min", &Fluid::gradient_thresholdLow, 0.0f, 50.f, "%.2f", sliderflags);
-    ImGui::SliderFloat("Max", &Fluid::gradient_thresholdHigh, 0.f, 75.f, "%.2f", sliderflags);
+    MAKESLIDERNAMED(Min, &Fluid::gradient_thresholdLow ); max = 75.f;
+    MAKESLIDERNAMED(Max, &Fluid::gradient_thresholdHigh);
     
     numlines += 1;
     ImGui::Separator();
@@ -434,6 +420,11 @@ void MainGUI::DrawFluidParams(float& next_height)
          ImGui::TextColored({0xFF, 0x00, 0x08, 0xFF}, "Enabled" );
     else ImGui::TextColored({0x00, 0x40, 0xFF, 0xFF}, "Disabled");
     ImGui::Separator();
+    
+    
+    #undef PREFIX
+    #undef PSTRUCT
+    #undef PRECISION
     
     // for some reason this can't autosize correctly. // Note: titlebar also takes ~25 pixels
     ImGui::SetWindowSize({m_width, 25.0f*numlines});
@@ -492,11 +483,11 @@ void MainGUI::DrawMouseParams(float& next_height)
     };
     
     sf::Color modeColor = ModeColor(this->MouseParams->mode);
-    ImGui::PushStyleColor(ImGuiCol_Border, modeColor - sf::Color{0x22222222});
-    ImGui::PushStyleColor(ImGuiCol_TitleBg, modeColor - sf::Color{0x20202077});
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, modeColor - sf::Color{0x111111BB});
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, modeColor - sf::Color{0x222222BB});
-    ImGui::PushStyleColor(ImGuiCol_Separator, modeColor - sf::Color{0x20202020});
+    ImGui::PushStyleColor(ImGuiCol_Border    , modeColor-sf::Color{0x22222222});
+    ImGui::PushStyleColor(ImGuiCol_TitleBg   , modeColor-sf::Color{0x20202077});
+    ImGui::PushStyleColor(ImGuiCol_ChildBg   , modeColor-sf::Color{0x111111BB});
+    ImGui::PushStyleColor(ImGuiCol_WindowBg  , modeColor-sf::Color{0x222222BB});
+    ImGui::PushStyleColor(ImGuiCol_Separator , modeColor-sf::Color{0x20202020});
     
     ImGui::Begin("Mouse", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
     ImGui::SetWindowPos({0, next_height});
@@ -524,9 +515,9 @@ void MainGUI::DrawMouseParams(float& next_height)
     
     ImGui::BeginDisabled(!isEnabled);
     
-    ImGui::Text("Painted:%lu", numlocked+numUnlocked); ImGui::SameLine();
-    ImGui::Text("unlocked:%lu", numUnlocked);          ImGui::SameLine();
-    ImGui::Text("locked:%lu", numlocked); // '%lu' == long unsigned int
+    ImGui::Text("Painted:%lu",  numlocked+numUnlocked); ImGui::SameLine();
+    ImGui::Text("unlocked:%lu", numUnlocked);           ImGui::SameLine();
+    ImGui::Text("locked:%lu",   numlocked); // '%lu' == long unsigned int
     ImGui::Separator();
     
     ImGui::EndDisabled();
@@ -543,13 +534,14 @@ void MainGUI::DrawMouseParams(float& next_height)
     ImGui::Separator();
     ImGui::PopStyleColor(6);
     
+    float min =  1.f; float max =  255.f;
+    #define PRECISION()
     static bool shouldDrawGrid_old;
-    if(ImGui::SliderFloat("Strength", &MouseParams->strength, 1.f, 255.f, "%f", sliderflags))
-    {
+    MAKESLIDERNAMED(Strength, &MouseParams->strength, 
         shouldDrawGrid = true;
         MouseParams->realptr->RecalculateModDensities();
         lastactiveSlider = &MouseParams->strength;
-    }
+    )
     if(ImGui::IsItemDeactivatedAfterEdit()) { shouldDrawGrid = shouldDrawGrid_old; } // waiting until slider is released
     else if(!ImGui::IsItemActive()) { shouldDrawGrid_old = shouldDrawGrid; }
     
@@ -558,11 +550,6 @@ void MainGUI::DrawMouseParams(float& next_height)
     return;
 }
 
-
-// SLIDER MACROS //
-#undef FMTSTRING
-#undef XMACRO
-#undef MAKESLIDER
 
 
 void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses) 
@@ -623,3 +610,12 @@ void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses)
     sf::RenderWindow::display();
     return;
 }
+
+
+// SLIDER MACROS //
+#undef FMTSTRING
+#undef VARIABLEPTR
+#undef DEFSLIDER
+#undef MAKESLIDER
+#undef MAKESLIDERNAMED
+

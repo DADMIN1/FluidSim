@@ -76,7 +76,7 @@ int main(int argc, char** argv)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM", mainstyle);
     mainwindow.setPosition({2600, 0}); // move to right monitor
-    mainwindow.setFramerateLimit(framerateCap);
+    // mainwindow.setFramerateLimit(framerateCap);
     mainwindow.setVerticalSyncEnabled(usingVsync);
     
     GradientWindow_T gradientWindow{};

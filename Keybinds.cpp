@@ -79,7 +79,7 @@ struct AllKeybinds
         KEY(U, "toggle particle-scaling direction (positive/negative)");
         current_section = Keybind::Section::unspecified;
         //KEY(Subtract, "");
-        KEY(Add, "increment/decrement: 1% (+Shift: 10%)")
+        KEY(Add, "increment/decrement: ~0.4-1.5% (+Shift: 4x-faster)")
             -> extrainfo = "+/- Keys control the last active slider in GUI";
         KEY(N, "print mouse position");
         

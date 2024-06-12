@@ -2,7 +2,7 @@
 #define FLUIDSIM_GLOBALS_HPP_INCLUDED
 
 
-constexpr int NUMCOLUMNS {50}, NUMROWS {50}; // layout (and number) of particles spawned during init
+constexpr int NUMCOLUMNS {64}, NUMROWS {64}; // layout (and number) of particles spawned during init
 constexpr int BOXWIDTH {1000}, BOXHEIGHT {1000}; // internal resolution (default window resolution should match)
 //constexpr float DEFAULTRADIUS {float(BOXWIDTH/NUMCOLUMNS) / 2.0f};
 constexpr float DEFAULTRADIUS {10.0f}; // size of particles (sf::CircleShape)

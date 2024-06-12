@@ -60,7 +60,6 @@ class MainGUI: public sf::RenderWindow
             momentumTransfer     {simulation->momentumTransfer},
             momentumDistribution {simulation->momentumDistribution}
         { ; }
-        //void MakeSliderFloats();
     };
     
     struct MouseParameters
@@ -114,7 +113,9 @@ class MainGUI: public sf::RenderWindow
     
     #undef SETUPFUNCTION
     
+    // TODO: slider struct
     float* lastactiveSlider {nullptr};
+    std::string lastactiveSliderName{};
     
     // internal draw functions
     void DrawFocusIndicator();
