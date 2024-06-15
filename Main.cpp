@@ -149,6 +149,12 @@ int main(int argc, char** argv)
                 std::cout << (simulation.TogglePause()?"paused":"unpaused") << '\n';
             break;
             
+            case sf::Keyboard::R:
+                mouse.Reset(); // can't carry over locked cells at the moment
+                simulation.Reset();
+                std::cout << "Reset Simulation\n";
+            break;
+            
             case sf::Keyboard::BackSpace:
                 simulation.Freeze();
                 std::cout << "Velocities have been zeroed\n";

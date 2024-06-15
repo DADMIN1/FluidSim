@@ -147,7 +147,27 @@ class Simulation
         diffusionField.ResetMomentum();
         //hasGravity = false;
     }
-    void Reset(); // TODO: implement reset
+    
+    void Reset()
+    {
+        particleMap.clear();
+        diffusionField.Reset();
+        fluid.Reset(); // resets positions! (required for next loop)
+        for (Fluid::Particle& particle: fluid.particles)
+        {
+            const auto& [x, y] = particle.getPosition();
+            const unsigned int xi = x / SPATIAL_RESOLUTION;
+            const unsigned int yi = y / SPATIAL_RESOLUTION;
+            Cell* cell = diffusionField.cellmatrix.at(xi).at(yi);
+            
+            particleMap[cell->UUID].emplace(particle.UUID);
+            particle.cellID = cell->UUID;
+            cell->density += 1.0;
+        }
+        RedrawGrid();
+        RedrawFluid();
+        return;
+    }
     
     void RedrawGrid()  { diffusionField.Redraw(); }
     void RedrawFluid() { fluid.Redraw(useTransparency); }

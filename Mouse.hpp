@@ -140,6 +140,7 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     auto StoreCell(Cell* const cellptr);  // saves the cell's current state, returns an iterator
     void ModifyCell(const Cell* const cellptr); // modifies cell's properties based on mode
     void RestoreCell(const std::size_t cellID); // restores original state and removes entry for cell
+    void Reset();
 };
 
 

@@ -55,7 +55,7 @@ struct CellState_T
     } mod;
     
     CellState_T(const CellState_T& other): 
-    UUID{other.UUID},
+    UUID {other.UUID},
     cellptr {other.cellptr}, 
     originalState {*other.cellptr},
     mod {other.mod}
@@ -91,6 +91,19 @@ struct CellState_T
 std::unordered_map<std::size_t, CellState_T> Mouse_T::savedState{};
 std::unordered_map<std::size_t, CellState_T> Mouse_T::preservedOverlays{};
 
+// TODO: allow carrying over locked/painted cells
+void Mouse_T::Reset()
+{
+    savedState.clear();
+    preservedOverlays.clear();
+    cellOverlay.clear(sf::Color::Transparent);
+    outlineOverlay.clear(sf::Color::Transparent);
+    outlined.clear();
+    // breaks the mouse?
+    //SwitchMode(Disabled);
+    //hoveredCell = nullptr;
+    return;
+}
 
 void Mouse_T::RecalculateModDensities() const 
 {

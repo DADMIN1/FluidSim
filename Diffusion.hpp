@@ -107,6 +107,8 @@ class DiffusionField
             cell.momentum = {0.0, 0.0};
         }
     }
+    
+    void Reset() { for (Cell& cell: cells) { cell.Reset(); } }
 };
 
 

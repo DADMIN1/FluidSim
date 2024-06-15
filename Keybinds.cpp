@@ -33,7 +33,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{23};
+    static constexpr auto numkeybinds{24};
     std::vector<Keybind> all;  // TODO: array instead?
     std::vector<std::vector<Keybind*>> sections; 
     
@@ -63,13 +63,14 @@ struct AllKeybinds
             ->extrainfo = "(while open) switches focus between side-panel and main-window\n"
             "  - Left/Right: switch docking side of side-panel\n"
             "  - Q/ESC: close side-panel\n";
-        KEY(Tab, "toggle mouse interactions");
         
         current_section = Keybind::Section::interactions;
         KEY(Space, "pause/unpause simulation");
         KEY(BackSpace, "freeze particles")
             -> extrainfo = "all velocities are zeroed. (it also pauses the simulation)";
+        KEY(R, "Reset the simulation");
         KEY(G, "toggle gravity \n(+Shift):  xgravity");
+        KEY(Tab, "toggle mouse interactions");
         KEY(P, "toggle painting-mode");
         KEY(K, "clear painted cells (painting mode)");
         KEY(C, "toggle cell-grid display");
@@ -98,12 +99,12 @@ struct AllKeybinds
             "          (so that the effects of the 'threshold' parameter can be observed)\n"
             "  activating this shader automatically enables Turbulence-mode\n";
         
-        KEY(Pause, "toggle framebuffer-clears") // Pause-Break
+        KEY(Pause, "(Pause-Break): toggle framebuffer-clears") // Pause-Break
             -> extrainfo = "while the 'turbulence' shader is active and the simulation is paused, the framebuffer will always be cleared\n"
             " (so that the effects of the 'threshold' parameter can be observed)\n";
         trailing_newline = true;
         
-        keybind_Tab.extrainfo = "(while the mouse is enabled, the currently-hovered cell will be outlined)\n\n"
+        keybind_Tab.extrainfo = "(while the mouse is enabled, it will be displayed as a circle)\n\n"
             "  Mouse-interactions: (hold)\n"
             "      Left-Click  = Push (increases density)\n"
             "      Right-Click = Pull (negative density)\n"

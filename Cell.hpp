@@ -67,6 +67,13 @@ class Cell: public sf::RectangleShape {
     sf::Vector2f momentum{0.0, 0.0}; // stored velocity imparted by particles, distributed to local particles
     float density{0.0};
     
+    void Reset() {
+        diffusionVec = {0.f, 0.f};
+        momentum     = {0.f, 0.f};
+        density      =  0.f;
+    }
+    // IX, IY, UUID will be handled by Simulation::Reset()
+    
     public:
     friend class DiffusionField;
     friend class Simulation;
