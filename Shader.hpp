@@ -17,6 +17,9 @@ class Shader: public sf::Shader, public sf::RenderStates {
     std::map<std::string, float> uniform_vars;  // variables specific to the shader
     //Keybind keybind  //TODO: store keybind as a member variable
     
+    //friend int main(int argc, char** argv);
+    friend class MainGUI;
+    
     public:
     const std::string name;
     static const Shader* current;

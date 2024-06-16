@@ -94,13 +94,20 @@ int main(int argc, char** argv)
     Mouse_T mouse(mainwindow, simulation.GetDiffusionFieldPtr());
     auto&& [gridSprite, fluidSprite] = simulation.GetSprites();
     auto [cellOverlay, outlineOverlay] {mouse.GetOverlaySprites()};
+    // must be loaded before mainGUI
+    const std::map<sf::Keyboard::Key, Shader*>& shader_map = Shader::LoadAll();
+    const Shader* empty = shader_map.cbegin()->second;
+    if (!empty->InvokeSwitch()) { 
+        std::cerr << "ragequitting because empty shader didn't load.\n";
+        return 2;
+    }
     
     assert(IMGUI_CHECKVERSION() && "ImGui version-check failed!");
     std::cout << "using imgui v" << IMGUI_VERSION << '\n';
     
     MainGUI mainGUI{};
     if (mainGUI.initErrorFlag) {
-        std::cerr << "imgui-sfml failed to init! exiting.\n";
+        std::cerr << "mainGUI failed to init! exiting.\n";
         return 3;
     }
     mainGUI.SetupFluidParameters(&simulation.fluid);
@@ -119,13 +126,6 @@ int main(int argc, char** argv)
     hoverOutline.setOutlineThickness(2.5f);
     
     PrintKeybinds();
-    
-    const std::map<sf::Keyboard::Key, Shader*>& shader_map = Shader::LoadAll();
-    const Shader* empty = shader_map.cbegin()->second;
-    if (!empty->InvokeSwitch()) { 
-        std::cerr << "ragequitting because empty shader didn't load.\n";
-        return 2;
-    }
     
     sf::Clock frametimer{};
     
@@ -291,17 +291,6 @@ int main(int argc, char** argv)
             case sf::Keyboard::Dash:
             case sf::Keyboard::Equal:
                 mainGUI.AdjustActiveSlider(keycode);
-            // TODO: create slider for threshold in MainGUI
-            /* {
-                if (Shader::current->name != "turbulence") {
-                    std::cerr << "turbulence is not active\n";
-                    break;
-                }
-                float threshold = Shader::current->uniform_vars.at("threshold");
-                threshold += ((keycode==sf::Keyboard::Add)? 0.01 : -0.01);
-                if (threshold < 0) threshold = 0.0f;
-                Shader::current->GetWritePtr()->ApplyUniform("threshold", threshold);
-            } */
             break;
             
             // case sf::Keyboard::_:

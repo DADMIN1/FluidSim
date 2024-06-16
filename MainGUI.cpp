@@ -3,6 +3,12 @@
 
 #include <SFML/Window.hpp>  // defines sf::Event
 
+#include <iostream> // only used in MainGUI::Initialize()
+
+#include "Shader.hpp"
+Shader* turbulence_ptr = nullptr;
+float* turbulence_threshold_ptr = nullptr;
+
 
 // Main.cpp
 extern bool usingVsync;
@@ -46,7 +52,7 @@ bool MainGUI::Initialize()
     //setFramerateLimit(framerateCap);
     setVerticalSyncEnabled(usingVsync);
     if (!ImGui::SFML::Init(*this)) {
-        // std::cerr << "imgui-sfml failed to init! exiting.\n";
+        std::cerr << "imgui-sfml failed to init! exiting.\n";
         return true; //error has occcured
     }
     
@@ -58,6 +64,20 @@ bool MainGUI::Initialize()
     //imguiIO.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     //imguiIO.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
     imguiIO.IniFilename = NULL; // disable autosaving of the 'imgui.ini' config file (just stores window states)
+    
+    // shaders must be initialized before this!
+    turbulence_ptr = Shader::NameLookup["turbulence"];
+    if ((!turbulence_ptr) || !turbulence_ptr->isValid) {
+        std::cerr << "turbulence-pointer is null or invalid! exiting!\n";
+        return true;
+    }
+    else if (turbulence_ptr && turbulence_ptr->isValid)
+        turbulence_threshold_ptr = &turbulence_ptr->uniform_vars["threshold"];
+    if (!turbulence_threshold_ptr) {
+        std::cerr << "threshold-pointer is null! exiting!\n";
+        return true;
+    };
+    
     return false;
 }
 
@@ -79,7 +99,7 @@ void MainGUI::FollowMainWindow()
     if(!isEnabled || !mainwindowPtr || !mainwindowPtr->isOpen()) return;
     // set height to match mainwindow
     m_height = mainwindowPtr->getSize().y;
-    setSize({u_int(m_width), u_int(m_height)});
+    //setSize({u_int(m_width), u_int(m_height)}); //this glitches out when debug window is active (constant resizing)
     
     // snap position to either side of mainwindow
     auto [mwx, mwy] = mainwindowPtr->getPosition();
@@ -190,6 +210,11 @@ void MainGUI::AdjustActiveSlider(sf::Keyboard::Key plus_minus)
                 MouseParams->realptr->RecalculateModDensities();
                 lastactiveSlider = &MouseParams->strength;
             }
+            else if (lastactiveSliderName == "turbulence_threshold")
+            {
+                turbulence_ptr->ApplyUniform("threshold", *turbulence_threshold_ptr);
+                //lastactiveSlider = turbulence_threshold_ptr; // done elsewhere
+            }
         break;
         
         default: break; // shouldn't happen
@@ -238,6 +263,9 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
                     }
                     break;
                     
+                    // catching this to prevent mouse-toggling when alt-tabbing (or navigating by keyboard)
+                    case sf::Keyboard::Tab: break;
+                    
                     default:
                         unhandled_keypresses.push_back(event.key.code);
                     break;
@@ -245,7 +273,8 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
             }
             break;
             
-            case sf::Event::Resized:
+            // disabled because this forces the debug window offscreen (since every section expands to m_width)
+            /* case sf::Event::Resized:
             {
                 auto [newwidth, newheight] = event.size;
                 m_width = newwidth;
@@ -255,7 +284,7 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
                     FollowMainWindow();
                 }
             }
-            break;
+            break; */
             
             default:
             break;
@@ -266,7 +295,9 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
 }
 
 
-// SLIDER MACROS //
+// ========================= //
+//  ---- SLIDER MACROS ----  //
+// ========================= //
 
 #define FMTSTRING(field) #field ": %." PRECISION() "f"
 // FMTSTRING gets concatenated into a single string. ('name: %.3f')
@@ -434,7 +465,7 @@ void MainGUI::DrawFluidParams(float& next_height)
     return;
 }
 
-
+// TODO: display size of mouse (RD) in UI
 void MainGUI::DrawMouseParams(float& next_height)
 {
     auto sliderflags = ImGuiSliderFlags_NoRoundToFormat | \
@@ -580,29 +611,45 @@ void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses)
     DrawSimulParams(next_height);
     DrawFluidParams(next_height);
     DrawMouseParams(next_height);
-    // TODO: demo-window has very little space left!
+    
+    constexpr int sliderflags_ttresh = ImGuiSliderFlags_NoRoundToFormat | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
+    
+    // TODO: disable if not using turbulence shader, and move to bottom of 'DrawFluidParams'
+    ImGui::Begin("turbulence_threshold_section", nullptr, subwindow_flags);
+    ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
+    ImGui::SetWindowPos({0, next_height});
+    //SliderT turbulenceThresholdSlider {SliderT("threshold", 0.f, 255.f)};
+    if (ImGui::SliderFloat("turbulence_threshold", turbulence_threshold_ptr, 0.f, 1.f, "threshold: %.2f", sliderflags_ttresh))
+    {
+        lastactiveSliderName = "turbulence_threshold";
+        lastactiveSlider = turbulence_threshold_ptr;
+        turbulence_ptr->ApplyUniform("threshold", *turbulence_threshold_ptr);
+    }
+    ImGui::End();
+    next_height += 35;
     
     // Demo-Window Toggle Button
     ImGui::Begin("DemoToggle", nullptr, subwindow_flags);
     ImGui::SetWindowPos({0, next_height});
     
     //ImGui::Separator();
-    if(ImGui::Button("Demo Window")) showDemoWindow = !showDemoWindow;
+    if(ImGui::Button("Demo Window")) 
+    {
+        showDemoWindow = !showDemoWindow;
+        unsigned int nextWidth = (showDemoWindow? m_width*2.f : m_width);
+        sf::RenderWindow::setSize({nextWidth, sf::RenderWindow::getSize().y});
+    }
     //ImGui::Separator();
     
-    ImGui::SetWindowSize({m_width, ImGui::GetWindowHeight()});
+    ImGui::SetWindowSize({m_width, -1});
     next_height += ImGui::GetWindowHeight();
     
     // Actual Demo Window
     if(showDemoWindow)
     {
-        // cannot make this a child window; it just refuses to behave correctly
-        //ImGui::BeginChild("DemoWindow", {m_width, remaining_height}, 0, 0);
         ImGui::ShowDemoWindow(&showDemoWindow);
-        ImGui::SetWindowPos("Dear ImGui Demo", {0, next_height}); // selecting window by name
-        ImGui::SetWindowSize("Dear ImGui Demo", {m_width, m_height-next_height});
-        
-        //ImGui::EndChild(); //demowindow
+        ImGui::SetWindowPos ("Dear ImGui Demo", {m_width,  0}); // selecting window by name
+        ImGui::SetWindowSize("Dear ImGui Demo", {m_width, -1});
     }
     ImGui::End(); // Bottom half (Demo Window)
     

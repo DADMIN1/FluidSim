@@ -101,7 +101,7 @@ void Shader::ApplyUniform(std::string varName, float val) {
         std::cerr << "Shader: " << this->name << " does not have a variable: " << varName << '\n';
         return;
     }
-    std::cout << "setting uniform: '" << varName << "' = " << val << '\n';
+    //std::cout << "setting uniform: '" << varName << "' = " << val << '\n';
     uniform_vars[varName] = val;
     this->setUniform(varName, val);
     return;
@@ -109,7 +109,7 @@ void Shader::ApplyUniform(std::string varName, float val) {
 
 void Shader::ApplyUniforms() {
     for (const auto& [uniform, val]: uniform_vars) {
-        std::cout << "setting uniform: '" << uniform << "' = " << val << '\n';
+        //std::cout << "setting uniform: '" << uniform << "' = " << val << '\n';
         this->setUniform(uniform, val);
     }
 }
