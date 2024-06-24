@@ -71,7 +71,7 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     
     void RedrawOutlines();  // for painting mode, outlines every cell around mouse
     void RedrawOverlay(); // also for painting mode; overlay of 
-    void ClearPreservedOverlays(); // for painting-mode
+    void ClearPreservedOverlays()  const; // for painting-mode
     void RecalculateModDensities() const; // updates preservedOverlays' mod.densities (when strength changes)
     
     void HandleEvent(const sf::Event&);

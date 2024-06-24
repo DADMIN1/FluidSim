@@ -1,5 +1,6 @@
 #include "MainGUI.hpp"
 #include "Gradient.hpp" // gradientWindow type-definition
+#include "Slider.hpp"
 
 #include <SFML/Window.hpp>  // defines sf::Event
 
@@ -183,13 +184,15 @@ void MainGUI::DrawDockingControls() // status and switches
     return;
 }
 
-// TODO: enforce min/max values
+
 void MainGUI::AdjustActiveSlider(sf::Keyboard::Key plus_minus)
 {
-    if (!lastactiveSlider) return;
+    if (!Slider::lastactive) return;
+    Slider& slider {*Slider::lastactive};
     constexpr float one_over_64  = 1.f/64.f;
     constexpr float one_over_255 = 1.f/255.f;
-    float valueDelta = std::abs(*lastactiveSlider) * one_over_64;
+    float value = *slider.heldvar;
+    float valueDelta = std::abs(value) * one_over_64;
     if (valueDelta < one_over_255) valueDelta = one_over_255;
     const bool isShiftPressed {sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)};
     if (isShiftPressed) valueDelta *= 4.f;
@@ -199,22 +202,17 @@ void MainGUI::AdjustActiveSlider(sf::Keyboard::Key plus_minus)
     {
         case sf::Keyboard::Add:
         case sf::Keyboard::Equal:
-             isPositive = true;
-        [[fallthrough]];
+             isPositive = true; [[fallthrough]];
         case sf::Keyboard::Subtract:
         case sf::Keyboard::Dash:
-            *lastactiveSlider += (isPositive? valueDelta : -valueDelta);
-            if (lastactiveSliderName == "Strength")
-            {
-                //shouldDrawGrid = true;
-                MouseParams->realptr->RecalculateModDensities();
-                lastactiveSlider = &MouseParams->strength;
-            }
-            else if (lastactiveSliderName == "turbulence_threshold")
-            {
-                turbulence_ptr->ApplyUniform("threshold", *turbulence_threshold_ptr);
-                //lastactiveSlider = turbulence_threshold_ptr; // done elsewhere
-            }
+        {
+            value += (isPositive? valueDelta : -valueDelta);
+            if(value < slider.min) value = slider.min;
+            if(value > slider.max) value = slider.max;
+            *slider.heldvar = value;
+            slider.Callback();
+            return;
+        }
         break;
         
         default: break; // shouldn't happen
@@ -241,7 +239,6 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
             {
                 switch(event.key.code)
                 {
-                    case sf::Keyboard::Q:
                     case sf::Keyboard::Escape:
                         ToggleEnabled();
                     break;
@@ -286,6 +283,20 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
             }
             break; */
             
+            // handling the Mouse side-buttons. Can't be handled through 'unhandled_keypresses' because it's the wrong event-type
+            case sf::Event::MouseButtonPressed:
+            {
+                switch (event.mouseButton.button)
+                {
+                    case 3: case 4: //side-buttons
+                        MouseParams->realptr->ClearPreservedOverlays();
+                    break;
+                    
+                    default: break;
+                }
+            }
+            break;
+            
             default:
             break;
         }
@@ -299,32 +310,29 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
 //  ---- SLIDER MACROS ----  //
 // ========================= //
 
-#define FMTSTRING(field) #field ": %." PRECISION() "f"
+#define FMTSTRING(fmtstring) #fmtstring ": %." PRECISION() "f"
 // FMTSTRING gets concatenated into a single string. ('name: %.3f')
 // the spaces are actually necessary; C++11 requires a space between literal and string macro
 
-#define VARIABLEPTR(input) &PSTRUCT()->PREFIX(input)
+#define VARIABLEPTR(field) &PSTRUCT()->PREFIX(field)
 
-// local variables 'min', 'max', and 'sliderflags' are expected to exist
-#define DEFSLIDER(name, field) ImGui::SliderFloat(#name, VARIABLEPTR(field), \
-    min, max, FMTSTRING(name), sliderflags)
+// local variables 'min', 'max', and 'xor_sliderflags' are expected to exist
+#define DEFSLIDER(name, field) static Slider slider_##name {#name, VARIABLEPTR(field), min, max, FMTSTRING(name), xor_sliderflags}
 
 // optional arg can be additional callbacks/hooks to execute on slider interation
-#define MAKESLIDER(field, ...) if(DEFSLIDER(field, field)) { \
-    lastactiveSlider = VARIABLEPTR(field);                   \
-    lastactiveSliderName = #field;                           \
-    __VA_OPT__(__VA_ARGS__;)                                 \
-}
+#define MAKESLIDER(field, ...) DEFSLIDER(field, field);\
+    if(slider_##field) {           \
+       slider_##field.Activate();  \
+       __VA_OPT__(__VA_ARGS__;)    \
+    }
 
 // when the slider's displayed text shouldn't be the field
-#define MAKESLIDERNAMED(name, field, ...)  \
-    if(DEFSLIDER(name, field)) {           \
-    lastactiveSlider = VARIABLEPTR(field); \
-    lastactiveSliderName = #name;          \
-    __VA_OPT__(__VA_ARGS__;)               \
-}
-// TODO: somehow store/map the name to the callback (so that AdjustActiveSlider can call it)
-
+#define MAKESLIDERNAMED(name, field, ...) DEFSLIDER(name, field);\
+    if(slider_##name) {          \
+       slider_##name.Activate(); \
+       __VA_OPT__(__VA_ARGS__;)  \
+    }
+// TODO: accept/set callback definitions within the macro
 
 // use the slider macros by defining input macros like this: 
 /* 
@@ -333,7 +341,7 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
     #define PRECISION() "3" 
     MAKESLIDER(Transfer)
 */
-// 'DEFSLIDER' expects local variables 'min', 'max', and 'sliderflags' to exist
+// 'DEFSLIDER' expects local variables 'min', 'max', and 'xor_sliderflags' to be defined. (xor_sliderflags is negated from default-flags)
 // the 'PREFIX' macro can be used to add a prefix to the field-name if it doesn't match the struct-member
 // (in the example, it would construct: 'SimulParams->momentumTransfer' instead: of 'SimulParams->Transfer')
 
@@ -344,12 +352,10 @@ void MainGUI::DrawSimulParams(float& next_height)
     ImGui::SetWindowPos({0, next_height});
     ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
     
-    auto sliderflags = ImGuiSliderFlags_NoRoundToFormat | \
-      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
-    
     // unfortunately negative timescales don't work properly
-    if (ImGui::SliderFloat("Timescale", &timestepMultiplier, 0.001f, 2.0f, "%.3fx", sliderflags))
-        lastactiveSlider = &timestepMultiplier;
+    static Slider slider_Timescale {"Timescale", &timestepMultiplier, 0.001f, 2.0f, "%.3fx"};
+    slider_Timescale();
+    
     ImGui::SeparatorText("Momentum");
     
     #define PREFIX(fieldname) momentum##fieldname
@@ -358,11 +364,10 @@ void MainGUI::DrawSimulParams(float& next_height)
     // you can define these as normal variables, but 'PRECISION' just cannot
     float min = 0.0f;
     float max = 1.0f;
+    constexpr int xor_sliderflags=ImGuiSliderFlags_None; // uses default-flags (definition required for slider-macros)
     
     MAKESLIDER(Transfer) 
     MAKESLIDER(Distribution)
-    //ImGui::SliderFloat("Transfer",     &SimulParams->momentumTransfer,     min, max, "Transfer: %.3f",     sliderflags); 
-    //ImGui::SliderFloat("Distribution", &SimulParams->momentumDistribution, min, max, "Distribution: %.3f", sliderflags);
     
     #undef PREFIX
     #undef PSTRUCT
@@ -403,18 +408,14 @@ void MainGUI::DrawFluidParams(float& next_height)
     }
     
     numlines += 5;
-    auto sliderflags = ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat\
-                     | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
-    // input is disabled because it's also activated with 'Tab' (normally Ctrl+click);
-    // which you're likely to hit accidentally when trying to activate mouse
-    
+    #define PREFIX(fieldname) fieldname
+    #define PSTRUCT() FluidParams
+    #define PRECISION() "3"
+    int xor_sliderflags = ImGuiSliderFlags_None;
     // you can define these as normal variables, but 'precision' just cannot
     float min = -3.0f;
     float max =  3.0f;
     
-    #define PREFIX(fieldname) fieldname
-    #define PSTRUCT() FluidParams
-    #define PRECISION() "3"
     // gravity sliders //
     MAKESLIDER(gravity , SimulParams->hasGravity  = true;);
     MAKESLIDER(xgravity, SimulParams->hasXGravity = true;);
@@ -430,7 +431,7 @@ void MainGUI::DrawFluidParams(float& next_height)
     #undef  PRECISION
     #define PRECISION() "2"
     min = -2.0f; max = 2.0f;
-    sliderflags ^= ImGuiSliderFlags_Logarithmic; // negating logarithmic flag
+    xor_sliderflags = ImGuiSliderFlags_Logarithmic; // negating logarithmic flag
     MAKESLIDER(bounceDampening);
     
     // TODO: button to reset defaults
@@ -468,8 +469,7 @@ void MainGUI::DrawFluidParams(float& next_height)
 // TODO: display size of mouse (RD) in UI
 void MainGUI::DrawMouseParams(float& next_height)
 {
-    auto sliderflags = ImGuiSliderFlags_NoRoundToFormat | \
-      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
+    constexpr int xor_sliderflags = ImGuiSliderFlags_None;
     
     sf::Color enabledColor = {0x1A, 0xEE, 0x22, 0xFF}; // green
     sf::Color disableColor = {0xFF, 0x20, 0x20, 0xFF}; // red
@@ -570,11 +570,14 @@ void MainGUI::DrawMouseParams(float& next_height)
     static bool shouldDrawGrid_old;
     MAKESLIDERNAMED(Strength, &MouseParams->strength, 
         shouldDrawGrid = true;
-        MouseParams->realptr->RecalculateModDensities();
-        lastactiveSlider = &MouseParams->strength;
     )
     if(ImGui::IsItemDeactivatedAfterEdit()) { shouldDrawGrid = shouldDrawGrid_old; } // waiting until slider is released
     else if(!ImGui::IsItemActive()) { shouldDrawGrid_old = shouldDrawGrid; }
+    
+    // creating the callback must be done in two steps, since capturing lambdas CANNOT be stored in any kind of function-pointer
+    // static lambda is also required, otherwise the second lambda would be forced to capture it. Alternative, a static member variable would work
+    static const auto Lambda = [ MouseParams=this->MouseParams ](){ MouseParams->realptr->RecalculateModDensities(); };
+    slider_Strength.Callback = [](){ Lambda(); };
     
     next_height += ImGui::GetWindowHeight();
     ImGui::End();
@@ -612,19 +615,15 @@ void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses)
     DrawFluidParams(next_height);
     DrawMouseParams(next_height);
     
-    constexpr int sliderflags_ttresh = ImGuiSliderFlags_NoRoundToFormat | ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput;
-    
     // TODO: disable if not using turbulence shader, and move to bottom of 'DrawFluidParams'
     ImGui::Begin("turbulence_threshold_section", nullptr, subwindow_flags);
     ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
     ImGui::SetWindowPos({0, next_height});
-    //SliderT turbulenceThresholdSlider {SliderT("threshold", 0.f, 255.f)};
-    if (ImGui::SliderFloat("turbulence_threshold", turbulence_threshold_ptr, 0.f, 1.f, "threshold: %.2f", sliderflags_ttresh))
-    {
-        lastactiveSliderName = "turbulence_threshold";
-        lastactiveSlider = turbulence_threshold_ptr;
-        turbulence_ptr->ApplyUniform("threshold", *turbulence_threshold_ptr);
-    }
+    
+    static Slider slider_tthreshold {"turbulence_threshold", turbulence_threshold_ptr, 0.f, 1.f, "threshold: %.2f", ImGuiSliderFlags_Logarithmic};
+    slider_tthreshold.Callback = [](){ turbulence_ptr->ApplyUniform("threshold", *turbulence_threshold_ptr); };
+    slider_tthreshold();
+    
     ImGui::End();
     next_height += 35;
     

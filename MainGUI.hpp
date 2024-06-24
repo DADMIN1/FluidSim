@@ -113,9 +113,6 @@ class MainGUI: public sf::RenderWindow
     
     #undef SETUPFUNCTION
     
-    // TODO: slider struct
-    float* lastactiveSlider {nullptr};
-    std::string lastactiveSliderName{};
     
     // internal draw functions
     void DrawFocusIndicator();

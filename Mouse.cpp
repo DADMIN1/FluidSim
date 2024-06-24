@@ -122,7 +122,8 @@ void Mouse_T::RecalculateModDensities() const
 }
 
 
-void Mouse_T::ClearPreservedOverlays() { 
+// this can be const because savedstate / preservedOverlays are both static
+void Mouse_T::ClearPreservedOverlays() const { 
     for (auto& [id, state]: preservedOverlays) {
         fieldptr->cells[id].density -= state.mod.density;
     }
