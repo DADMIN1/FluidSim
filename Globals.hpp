@@ -2,20 +2,20 @@
 #define FLUIDSIM_GLOBALS_HPP_INCLUDED
 
 
-constexpr int NUMCOLUMNS {64}, NUMROWS {64}; // layout (and number) of particles spawned during init
-constexpr int BOXWIDTH {1000}, BOXHEIGHT {1000}; // internal resolution (default window resolution should match)
+constexpr int NUMCOLUMNS{55}, NUMROWS{55}; // layout (and number) of particles spawned during init
+constexpr int BOXWIDTH{1000}, BOXHEIGHT{1000}; // internal resolution (default window resolution should match)
 //constexpr float DEFAULTRADIUS {float(BOXWIDTH/NUMCOLUMNS) / 2.0f};
-constexpr float DEFAULTRADIUS {10.0f}; // size of particles (sf::CircleShape)
+constexpr float DEFAULTRADIUS {10.f}; // size of particles (sf::CircleShape)
 constexpr int DEFAULTPOINTCOUNT {16}; // number of points used to draw each circle (particles)
-constexpr unsigned int SPATIAL_RESOLUTION {16}; // units/pixels per grid-cell for calculating diffusion/collision
+constexpr unsigned int SPATIAL_RESOLUTION{16}; // units/pixels per grid-cell for calculating diffusion/collision
 
 static_assert((DEFAULTRADIUS > 0.0), "Radius must be greater than 0");
 static_assert((DEFAULTPOINTCOUNT > 1), "Pointcount must be greater than ");
 static_assert((NUMCOLUMNS > 0) && (NUMROWS > 0), "Columns and Rows must be greater than 0");
 
 // if the field's dimensions are not evenly divisible by cell-size, we need an extra cell to cover the remainder
-constexpr unsigned int maxindexAdjX = ((BOXWIDTH  % SPATIAL_RESOLUTION) == 0? 1 : 0);
-constexpr unsigned int maxindexAdjY = ((BOXHEIGHT % SPATIAL_RESOLUTION) == 0? 1 : 0);
+constexpr int maxindexAdjX = ((BOXWIDTH  % SPATIAL_RESOLUTION)? -1 : 0 );
+constexpr int maxindexAdjY = ((BOXHEIGHT % SPATIAL_RESOLUTION)? -1 : 0 );
 // the order is correct; it's subtracted from the max-index (because normally: maxIndex = size-1)
 
 // calculations for initial positioning of particles

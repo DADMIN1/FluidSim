@@ -346,7 +346,7 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
 // (in the example, it would construct: 'SimulParams->momentumTransfer' instead: of 'SimulParams->Transfer')
 
 
-void MainGUI::DrawSimulParams(float& next_height)
+float MainGUI::DrawSimulParams(float next_height)
 {
     ImGui::Begin("Simulation Parameters", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
     ImGui::SetWindowPos({0, next_height});
@@ -373,38 +373,44 @@ void MainGUI::DrawSimulParams(float& next_height)
     #undef PSTRUCT
     #undef PRECISION
     
-    //next_height += 50.f;
     next_height += ImGui::GetWindowHeight(); // 'GetWindowHeight' returns height of current section
     ImGui::End();
+    return next_height;
 }
 
 
-void MainGUI::DrawFluidParams(float& next_height)
+float MainGUI::DrawFluidParams(float next_height)
 {
-    if (!FluidParams) return;  // TODO: give some kind of indicator that it's been invalidated
+    if (!FluidParams) return next_height; // TODO: give some kind of indicator that it's been invalidated
     //ImGui::Separator();
     ImGui::Begin("Fluid Parameters", nullptr, subwindow_flags^ImGuiWindowFlags_NoTitleBar);
     ImGui::SetWindowPos({0, next_height});
     int numlines = 0;
     
-    sf::Color enabledColor = {0x1A, 0xEE, 0x22, 0xFF}; // green
-    sf::Color disableColor = {0xFF, 0x20, 0x20, 0xFF}; // red
+    // seems slightly slower with const
+    const sf::Color enabledColor  {0x1A, 0xEE, 0x22, 0xFF}; // green
+    const sf::Color disableColor  {0xFF, 0x20, 0x20, 0xFF}; // red
+    const sf::Color inactiveColor {0x5F, 0x5F, 0x5F, 0xFF}; // grey
     
-    numlines += 2;
+    numlines += 1; // gravity & xgravity are on the same line
     if (SimulParams->hasGravity) {
         ImGui::Text("Gravity:");  ImGui::SameLine();
         ImGui::TextColored(enabledColor, "Enabled");
     } else {
-        ImGui::TextColored(sf::Color{0x5F, 0x5F, 0x5F, 0xFF}, "Gravity:");
-        ImGui::SameLine();   ImGui::TextColored(disableColor, "Disabled");
+        ImGui::TextColored(inactiveColor, "Gravity:");
+        ImGui::SameLine(); ImGui::TextColored(disableColor, "Disabled");
     }
     
+    ImGui::SameLine(0, 8.0f);
+    ImGui::TextColored(inactiveColor-sf::Color{0,0,0,0x9F}, "|");
+    ImGui::SameLine(0, 8.0f);
+    
     if (SimulParams->hasXGravity) {
-        ImGui::Text("XGravity:");  ImGui::SameLine();
+        ImGui::Text("XGravity:"); ImGui::SameLine();
         ImGui::TextColored(enabledColor, "Enabled");
     } else {
-        ImGui::TextColored(sf::Color{0x5F, 0x5F, 0x5F, 0xFF}, "XGravity:");
-        ImGui::SameLine();   ImGui::TextColored(disableColor, "Disabled");
+        ImGui::TextColored(inactiveColor, "XGravity:");
+        ImGui::SameLine(); ImGui::TextColored(disableColor, "Disabled");
     }
     
     numlines += 5;
@@ -445,15 +451,6 @@ void MainGUI::DrawFluidParams(float& next_height)
     MAKESLIDERNAMED(Min, &Fluid::gradient_thresholdLow ); max = 75.f;
     MAKESLIDERNAMED(Max, &Fluid::gradient_thresholdHigh);
     
-    numlines += 1;
-    ImGui::Separator();
-    ImGui::Text("Turbulence:"); ImGui::SameLine();
-    if (FluidParams->realptr->isTurbulent) 
-         ImGui::TextColored({0xFF, 0x00, 0x08, 0xFF}, "Enabled" );
-    else ImGui::TextColored({0x00, 0x40, 0xFF, 0xFF}, "Disabled");
-    ImGui::Separator();
-    
-    
     #undef PREFIX
     #undef PSTRUCT
     #undef PRECISION
@@ -462,31 +459,32 @@ void MainGUI::DrawFluidParams(float& next_height)
     ImGui::SetWindowSize({m_width, 25.0f*numlines});
     next_height += 25.0f*numlines;
     ImGui::End();
-    //ImGui::Separator();
-    return;
+    
+    return next_height;
 }
 
+
 // TODO: display size of mouse (RD) in UI
-void MainGUI::DrawMouseParams(float& next_height)
+float MainGUI::DrawMouseParams(float next_height)
 {
     constexpr int xor_sliderflags = ImGuiSliderFlags_None;
     
-    sf::Color enabledColor = {0x1A, 0xEE, 0x22, 0xFF}; // green
-    sf::Color disableColor = {0xFF, 0x20, 0x20, 0xFF}; // red
+    const sf::Color enabledColor {0x1A, 0xEE, 0x22, 0xFF}; // green
+    const sf::Color disableColor {0xFF, 0x20, 0x20, 0xFF}; // red
     // creates an enabled/disabled line of text from a bool, with colors
-    [[maybe_unused]] auto BooleanText = [&, enabledColor, disableColor] (const char* label, bool B)
+    [[maybe_unused]] auto BooleanText = [&enabledColor, &disableColor](const char* label, bool B)
     {
         if(B) { 
             ImGui::TextColored(enabledColor, "%s", label); 
-            ImGui::SameLine(); ImGui::Text("Enabled" ); }
+            ImGui::SameLine();  ImGui::Text("Enabled"); }
         else  {
             ImGui::TextColored(disableColor, "%s", label);
             ImGui::SameLine(); ImGui::TextDisabled("Disabled"); 
-            }
+        }
     };
     
     // applies the colors in the opposite order
-    [[maybe_unused]] auto BooleanTextFlip = [&, enabledColor, disableColor] (const char* label, bool B)
+    [[maybe_unused]] auto BooleanTextFlip = [&enabledColor, &disableColor](const char* label, bool B)
     {
         if(B) { 
             ImGui::Text("%s", label);
@@ -498,7 +496,7 @@ void MainGUI::DrawMouseParams(float& next_height)
     };
     
     // Selects color for status text
-    auto ModeColor = [](const Mouse_T::Mode& m) -> ImVec4 {
+    auto ModeColor = [](const Mouse_T::Mode& m) {
         switch(m) {
             case (Mouse_T::Mode::None):     return sf::Color{0xAA, 0xAA, 0xAA, 0xCC};
             case (Mouse_T::Mode::Push):     return sf::Color::Cyan;
@@ -506,14 +504,14 @@ void MainGUI::DrawMouseParams(float& next_height)
             case (Mouse_T::Mode::Disabled): return sf::Color{0xAA, 0xAA, 0xAA, 0x77};
             
             default:
-            case (Mouse_T::Mode::Drag):
-            case (Mouse_T::Mode::Fill):
-            case (Mouse_T::Mode::Erase):
-            return {0xFF, 0xFF, 0xFF, 0xFF};
+              case (Mouse_T::Mode::Drag):
+              case (Mouse_T::Mode::Fill):
+              case (Mouse_T::Mode::Erase):
+            return sf::Color{0xFF, 0xFF, 0xFF, 0xFF};
         }
     };
     
-    sf::Color modeColor = ModeColor(this->MouseParams->mode);
+    const sf::Color modeColor = ModeColor(this->MouseParams->mode);
     ImGui::PushStyleColor(ImGuiCol_Border    , modeColor-sf::Color{0x22222222});
     ImGui::PushStyleColor(ImGuiCol_TitleBg   , modeColor-sf::Color{0x20202077});
     ImGui::PushStyleColor(ImGuiCol_ChildBg   , modeColor-sf::Color{0x111111BB});
@@ -579,11 +577,37 @@ void MainGUI::DrawMouseParams(float& next_height)
     static const auto Lambda = [ MouseParams=this->MouseParams ](){ MouseParams->realptr->RecalculateModDensities(); };
     slider_Strength.Callback = [](){ Lambda(); };
     
+    ImGui::Separator();
     next_height += ImGui::GetWindowHeight();
     ImGui::End();
-    return;
+    return next_height;
 }
 
+
+float MainGUI::DrawTurbSection(float next_height)
+{
+    ImGui::Begin("turbulence_section", nullptr, subwindow_flags);
+    ImGui::SetWindowPos({0, next_height});
+    ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
+    
+    // TODO: disable if not using turbulence shader
+    bool isTurbulent = FluidParams->realptr->isTurbulent; // TODO: need a better condition than this (check if the appropriate shader is active)
+    
+    ImGui::Text("Turbulence:"); ImGui::SameLine();
+    if (isTurbulent)
+         ImGui::TextColored({0xFF, 0x00, 0x08, 0xFF}, "Enabled" );
+    else ImGui::TextColored({0x00, 0x40, 0xFF, 0xFF}, "Disabled");
+    
+    if (!isTurbulent) ImGui::BeginDisabled();
+    static Slider slider_tthreshold {"shader parameter", turbulence_threshold_ptr, 0.f, 1.f, "threshold: %.2f", ImGuiSliderFlags_Logarithmic};
+    slider_tthreshold.Callback = [](){ turbulence_ptr->ApplyUniform("threshold", *turbulence_threshold_ptr); };
+    slider_tthreshold();
+    if (!isTurbulent) ImGui::EndDisabled();
+    
+    next_height += ImGui::GetWindowHeight();
+    ImGui::End();
+    return next_height;
+}
 
 
 void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses) 
@@ -611,21 +635,11 @@ void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses)
     ImGui::End(); // Top section (Main)
     
     // Simulation Parameters
-    DrawSimulParams(next_height);
-    DrawFluidParams(next_height);
-    DrawMouseParams(next_height);
+    next_height = DrawSimulParams(next_height);
+    next_height = DrawFluidParams(next_height);
+    next_height = DrawTurbSection(next_height);
+    next_height = DrawMouseParams(next_height);
     
-    // TODO: disable if not using turbulence shader, and move to bottom of 'DrawFluidParams'
-    ImGui::Begin("turbulence_threshold_section", nullptr, subwindow_flags);
-    ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
-    ImGui::SetWindowPos({0, next_height});
-    
-    static Slider slider_tthreshold {"turbulence_threshold", turbulence_threshold_ptr, 0.f, 1.f, "threshold: %.2f", ImGuiSliderFlags_Logarithmic};
-    slider_tthreshold.Callback = [](){ turbulence_ptr->ApplyUniform("threshold", *turbulence_threshold_ptr); };
-    slider_tthreshold();
-    
-    ImGui::End();
-    next_height += 35;
     
     // Demo-Window Toggle Button
     ImGui::Begin("DemoToggle", nullptr, subwindow_flags);

@@ -84,9 +84,10 @@ class MainGUI: public sf::RenderWindow
     FluidParameters* FluidParams {nullptr};
     SimulParameters* SimulParams {nullptr};
     MouseParameters* MouseParams {nullptr};
-    void DrawFluidParams(float& start_height); // modifies parameter
-    void DrawSimulParams(float& start_height);
-    void DrawMouseParams(float& start_height);
+    float DrawFluidParams(float start_height);
+    float DrawSimulParams(float start_height);
+    float DrawMouseParams(float start_height);
+    float DrawTurbSection(float start_height);
     
     
     // initializes a 'Parameter' struct and sets the corresponding 'Params' pointer (above)

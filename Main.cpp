@@ -266,7 +266,7 @@ int main(int argc, char** argv)
             case sf::Keyboard::Num4:
             case sf::Keyboard::Num5:
             {
-                std::string previous_name = Shader::current->name;
+                const std::string previous_name = Shader::current->name;
                 //Shader* selectedShader = shader_map.at(event.key.code);
                 shader_map.at(keycode)->InvokeSwitch();
                 // enable transparency and turbulence-mode automatically
@@ -277,6 +277,7 @@ int main(int argc, char** argv)
                         std::cout << "window clears " << (windowClearDisabled ? "enabled" : "disabled") << "\n";
                     }
                 }
+                else { if(simulation.ToggleTurbulence()) simulation.ToggleTurbulence(); } // disabling
                 // TODO: restore previous settings for turbulence, transparency, and window-clears
             }
             break;
