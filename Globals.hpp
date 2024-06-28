@@ -9,20 +9,8 @@ constexpr float DEFAULTRADIUS {10.f}; // size of particles (sf::CircleShape)
 constexpr int DEFAULTPOINTCOUNT {16}; // number of points used to draw each circle (particles)
 constexpr unsigned int SPATIAL_RESOLUTION{16}; // units/pixels per grid-cell for calculating diffusion/collision
 
-static_assert((DEFAULTRADIUS > 0.0), "Radius must be greater than 0");
-static_assert((DEFAULTPOINTCOUNT > 1), "Pointcount must be greater than ");
 static_assert((NUMCOLUMNS > 0) && (NUMROWS > 0), "Columns and Rows must be greater than 0");
 
-// if the field's dimensions are not evenly divisible by cell-size, we need an extra cell to cover the remainder
-constexpr int maxindexAdjX = ((BOXWIDTH  % SPATIAL_RESOLUTION)? -1 : 0 );
-constexpr int maxindexAdjY = ((BOXHEIGHT % SPATIAL_RESOLUTION)? -1 : 0 );
-// the order is correct; it's subtracted from the max-index (because normally: maxIndex = size-1)
-
-// calculations for initial positioning of particles
-constexpr float INITIALSPACINGX {BOXWIDTH/NUMCOLUMNS};
-constexpr float INITIALSPACINGY {BOXHEIGHT/NUMROWS};
-constexpr float INITIALOFFSETX {(INITIALSPACINGX/2.0f) - DEFAULTRADIUS};
-constexpr float INITIALOFFSETY {(INITIALSPACINGY/2.0f) - DEFAULTRADIUS};
 
 // diffusion stuff
 constexpr int radialdist_limit{5}; // highest radial_distance implemented by GetNeighbors

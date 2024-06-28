@@ -80,10 +80,11 @@ class Cell: public sf::RectangleShape {
     friend class Mouse_T;
     
     // maybe better in Coord class??
-    static constexpr unsigned int maxIX = (BOXWIDTH/SPATIAL_RESOLUTION - maxindexAdjX);
-    static constexpr unsigned int maxIY = (BOXHEIGHT/SPATIAL_RESOLUTION - maxindexAdjY);
-    static constexpr unsigned int maxSizeX = maxIX+1;
-    static constexpr unsigned int maxSizeY = maxIY+1;
+    // if the field's dimensions are not evenly divisible by cell-size, we need an extra cell to cover the remainder
+    static constexpr unsigned int maxIX = (BOXWIDTH /SPATIAL_RESOLUTION + ((BOXWIDTH %SPATIAL_RESOLUTION)? 1:0));
+    static constexpr unsigned int maxIY = (BOXHEIGHT/SPATIAL_RESOLUTION + ((BOXHEIGHT%SPATIAL_RESOLUTION)? 1:0));
+    static constexpr unsigned int arraySizeX = maxIX+1;
+    static constexpr unsigned int arraySizeY = maxIY+1;
     
     
     Cell()

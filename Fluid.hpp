@@ -96,16 +96,7 @@ class Fluid
     
     // multithreaded version
     void UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd, bool hasGravity, bool hasXGravity);
-    void Reset() {
-        int c{0}; int r{0};
-        for (Particle& particle: particles) {
-            particle.cellID = -1;
-            particle.velocity = {0,0};
-            if (++c >= NUMCOLUMNS) { c=0; ++r; }
-            particle.setPosition((c*INITIALSPACINGX)+INITIALOFFSETX, (r*INITIALSPACINGY)+INITIALOFFSETY);
-            // the particles still need their Cell-related variables set, and the cells need to have their density increased
-        }
-    }
+    void Reset();
 };
 
 

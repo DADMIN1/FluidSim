@@ -91,6 +91,12 @@ void Fluid::Particle::UpdateColor(const bool useTransparency)
 }
 
 
+// calculations for initial positioning of particles
+static constexpr float INITIALSPACINGX {BOXWIDTH/NUMCOLUMNS};
+static constexpr float INITIALSPACINGY {BOXHEIGHT/NUMROWS};
+static constexpr float INITIALOFFSETX {(INITIALSPACINGX/2.0f) - DEFAULTRADIUS};
+static constexpr float INITIALOFFSETY {(INITIALSPACINGY/2.0f) - DEFAULTRADIUS};
+
 bool Fluid::Initialize()
 {
     assert((bounceDampening >= 0.0) && (bounceDampening <= 1.0) && "collision-damping must be between 0 and 1");
@@ -112,6 +118,17 @@ bool Fluid::Initialize()
     return true;
 }
 
+void Fluid::Reset()
+{
+    int c{0}; int r{0};
+    for (Particle& particle: particles) {
+        particle.cellID = -1;
+        particle.velocity = {0,0};
+        if (++c >= NUMCOLUMNS) { c=0; ++r; }
+        particle.setPosition((c*INITIALSPACINGX)+INITIALOFFSETX, (r*INITIALSPACINGY)+INITIALOFFSETY);
+        // the particles still need their Cell-related variables set, and the cells need to have their density increased
+    }
+}
 
 float Fluid::Particle::Distance(const Particle& rh) const
 {

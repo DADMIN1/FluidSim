@@ -53,8 +53,8 @@ class DiffusionField
     // these are added with signed-ints in GetCellNeighbors (because the result might be negative); hence the assertion.
     static_assert((Cell::maxIX < __INT_MAX__) && (Cell::maxIY < __INT_MAX__), "max-indecies will overflow");
     
-    using CellMatrix = std::array<std::array<Cell*, Cell::maxSizeY>, Cell::maxSizeX>;
-    //using CellArray = std::array<Cell, ((maxSizeY)*(maxSizeX))>; // crashes
+    using CellMatrix = std::array<std::array<Cell*, Cell::arraySizeY>, Cell::arraySizeX>;
+    //using CellArray = std::array<Cell, ((arraySizeY)*(arraySizeX))>; // crashes
     using CellArray = std::vector<Cell>; // doesn't crash
     CellArray cells; // TODO: figure out how to do this with an array without crashing
     CellMatrix cellmatrix;
@@ -76,11 +76,11 @@ class DiffusionField
         if (!cellgrid_texture.create(BOXWIDTH, BOXHEIGHT))
             return false;
         
-        cells.reserve((Cell::maxSizeY)*(Cell::maxSizeX));
+        cells.reserve((Cell::arraySizeY)*(Cell::arraySizeX));
         
         unsigned int ID = 0;
-        for (unsigned int c{0}; c < (Cell::maxSizeX); ++c) {
-            for (unsigned int r{0}; r < (Cell::maxSizeY); ++r) {
+        for (unsigned int c{0}; c < (Cell::arraySizeX); ++c) {
+            for (unsigned int r{0}; r < (Cell::arraySizeY); ++r) {
                 //cells[ID] = Cell{c, r, ID};
                 Cell& newcell = cells.emplace_back(c, r, ID++);
                 cellmatrix[c][r] = &newcell;
