@@ -317,21 +317,26 @@ void MainGUI::HandleWindowEvents(std::vector<sf::Keyboard::Key>& unhandled_keypr
 #define VARIABLEPTR(field) &PSTRUCT()->PREFIX(field)
 
 // local variables 'min', 'max', and 'xor_sliderflags' are expected to exist
-#define DEFSLIDER(name, field) static Slider slider_##name {#name, VARIABLEPTR(field), min, max, FMTSTRING(name), xor_sliderflags}
+#define DEFSLIDER(name, field) static Slider slider_##name {"##"#name, VARIABLEPTR(field), min, max, FMTSTRING(name), xor_sliderflags}
+// Imgui hides text following a double-octothorpe (here it prevents the redundant label (since name is displayed in formatstring)
 
 // optional arg can be additional callbacks/hooks to execute on slider interation
 #define MAKESLIDER(field, ...) DEFSLIDER(field, field);\
     if(slider_##field) {           \
        slider_##field.Activate();  \
        __VA_OPT__(__VA_ARGS__;)    \
-    }
+    } \
+    [[maybe_unused]] bool resetButton_##field = slider_##field.ResetButton("Reset##"#field);
+// Reset-buttons need unique names, otherwise they all reset the same slider.
+// It also shouldn't match the slider's name, that causes it to act like the slider! (in addition to normal button behavior)
 
 // when the slider's displayed text shouldn't be the field
 #define MAKESLIDERNAMED(name, field, ...) DEFSLIDER(name, field);\
     if(slider_##name) {          \
        slider_##name.Activate(); \
        __VA_OPT__(__VA_ARGS__;)  \
-    }
+    } \
+    [[maybe_unused]] bool resetButton_##name = slider_##name.ResetButton("Reset##"#name);
 // TODO: accept/set callback definitions within the macro
 
 // use the slider macros by defining input macros like this: 
@@ -353,8 +358,10 @@ float MainGUI::DrawSimulParams(float next_height)
     ImGui::SetWindowSize({m_width, -1});  // -1 retains current size
     
     // unfortunately negative timescales don't work properly
-    static Slider slider_Timescale {"Timescale", &timestepMultiplier, 0.001f, 2.0f, "%.3fx"};
+    static Slider slider_Timescale {"##Timescale", &timestepMultiplier, 0.001f, 2.0f, "Timescale: %.3fx"};
     slider_Timescale();
+    ImGui::SameLine();
+    if(ImGui::Button("Reset##Timescale")) timestepMultiplier = 1.0f;
     
     ImGui::SeparatorText("Momentum");
     
@@ -563,12 +570,15 @@ float MainGUI::DrawMouseParams(float next_height)
     ImGui::Separator();
     ImGui::PopStyleColor(6);
     
-    float min =  1.f; float max =  255.f;
-    #define PRECISION()
+    float min{1.f}; float max{255.f};
+    #define PRECISION() // no decimal displayed
+    
     static bool shouldDrawGrid_old;
-    MAKESLIDERNAMED(Strength, &MouseParams->strength, 
+    DEFSLIDER(Strength, &MouseParams->strength);
+    if(slider_Strength) {
+        slider_Strength.Activate();
         shouldDrawGrid = true;
-    )
+    }
     if(ImGui::IsItemDeactivatedAfterEdit()) { shouldDrawGrid = shouldDrawGrid_old; } // waiting until slider is released
     else if(!ImGui::IsItemActive()) { shouldDrawGrid_old = shouldDrawGrid; }
     
@@ -576,6 +586,10 @@ float MainGUI::DrawMouseParams(float next_height)
     // static lambda is also required, otherwise the second lambda would be forced to capture it. Alternative, a static member variable would work
     static const auto Lambda = [ MouseParams=this->MouseParams ](){ MouseParams->realptr->RecalculateModDensities(); };
     slider_Strength.Callback = [](){ Lambda(); };
+    
+    if(slider_Strength.ResetButton("Reset##Strength")) { Lambda(); }
+    
+    #undef PRECISION
     
     ImGui::Separator();
     next_height += ImGui::GetWindowHeight();
@@ -598,11 +612,12 @@ float MainGUI::DrawTurbSection(float next_height)
          ImGui::TextColored({0xFF, 0x00, 0x08, 0xFF}, "Enabled" );
     else ImGui::TextColored({0x00, 0x40, 0xFF, 0xFF}, "Disabled");
     
-    if (!isTurbulent) ImGui::BeginDisabled();
-    static Slider slider_tthreshold {"shader parameter", turbulence_threshold_ptr, 0.f, 1.f, "threshold: %.2f", ImGuiSliderFlags_Logarithmic};
+    if(!isTurbulent) ImGui::BeginDisabled();
+    static Slider slider_tthreshold {"##shader_parameter", turbulence_threshold_ptr, 0.f, 1.f, "threshold: %.2f", ImGuiSliderFlags_Logarithmic};
     slider_tthreshold.Callback = [](){ turbulence_ptr->ApplyUniform("threshold", *turbulence_threshold_ptr); };
     slider_tthreshold();
-    if (!isTurbulent) ImGui::EndDisabled();
+    if(slider_tthreshold.ResetButton("Reset##tthreshold")) { slider_tthreshold.Callback(); }
+    if(!isTurbulent) ImGui::EndDisabled();
     
     next_height += ImGui::GetWindowHeight();
     ImGui::End();

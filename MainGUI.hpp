@@ -19,7 +19,7 @@
 
 class MainGUI: public sf::RenderWindow
 {
-    float m_width  {360}; // ImVec2 (used by SetWindowSize/Position) only holds floats
+    float m_width  {345}; // ImVec2 (used by SetWindowSize/Position) only holds floats
     float m_height {BOXHEIGHT};
     bool showDemoWindow {false};
     sf::Clock clock; // ImGui::SFML::Update() needs deltatime

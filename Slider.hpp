@@ -31,6 +31,7 @@ struct Slider
     const char* const name;   // text displayed on/beside slider
     const char* const format; // printf-style; formatting displayed value (heldvar)
     float* const heldvar;
+    const float originalValue;
     void (*Callback)() = [](){ return; }; // triggered on interaction
     const float min{0.0f};
     const float max{1.0f};
@@ -51,12 +52,19 @@ struct Slider
     void operator()() { if(this->operator bool()) Activate(); } // (implicitly) invokes the imgui constructor/object
     // manually-constructed Sliders (not using the Macros) must invoke either operator to actually create the imgui object
     
+    // TODO: create the buttonText string inside function
+    bool ResetButton(const char* buttonText) {
+        ImGui::SameLine();
+        bool returnval = ImGui::Button(buttonText);
+        if(returnval) { *heldvar = originalValue; /* Callback(); */ }
+        return returnval;
+    }
+    
     // TODO: pass callback as parameter
     Slider(const char* namestr, float* const varptr, float minp=0.0f, float maxp=1.0f, 
            const char* ffmtstr = {": %.3f"}, int xor_sliderflags=ImGuiSliderFlags_None)
-    : name{namestr}, format{ffmtstr}, 
-      heldvar{varptr}, min{minp}, max{maxp}, 
-      sliderflags {defaultflags xor xor_sliderflags}
+    : name{namestr}, format{ffmtstr}, heldvar{varptr}, originalValue{*varptr},
+      min{minp}, max{maxp}, sliderflags {defaultflags xor xor_sliderflags}
     { ; }
     
 };
