@@ -3,6 +3,8 @@
 
 //#include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>  // defines sf::Event
+#include <imgui.h> // required for imgui versionchecks
+#include <imgui-SFML.h> // imgui::SFML::Shutdown()
 
 #include "Simulation.hpp"
 #include "Mouse.hpp"
@@ -13,7 +15,9 @@
 #include "MainGUI.hpp"
 
 
-// TODO: overlay displaying stats for hovered cell/particles
+float timestepRatio{1.0f}; // normalizing timesteps to make physics independent of frame-rate
+float timestepMultiplier{1.0f};
+
 
 extern void EmbedMacroTest();  // MacroTest.cpp
 extern void PrintKeybinds();   // Keybinds.cpp
@@ -22,14 +26,8 @@ extern void PrintKeybinds();   // Keybinds.cpp
 extern void ModuloTest();
 extern void PrintComptimeCoords();
 
-
 // Cell.cpp
 extern void AdjacentCellsTest();
-
-constexpr int framerateCap{300}; // duplicated in 'MainGUI.cpp'
-float timestepRatio{1.0f/float(framerateCap/60.0f)};  // normalizing timesteps to make physics independent of frame-rate
-float timestepMultiplier {1.0f};
-
 
 // Mouse.cpp
 extern sf::RectangleShape hoverOutline;
@@ -37,12 +35,13 @@ bool windowClearDisabled{false};  // option used by the turbulence shader
 
 // for MainGUI.cpp (controlling VSync)
 sf::RenderWindow* mainwindowPtr{nullptr};
-GradientWindow_T* gradientWindowPtr{nullptr};
+sf::RenderWindow* gradientWindowPtr{nullptr}; // not 'GradientWindow_T'; otherwise MainGUI would require definition
 bool usingVsync {true};
 
 // cell-grid
 bool shouldDrawGrid {false};
 bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGrid; }
+// TODO: overlay displaying stats for hovered cell/particles
 
 
 int main(int argc, char** argv)
@@ -189,11 +188,7 @@ int main(int argc, char** argv)
             
             case sf::Keyboard::F2:
                 if (gradientWindow.isOpen()) { gradientWindow.close(); }
-                else
-                {
-                    gradientWindow.Create(usingVsync, mainwindow.getPosition().x);
-                    gradientWindow.FrameLoop();
-                }
+                else { gradientWindow.Create(usingVsync, mainwindow.getPosition().x); }
             break;
             
             case sf::Keyboard::Tilde:

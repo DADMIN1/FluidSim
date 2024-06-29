@@ -13,20 +13,14 @@
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Window/WindowStyle.hpp>
 
-#include <imgui.h>
-#include <imgui-SFML.h>
 
-
-class MainGUI: public sf::RenderWindow
+class MainGUI: sf::RenderWindow
 {
     float m_width  {345}; // ImVec2 (used by SetWindowSize/Position) only holds floats
     float m_height {BOXHEIGHT};
     bool showDemoWindow {false};
     sf::Clock clock; // ImGui::SFML::Update() needs deltatime
-    ImGuiContext* m_context;
-    //ImGuiIO& imguiIO;  // you're not supposed to store this?
     
-    friend int main(int, char**);
     
     struct FluidParameters
     {
@@ -134,17 +128,16 @@ class MainGUI: public sf::RenderWindow
     void FollowMainWindow(); // updates window position/height to match main
     
     
+    friend int main(int, char**);
+    
     // constructors do not actually create the window; call '.create()' later
-    MainGUI(): sf::RenderWindow(), 
-    m_context{ImGui::CreateContext()}, /* imguiIO{ImGui::GetIO()}, */ initErrorFlag{Initialize()}
+    MainGUI(): sf::RenderWindow(), initErrorFlag{Initialize()}
     { ; }
     
     ~MainGUI() {
         if (FluidParams) { delete FluidParams; }
         if (SimulParams) { delete SimulParams; }
         if (MouseParams) { delete MouseParams; }
-        ImGui::DestroyContext(m_context);
-        //ImGui::SFML::Shutdown();  // destroys ALL! contexts
     }
 };
 

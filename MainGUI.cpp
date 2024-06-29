@@ -1,26 +1,25 @@
 #include "MainGUI.hpp"
-#include "Gradient.hpp" // gradientWindow type-definition
 #include "Slider.hpp"
-
-#include <SFML/Window.hpp>  // defines sf::Event
+#include "Shader.hpp" // turbulence_ptrs
 
 #include <iostream> // only used in MainGUI::Initialize()
 
-#include "Shader.hpp"
-Shader* turbulence_ptr = nullptr;
-float* turbulence_threshold_ptr = nullptr;
+#include <SFML/Window.hpp>  // defines sf::Event
+#include <imgui.h>
+#include <imgui-SFML.h>
 
 
 // Main.cpp
 extern bool usingVsync;
-constexpr int framerateCap{300}; // const/constexpr makes 'extern' fail, so this is duplicated here
 extern sf::RenderWindow* mainwindowPtr;
-extern GradientWindow_T* gradientWindowPtr;
-
-// Main.cpp
+extern sf::RenderWindow* gradientWindowPtr; // only for windowcount and setting vsync
 // required for Mouse controls (when painting-debug is toggled)
 extern bool shouldDrawGrid;
 extern bool ToggleGridDisplay();
+
+// required for 'threshold' slider. set during 'Initialize()'
+static Shader* turbulence_ptr = nullptr;
+static float* turbulence_threshold_ptr = nullptr;
 
 
 // bitwise-OR flags together flags (into zero)
@@ -50,16 +49,12 @@ constexpr ImGuiChildFlags child_flags { 0
 
 bool MainGUI::Initialize()
 {
-    //setFramerateLimit(framerateCap);
     setVerticalSyncEnabled(usingVsync);
     if (!ImGui::SFML::Init(*this)) {
         std::cerr << "imgui-sfml failed to init! exiting.\n";
         return true; //error has occcured
     }
-    
-    // creating the context (in constructor) already sets current context; DON'T call again (double-free)
-    //m_context = ImGui::CreateContext();
-    //ImGui::SetCurrentContext(m_context);
+    // ImGuiContext gets created by 'ImGui::SFML::Init()'
     
     ImGuiIO& imguiIO = ImGui::GetIO(); // required for configflags and framerate
     //imguiIO.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -88,7 +83,6 @@ void MainGUI::Create()
     constexpr auto m_style = sf::Style::Titlebar | sf::Style::Resize | sf::Style::Close;
     // sf::Style::Default = Titlebar | Resize | Close
     sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "FLUIDSIM - Main GUI", m_style);
-    // setFramerateLimit(framerateCap);
     setVerticalSyncEnabled(usingVsync);
     clock.restart();
     return;
