@@ -260,7 +260,7 @@ void*                               GImGuiDemoMarkerCallbackUserData = NULL;
 // Demonstrate most Dear ImGui features (this is big function!)
 // You may execute this function to experiment with the UI and understand what it does.
 // You may then search for keywords in the code when you are interested by a specific feature.
-void ImGui::ShowDemoWindow(bool* p_open)
+void ImGui::ShowDemoWindow(bool* p_open, ImGuiWindowFlags p_flags)
 {
     // Exceptionally add an extra assert here for people confused about initial Dear ImGui setup
     // Most functions would normally just assert/crash if the context is missing.
@@ -318,17 +318,17 @@ void ImGui::ShowDemoWindow(bool* p_open)
         ImGui::ShowAboutWindow(&show_tool_about);
 
     // Demonstrate the various window flags. Typically you would just use the default!
-    static bool no_titlebar = false;
-    static bool no_scrollbar = false;
-    static bool no_menu = false;
-    static bool no_move = false;
-    static bool no_resize = false;
-    static bool no_collapse = false;
-    static bool no_close = false;
-    static bool no_nav = false;
-    static bool no_background = false;
-    static bool no_bring_to_front = false;
-    static bool unsaved_document = false;
+    static bool no_titlebar       = p_flags & ImGuiWindowFlags_NoTitleBar;
+    static bool no_scrollbar      = p_flags & ImGuiWindowFlags_NoScrollbar;
+    static bool no_menu           = !(p_flags & ImGuiWindowFlags_MenuBar); // this one isn't negative
+    static bool no_move           = p_flags & ImGuiWindowFlags_NoMove;
+    static bool no_resize         = p_flags & ImGuiWindowFlags_NoResize;
+    static bool no_collapse       = p_flags & ImGuiWindowFlags_NoCollapse;
+    static bool no_close          = false;
+    static bool no_nav            = p_flags & ImGuiWindowFlags_NoNav;
+    static bool no_background     = p_flags & ImGuiWindowFlags_NoBackground;
+    static bool no_bring_to_front = p_flags & ImGuiWindowFlags_NoBringToFrontOnFocus;
+    static bool unsaved_document  = p_flags & ImGuiWindowFlags_UnsavedDocument;
 
     ImGuiWindowFlags window_flags = 0;
     if (no_titlebar)        window_flags |= ImGuiWindowFlags_NoTitleBar;
@@ -345,9 +345,10 @@ void ImGui::ShowDemoWindow(bool* p_open)
 
     // We specify a default position/size in case there's no data in the .ini file.
     // We only do it to make the demo applications a little more welcoming, but typically this isn't required.
-    const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+    /* const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 650, main_viewport->WorkPos.y + 20), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(550, 680), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(550, 680), ImGuiCond_FirstUseEver); */
+    // disabled because it screws with manual placements / layouts, and isn't useful.
 
     // Main body of the Demo window starts here.
     if (!ImGui::Begin("Dear ImGui Demo", p_open, window_flags))
@@ -8598,7 +8599,7 @@ void ShowExampleAppDocuments(bool* p_open)
 #else
 
 void ImGui::ShowAboutWindow(bool*) {}
-void ImGui::ShowDemoWindow(bool*) {}
+void ImGui::ShowDemoWindow(bool*, ImGuiWindowFlags) {}
 void ImGui::ShowUserGuide() {}
 void ImGui::ShowStyleEditor(ImGuiStyle*) {}
 
