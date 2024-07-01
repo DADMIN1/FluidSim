@@ -8,7 +8,7 @@
 
 #include "Simulation.hpp"
 #include "Mouse.hpp"
-#include "Gradient.hpp"
+#include "GradientWindow.hpp"
 //#include "ValarrayTest.hpp"
 #include "Threading.hpp"
 #include "Shader.hpp"
@@ -34,8 +34,8 @@ extern sf::RectangleShape hoverOutline;
 bool windowClearDisabled{false};  // option used by the turbulence shader
 
 // for MainGUI.cpp (controlling VSync)
-sf::RenderWindow* mainwindowPtr{nullptr};
-sf::RenderWindow* gradientWindowPtr{nullptr}; // not 'GradientWindow_T'; otherwise MainGUI would require definition
+sf::RenderWindow* mainwindowPtr {nullptr};
+sf::RenderWindow* gradientWinPtr{nullptr}; // pointing to base-class, not 'GradientWindow*'; otherwise MainGUI would require definition
 bool usingVsync {true};
 
 // cell-grid
@@ -46,7 +46,7 @@ bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGr
 
 int main(int argc, char** argv)
 {
-    std::cout << "fluid sim\n";
+    std::cout << "FLUIDSIM\n";
     //assert(false && "asserts are active!");
     
     for (int C{0}; C < argc; ++C) {
@@ -78,15 +78,20 @@ int main(int argc, char** argv)
     // mainwindow.setFramerateLimit(framerateCap);
     mainwindow.setVerticalSyncEnabled(usingVsync);
     
-    GradientWindow_T gradientWindow{};
-    gradientWindow.setPosition({mainwindow.getPosition().x, 360});
+    GradientWindow gradientWindow{};
+    if(!gradientWindow.Initialize(mainwindow.getPosition().x)) {
+        std::cerr << "GradientWindow initialization failed! exiting.\n";
+        return 4;
+    }
+    //gradientWindow.Create();  // not necessary to create the window, apparently
+    gradientWindow.AdjustPosition();
     
-        mainwindowPtr = &mainwindow;
-    gradientWindowPtr = &gradientWindow;
+     mainwindowPtr = &mainwindow;
+    gradientWinPtr = &gradientWindow;
     
     Simulation simulation{};
     if (!simulation.Initialize()) {
-        std::cerr << "simulation failed to initialize!\n";
+        std::cerr << "simulation failed to initialize! exiting.\n";
         return 1;
     }
     
@@ -185,11 +190,24 @@ int main(int argc, char** argv)
             case sf::Keyboard::F1:
                 PrintKeybinds();
             break;
+             
+             /* Toggling window-visibility screws with the FPS calc in MainGUI (NumWindowsOpen), because it still counts as open.
+              and there's no easy way to check for 'isEnabled' (because it only has access to the base-class 'RenderWindow')
+              Simply opening/closing the window repeatedly works fine, and doesn't seem to cause any problems (yet) */
             
-            case sf::Keyboard::F2:
-                if (gradientWindow.isOpen()) { gradientWindow.close(); }
-                else { gradientWindow.Create(usingVsync, mainwindow.getPosition().x); }
-            break;
+            //#define GRADIENTWINDOW_NOCLOSE
+            #ifdef GRADIENTWINDOW_NOCLOSE
+              case sf::Keyboard::F2:
+                  gradientWindow.stored_xposition = mainwindow.getPosition().x;
+                  if (!gradientWindow.isOpen()) {gradientWindow.isEnabled=true; gradientWindow.Create();}
+                  else gradientWindow.ToggleEnabled(); // calls AdjustPosition
+              break;
+            #else // using close instead of 'ToggleEnabled'
+              case sf::Keyboard::F2:
+                  if (gradientWindow.isOpen()) { gradientWindow.close(); }
+                  else { gradientWindow.isEnabled=true; gradientWindow.Create(); }
+              break;
+            #endif
             
             case sf::Keyboard::Tilde:
                 // just pass focus to mainGUI if it's already open
@@ -303,15 +321,15 @@ int main(int argc, char** argv)
     {
         // imgui needs window and deltatime. You can pass mousePosition and displaySize instead of window
         frametimer.restart();
-        sf::Event event;
         std::vector<sf::Keyboard::Key> unhandled_keypresses{};
         // 'unhandled_keypresses' is used as an output parameter so that it can be passed to multiple other windows
         // and it puts the declaration in the outer scope
         
-        if (gradientWindow.isOpen()) gradientWindow.FrameLoop();
+        if (gradientWindow.isOpen()) gradientWindow.FrameLoop(); 
         if (mainGUI.isOpen()) mainGUI.FrameLoop(unhandled_keypresses);
         for (sf::Keyboard::Key key: unhandled_keypresses) { HandleKeypress(key); }
         
+        sf::Event event;
         while (mainwindow.pollEvent(event))
         {
             switch(event.type)

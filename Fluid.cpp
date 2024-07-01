@@ -85,7 +85,7 @@ void Fluid::Particle::UpdateColor(const bool useTransparency)
         float scale = 1.0f + ((Fluid::isParticleScalingPositive)? particleScaling : -particleScaling);
         setScale({scale, scale});
     }
-    auto&&[r, g, b, a] = Gradient_T::Lookup(speedindex);
+    const auto&&[r, g, b, a] = Gradient_T::LookupDefault(speedindex);
     setFillColor({r,g,b,alpha});
     return;
 }

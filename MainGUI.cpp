@@ -12,7 +12,7 @@
 // Main.cpp
 extern bool usingVsync;
 extern sf::RenderWindow* mainwindowPtr;
-extern sf::RenderWindow* gradientWindowPtr; // only for windowcount and setting vsync
+extern sf::RenderWindow* gradientWinPtr; // only for windowcount and setting vsync
 // required for Mouse controls (when painting-debug is toggled)
 extern bool shouldDrawGrid;
 extern bool ToggleGridDisplay();
@@ -23,7 +23,8 @@ static float* turbulence_threshold_ptr = nullptr;
 
 
 // bitwise-OR flags together flags (into zero)
-constexpr ImGuiWindowFlags window_flags { 0 
+constexpr ImGuiWindowFlags window_flags { 
+      ImGuiWindowFlags_None
     //| ImGuiWindowFlags_NoTitleBar
     | ImGuiWindowFlags_NoMove
     | ImGuiWindowFlags_NoResize
@@ -32,18 +33,43 @@ constexpr ImGuiWindowFlags window_flags { 0
     //| ImGuiWindowFlags_MenuBar // adds a menubar
     //| ImGuiWindowFlags_AlwaysAutoResize  // doesn't allow manual resizing (of width)
 };
-constexpr ImGuiWindowFlags subwindow_flags { 0
+constexpr ImGuiWindowFlags subwindow_flags {
+      ImGuiWindowFlags_None
     | ImGuiWindowFlags_NoTitleBar
     | ImGuiWindowFlags_NoMove
     | ImGuiWindowFlags_NoResize
     | ImGuiWindowFlags_NoCollapse
     | ImGuiWindowFlags_NoScrollbar
 };
-constexpr ImGuiChildFlags child_flags { 0
-    //| ImGuiChildFlags_ResizeY
-    | ImGuiChildFlags_AutoResizeY
-    //| ImGuiChildFlags_AutoResizeX
-    | ImGuiChildFlags_AlwaysAutoResize
+constexpr ImGuiChildFlags child_flags {
+      ImGuiChildFlags_None
+    | ImGuiChildFlags_Border  // apparently this always has to be set for backwards-compatibility?
+    // | ImGuiChildFlags_ResizeX           // Allow resize from right border (layout direction). Enable .ini saving (unless ImGuiWindowFlags_NoSavedSettings passed to window flags)
+    // | ImGuiChildFlags_ResizeY           // Allow resize from bottom border (layout direction)
+    // ResizeX/Y are not allowed in combination with "AlwaysAutoResize"!! (Assert fails @imgui/imgui.cpp:5440: 'ImGui::BeginChildEx')
+    | ImGuiChildFlags_AutoResizeX       // Enable auto-resizing width. Read "IMPORTANT: Size measurement" details above.
+    | ImGuiChildFlags_AutoResizeY       // Enable auto-resizing height. Read "IMPORTANT: Size measurement" details above.
+    | ImGuiChildFlags_AlwaysAutoResize  // Combined with AutoResizeX/AutoResizeY. Always measure size even when child is hidden, always return true, always disable clipping optimization! NOT RECOMMENDED.
+};
+
+constexpr ImGuiWindowFlags demowindow_flags {
+      ImGuiWindowFlags_None 
+    | ImGuiWindowFlags_MenuBar
+    // | ImGuiWindowFlags_NoTitleBar
+    | ImGuiWindowFlags_NoCollapse
+    | ImGuiWindowFlags_NoMove
+    //| ImGuiWindowFlags_AlwaysAutoResize  // Resize every window to its content every frame
+    | ImGuiWindowFlags_NoSavedSettings  // Never load/save settings in .ini file  // interferes with Debug/demo window?
+    | ImGuiWindowFlags_HorizontalScrollbar // disallowed by default
+    | ImGuiWindowFlags_NoFocusOnAppearing  // Disable taking focus when transitioning from hidden to visible state
+    | ImGuiWindowFlags_NoBringToFrontOnFocus  // prevent it from overlapping other debug windows
+    //| ImGuiWindowFlags_AlwaysVerticalScrollbar // Always show vertical scrollbar (even if ContentSize.y < Size.y)
+    //| ImGuiWindowFlags_AlwaysHorizontalScrollbar  // Always show horizontal scrollbar (even if ContentSize.x < Size.x)
+    | ImGuiWindowFlags_NoNavInputs  // No gamepad/keyboard navigation within the window
+    | ImGuiWindowFlags_NoNavFocus   // No focusing toward this window with gamepad/keyboard navigation (e.g. skipped by CTRL+TAB)
+    | ImGuiWindowFlags_NoNav  // = ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus
+    //| ImGuiWindowFlags_NoDecoration  // = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse
+    //| ImGuiWindowFlags_NoInputs      // = ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus
 };
 
 
@@ -57,8 +83,21 @@ bool MainGUI::Initialize()
     // ImGuiContext gets created by 'ImGui::SFML::Init()'
     
     ImGuiIO& imguiIO = ImGui::GetIO(); // required for configflags and framerate
-    //imguiIO.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    //imguiIO.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
+    
+    imguiIO.ConfigInputTrickleEventQueue      = false; // spreads interactions (like simultaneous keypresses) across multiple frames
+    imguiIO.ConfigInputTextEnterKeepActive    = true ; // keep input focused after hitting enter
+    //imguiIO.ConfigWindowsResizeFromEdges      = false ; // can be annoying, and it requires BackendFlags_HasMouseCursors anyway
+    imguiIO.ConfigWindowsMoveFromTitleBarOnly = true ;
+    
+    imguiIO.ConfigFlags = ImGuiConfigFlags {
+        ImGuiConfigFlags_None
+        | ImGuiConfigFlags_NavEnableKeyboard     // Master keyboard navigation enable flag. Enable full Tabbing + directional arrows + space/enter to activate.
+        | ImGuiConfigFlags_NavNoCaptureKeyboard  // Instruct navigation to not set the io.WantCaptureKeyboard flag when io.NavActive is set.
+        | ImGuiConfigFlags_NoMouseCursorChange   // Prevent imgui from altering mouse visibility/shape
+        //| ImGuiConfigFlags_IsSRGB // Application is SRGB-aware. NOT used by core Dear ImGui (only used by backends, maybe)
+    };
+    
+    imguiIO.BackendFlags = ImGuiBackendFlags_HasMouseCursors;  // required for 'ResizeFromEdges'
     imguiIO.IniFilename = NULL; // disable autosaving of the 'imgui.ini' config file (just stores window states)
     
     // shaders must be initialized before this!
@@ -82,7 +121,7 @@ void MainGUI::Create()
     if (isOpen()) { return; }
     constexpr auto m_style = sf::Style::Titlebar | sf::Style::Resize | sf::Style::Close;
     // sf::Style::Default = Titlebar | Resize | Close
-    sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "FLUIDSIM - Main GUI", m_style);
+    sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "MainGUI [FLUIDSIM]", m_style);
     setVerticalSyncEnabled(usingVsync);
     clock.restart();
     return;
@@ -133,8 +172,8 @@ void MainGUI::DrawFocusIndicator()
 // the framerate is reported as divided among each window
 int NumWindowsOpen() {
     int total = 1; //assuming MainGUI is always open to call this
-    if (mainwindowPtr->isOpen())     total += 1;
-    if (gradientWindowPtr->isOpen()) total += 1;
+    if( mainwindowPtr->isOpen()) total += 1;
+    if(gradientWinPtr->isOpen()) total += 1;
     return total;
 }
 
@@ -147,9 +186,8 @@ void MainGUI::DrawFPS_Section() // FPS display and VSync
     
     if (ImGui::Checkbox("VSync:", &usingVsync)) // returns true if state has changed
     {
-        //std::cout << "vsync toggle event!\n";
-        if (mainwindowPtr) mainwindowPtr->setVerticalSyncEnabled(usingVsync);
-        if (gradientWindowPtr) gradientWindowPtr->setVerticalSyncEnabled(usingVsync);
+        if( mainwindowPtr)  mainwindowPtr->setVerticalSyncEnabled(usingVsync);
+        if(gradientWinPtr) gradientWinPtr->setVerticalSyncEnabled(usingVsync);
         setVerticalSyncEnabled(usingVsync);
     }
     ImGui::SameLine();
@@ -622,13 +660,12 @@ float MainGUI::DrawTurbSection(float next_height)
 void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses) 
 {
     if (!isEnabled || !isOpen()) { return; }
-    sf::RenderWindow::clear();
     if (dockedToMain) FollowMainWindow();
     
+    sf::RenderWindow::setActive(); // possibly unnecessary?
     HandleWindowEvents(unhandled_keypresses);
-    
-    // IMGUI
     ImGui::SFML::Update(*this, clock.restart());
+    sf::RenderWindow::clear();
     
     float next_height = 75.f; // leave space at the top for Nvidia's FPS/Vsync indicators
     
@@ -665,15 +702,15 @@ void MainGUI::FrameLoop(std::vector<sf::Keyboard::Key>& unhandled_keypresses)
     
     ImGui::SetWindowSize({m_width, -1});
     next_height += ImGui::GetWindowHeight();
+    ImGui::End(); // Bottom half (Demo Window
     
     // Actual Demo Window
     if(showDemoWindow)
     {
-        ImGui::ShowDemoWindow(&showDemoWindow);
+        ImGui::ShowDemoWindow(&showDemoWindow, demowindow_flags);
         ImGui::SetWindowPos ("Dear ImGui Demo", {m_width,  0}); // selecting window by name
-        ImGui::SetWindowSize("Dear ImGui Demo", {m_width, -1});
+        ImGui::SetWindowSize("Dear ImGui Demo", {m_width, m_height});  // using '-1' for height here disables resizing from edges, regardless of windowflags/IOflags
     }
-    ImGui::End(); // Bottom half (Demo Window)
     
     ImGui::SFML::Render(*this);
     sf::RenderWindow::display();
