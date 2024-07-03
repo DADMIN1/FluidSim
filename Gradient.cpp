@@ -92,7 +92,7 @@ void GradientWindow::Create()
 {
     if(isOpen()) { return; }
     constexpr auto m_style = sf::Style::Titlebar | sf::Style::Resize | sf::Style::Close;
-    sf::RenderWindow::create(sf::VideoMode(GradientNS::pixelCount, GradientNS::windowHeight), "GradientWindow [FLUIDSIM]", m_style);
+    sf::RenderWindow::create(sf::VideoMode(GradientNS::windowWidth, GradientNS::windowHeight), "GradientWindow [FLUIDSIM]", m_style);
     setVerticalSyncEnabled(usingVsync);
     AdjustPosition();
     setVisible(isEnabled);
@@ -151,7 +151,7 @@ void GradientWindow::EventLoop()
             {
                 auto [newwidth, newheight] = gw_event.size;
                 sf::View newview {sf::RenderWindow::getView()};
-                newview.setViewport({0, 0, float{float(GradientNS::pixelCount)/newwidth}, float{float(GradientNS::windowHeight)/newheight}});
+                newview.setViewport({0, 0, float{float(GradientNS::windowWidth)/newwidth}, float{float(GradientNS::windowHeight)/newheight}});
                 sf::RenderWindow::setView(newview);
             }
             break;
@@ -177,62 +177,7 @@ void GradientWindow::FrameLoop()
     sf::RenderWindow::draw(gradientViews[0]);
     sf::RenderWindow::draw(gradientViews[1]);
     
-    float next_height = GradientNS::headSpace;
-    ImGui::SetNextWindowSizeConstraints({512, -1}, {512, -1});
-    ImGui::SetNextWindowSize({GradientNS::pixelCount, -1});
-    ImGui::SetNextWindowPos({0, next_height});
-    
-    // must be called before the 'End' call (for GetWindowHeight)
-    #define NEXTPOSITION \
-      next_height += ImGui::GetWindowHeight(); \
-      ImGui::SetNextWindowSizeConstraints({512, -1}, {512, -1}); \
-      ImGui::SetNextWindowSize({GradientNS::pixelCount, -1}); \
-      ImGui::SetNextWindowPos({0, next_height});
-    
-    ImGui::Begin("Gradient", nullptr);
-      static bool showDemoWindow{false};
-      if(ImGui::Button("Demo Button")) { showDemoWindow = !showDemoWindow; }
-      NEXTPOSITION;
-    ImGui::End();
-    
-    
-    static constexpr ImGuiWindowFlags demowindow_flags {
-        ImGuiWindowFlags_None 
-        | ImGuiWindowFlags_MenuBar
-        // | ImGuiWindowFlags_NoTitleBar
-        | ImGuiWindowFlags_NoCollapse
-        //| ImGuiWindowFlags_NoMove
-        | ImGuiWindowFlags_AlwaysAutoResize  // Resize every window to its content every frame
-        | ImGuiWindowFlags_NoSavedSettings  // Never load/save settings in .ini file
-        //| ImGuiWindowFlags_HorizontalScrollbar // disallowed by default
-        //| ImGuiWindowFlags_NoFocusOnAppearing  // Disable taking focus when transitioning from hidden to visible state
-        //| ImGuiWindowFlags_NoBringToFrontOnFocus  // prevent it from overlapping other debug windows
-        //| ImGuiWindowFlags_AlwaysVerticalScrollbar // Always show vertical scrollbar (even if ContentSize.y < Size.y)
-        //| ImGuiWindowFlags_AlwaysHorizontalScrollbar  // Always show horizontal scrollbar (even if ContentSize.x < Size.x)
-        //| ImGuiWindowFlags_NoNavInputs  // No gamepad/keyboard navigation within the window
-        //| ImGuiWindowFlags_NoNavFocus   // No focusing toward this window with gamepad/keyboard navigation (e.g. skipped by CTRL+TAB)
-        //| ImGuiWindowFlags_NoNav  // = ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus
-        //| ImGuiWindowFlags_NoDecoration  // = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse
-        //| ImGuiWindowFlags_NoInputs      // = ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus
-    };
-    
-    if(showDemoWindow)
-    {
-        ImGui::ShowDemoWindow(&showDemoWindow, demowindow_flags);
-        ImGui::SetWindowPos ("Dear ImGui Demo", {0, next_height}); // selecting window by name
-        ImGui::SetWindowSize("Dear ImGui Demo", {512, -1}); 
-        // and doing it this way doesn't allow moving or resizing
-        
-        // you can 'capture' the demo-window by constructing a window matching it's ID beforehand
-        //ImGui::Begin("Dear ImGui Demo", &showDemoWindow, demowindow_flags);
-        //ImGui::ShowDemoWindow(&showDemoWindow);
-        //ImGui::End();
-        // unfortunately, it screws up the window-config toggles
-    }
-    
-    //ColorEdit3()
-    //ColorPicker3()
-    //ImGuiColorEditFlags_
+    DisplayTestWindows();
     
     ImGui::SFML::Render(*this);
     sf::RenderWindow::display();

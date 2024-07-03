@@ -16,7 +16,9 @@ namespace GradientNS {
     constexpr int pixelCount{1024};
     constexpr int bandHeight  {32};
     constexpr int headSpace{bandHeight*2 + 1};  // vertical space reserved for the first two gradients
-    constexpr int windowHeight{360};
+    constexpr int windowWidth{1536};
+    //constexpr int windowHeight{360};
+    constexpr int windowHeight{640};
 };
 
 
@@ -73,6 +75,8 @@ class GradientWindow: sf::RenderWindow
     bool Initialize(int xposition);
     void Create(); // calls sf::RenderWindow.create(...) with some arguments
     void AdjustPosition() {sf::RenderWindow::setPosition({stored_xposition, 144});}
+    
+    void DisplayTestWindows();
     
     public:
     void ToggleEnabled();

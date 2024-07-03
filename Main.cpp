@@ -133,7 +133,7 @@ int main(int argc, char** argv)
     
     sf::Clock frametimer{};
     
-    auto HandleKeypress = [&](sf::Keyboard::Key keycode)
+    const auto HandleKeypress = [&](const sf::Keyboard::Key& keycode)
     {
         const bool isShiftPressed {sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)};
         switch (keycode)
@@ -316,6 +316,23 @@ int main(int argc, char** argv)
         return;
     }; // End of HandleKeypress lambda
     
+    // disables mainwindow, uses alternative minimal frameloop
+    #define TESTING_SECONDARY_WINDOWS
+    #ifdef  TESTING_SECONDARY_WINDOWS
+    gradientWindow.Create();
+    gradientWindow.ToggleEnabled();
+    gradientWindow.setVisible(true);
+    gradientWindow.isEnabled = true;
+    mainwindow.close();
+    
+    while(gradientWindow.isOpen() || mainGUI.isOpen()) {
+        std::vector<sf::Keyboard::Key> unhandled_keypresses{};
+        if (gradientWindow.isOpen()) gradientWindow.FrameLoop();
+        if (mainGUI.isOpen()) mainGUI.FrameLoop(unhandled_keypresses);
+        for(const sf::Keyboard::Key& key: unhandled_keypresses) { HandleKeypress(key); } // still required for most keybinds (including the exit shortcuts!)
+    }
+    #endif
+    
     // frameloop
     while (mainwindow.isOpen())
     {
@@ -327,7 +344,7 @@ int main(int argc, char** argv)
         
         if (gradientWindow.isOpen()) gradientWindow.FrameLoop(); 
         if (mainGUI.isOpen()) mainGUI.FrameLoop(unhandled_keypresses);
-        for (sf::Keyboard::Key key: unhandled_keypresses) { HandleKeypress(key); }
+        for(const sf::Keyboard::Key& key: unhandled_keypresses) { HandleKeypress(key); }
         
         sf::Event event;
         while (mainwindow.pollEvent(event))
