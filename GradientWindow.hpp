@@ -4,7 +4,6 @@
 #include "Gradient.hpp"
 
 #include <array>
-#include <iostream>
 
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/RenderTexture.hpp>
@@ -71,14 +70,19 @@ class GradientWindow: sf::RenderWindow
     int stored_xposition{0}; // matching mainwindow's x-position
     sf::Clock clock{}; // imgui-sfml 'Update()' requires deltatime
     
-    friend int main(int argc, char** argv);
+    
     bool Initialize(int xposition);
     void Create(); // calls sf::RenderWindow.create(...) with some arguments
     void AdjustPosition() {sf::RenderWindow::setPosition({stored_xposition, 144});}
     
-    void DisplayTestWindows();
+    // Internal draw functions
+    void DrawGradients();        // GradientView.cpp
+    void DisplayTestWindows();   // GradientTestWindow.cpp
+    void CustomRenderingTest();  // GradientView.cpp
+    
     
     public:
+    friend int main(int argc, char** argv);
     void ToggleEnabled();
     void EventLoop(); // Window event-processing
     void FrameLoop(); // performs a single round of clear/draw/display and event-processing
