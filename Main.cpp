@@ -325,12 +325,14 @@ int main(int argc, char** argv)
     gradientWindow.isEnabled = true;
     mainwindow.close();
     
-    while(gradientWindow.isOpen() || mainGUI.isOpen()) {
+    while(gradientWindow.isOpen() /* || mainGUI.isOpen() */) {
         std::vector<sf::Keyboard::Key> unhandled_keypresses{};
         if (gradientWindow.isOpen()) gradientWindow.FrameLoop();
         if (mainGUI.isOpen()) mainGUI.FrameLoop(unhandled_keypresses);
         for(const sf::Keyboard::Key& key: unhandled_keypresses) { HandleKeypress(key); } // still required for most keybinds (including the exit shortcuts!)
     }
+    
+    if (mainGUI.isOpen()) mainGUI.close();
     #endif
     
     // frameloop

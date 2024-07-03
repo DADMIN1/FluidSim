@@ -7,9 +7,9 @@
 template<int C> constexpr static char num_to_char {static_cast<char>(0x30+C)}; // ascii numbers start at 0x30
 template<int C> constexpr static char column_c_str[8] {'C','O','L','U','M','N', num_to_char<C>, '\0'};
 
-constexpr static const std::array<const char*, 10> columns {
-    column_c_str<0>, column_c_str<1>, column_c_str<2>, column_c_str<3>, column_c_str<4>,
-    column_c_str<5>, column_c_str<6>, column_c_str<7>, column_c_str<8>, column_c_str<9>,
+constexpr static const std::array<const char*, 8> columns {
+    column_c_str<1>, column_c_str<2>, column_c_str<3>, column_c_str<4>,
+    column_c_str<5>, column_c_str<6>, column_c_str<7>, column_c_str<8>,
 };
 
 // Access/re-open columns like this: 'ImGui::Begin(columns[N])'
@@ -58,18 +58,18 @@ template<sf::Uint32 sfcolor> float Vec4Color[4] {
 */
 
 template<int C> constexpr static char color_c_str[7] {'C', 'O', 'L', 'O', 'R', num_to_char<C>, '\0'};
-constexpr static const std::array<const char*, 10> colornames {
-    color_c_str<0>, color_c_str<1>, color_c_str<2>, color_c_str<3>, color_c_str<4>,
-    color_c_str<5>, color_c_str<6>, color_c_str<7>, color_c_str<8>, color_c_str<9>,
+constexpr static const std::array<const char*, 8> colornames {
+    color_c_str<1>, color_c_str<2>, color_c_str<3>, color_c_str<4>,
+    color_c_str<5>, color_c_str<6>, color_c_str<7>, color_c_str<8>,
 };
 
 // allocating 10 seperate instances of Vec4Color (directly using Vec4Color with equivalent values would reference the same instance)
-constexpr static const std::array<float* const, 10> colors {
-    Vec4Color<0xFFFFFF00>, Vec4Color<0xFFFFFF01>, Vec4Color<0xFFFFFF02>, Vec4Color<0xFFFFFF03>, Vec4Color<0xFFFFFF04>,
-    Vec4Color<0xFFFFFF05>, Vec4Color<0xFFFFFF06>, Vec4Color<0xFFFFFF07>, Vec4Color<0xFFFFFF08>, Vec4Color<0xFFFFFF09>,
+constexpr static const std::array<float* const, 8> colors {
+    Vec4Color<0xFFFFFF00>, Vec4Color<0xFFFFFF01>, Vec4Color<0xFFFFFF02>, Vec4Color<0xFFFFFF03>,
+    Vec4Color<0xFFFFFF04>, Vec4Color<0xFFFFFF05>, Vec4Color<0xFFFFFF06>, Vec4Color<0xFFFFFF07>,
 };
 
-static std::array<bool, 10> ColorNeedsDefault { true, true, true, true, true, true, true, true, true, true, };
+static std::array<bool, 8> ColorNeedsDefault { true, true, true, true, true, true, true, true, };
 
 // Creates a widget and sets it's initial color
 #define IMGUICOLORWIDGET(Widgetclass, number, colorval, ...) \
@@ -160,13 +160,13 @@ void GradientWindow::DisplayTestWindows()
         constexpr float halfwidth = GradientNS::pixelCount/numcolumns;
         
         if(N >= 2){
-            ImGui::Begin(columns[N+1]);  // numbering starting from 1!
+            ImGui::Begin(columns[N]);
             ImGui::SetWindowPos({(N+N-2)*halfwidth, GradientNS::headSpace}, ImGuiCond_Once);
             ImGui::SetWindowSize({halfwidth*(numcolumns-N), GradientNS::windowHeight-GradientNS::headSpace}, ImGuiCond_Once);
             ImGui::End();
         } else {
             //if(demoToggleDisplayed) continue;
-            ImGui::Begin(columns[N+1]);  // numbering starting from 1!
+            ImGui::Begin(columns[N]);
             ImGui::SetWindowPos({N*halfwidth, GradientNS::headSpace}, ImGuiCond_Once);
             ImGui::SetWindowSize({halfwidth, GradientNS::windowHeight-GradientNS::headSpace}, ImGuiCond_Once);
             ImGui::End();
@@ -176,26 +176,26 @@ void GradientWindow::DisplayTestWindows()
     
     //if(!demoToggleDisplayed) {
         INTO_COLUMN ( 1,
-            IMGUICOLORWIDGET(ImGui::ColorPicker4, 1, 0x1122FF00);
+            IMGUICOLORWIDGET(ImGui::ColorPicker4, 0, 0x1122FF00);
             ImGui::Separator();
-            IMGUICOLORWIDGET(ImGui::ColorEdit4, 2, 0x00FF6400);
+            IMGUICOLORWIDGET(ImGui::ColorEdit4, 1, 0x00FF6400);
         );
         
         INTO_COLUMN ( 2,
             // names only determine whether the widgets are physically linked (user interactions applied to both simultaneously)
             // these widgets are still 'linked' because they use the same pointer (Vec4Color)
             ImGui::SeparatorText("Linked Color");
+            ImGui::ColorEdit4(colornames[3], Vec4Color<0xFF006400>);
             ImGui::ColorEdit4(colornames[4], Vec4Color<0xFF006400>);
-            ImGui::ColorEdit4(colornames[5], Vec4Color<0xFF006400>);
             
             ImGui::SeparatorText("Linked Physically");
-            ImGui::ColorEdit4(colornames[3], Vec4Color<0x00FF00FF>);
-            ImGui::ColorEdit4(colornames[3], Vec4Color<0xFF006400>); // and by pointer
+            ImGui::ColorEdit4(colornames[2], Vec4Color<0x00FF00FF>);
+            ImGui::ColorEdit4(colornames[2], Vec4Color<0xFF006400>); // and by pointer
             ImGui::SameLine(); ImGui::Text("+Colorlink");
             
             ImGui::SeparatorText("Linked Across Columns");
-            ImGui::ColorEdit4("ColorPicker", colors[1]); // linked to Column1 colorpicker
-            ImGui::ColorEdit4("ColorLink2", colors[2]);
+            ImGui::ColorEdit4("ColorPicker", colors[0]); // linked to Column1 colorpicker
+            ImGui::ColorEdit4("ColorLink2" , colors[1]);
             // linking physically across columns is not possible because the window-ID is always included in the hash
         );
     //}
@@ -297,8 +297,8 @@ void GradientWindow::DisplayTestWindows()
     
     ImGui::Begin("COLUMN4"); ImGui::SeparatorText("Applied Flags");
     ImGui::Separator();
-    IMGUICOLORWIDGET(ImGui::ColorEdit3, 6, 0x05F7FBCF, selectedflags); ImGui::Separator();
-    IMGUICOLORWIDGET(ImGui::ColorEdit4, 7, 0x05F7FBCF, selectedflags);
+    IMGUICOLORWIDGET(ImGui::ColorEdit3, 5, 0x05F7FBCF, selectedflags); ImGui::Separator();
+    IMGUICOLORWIDGET(ImGui::ColorEdit4, 6, 0x05F7FBCF, selectedflags);
     ImGui::SameLine(); ImGui::HelpMarker(
         "With the ImGuiColorEditFlags_NoInputs flag you can hide all the slider/text inputs.\n"
         "With the ImGuiColorEditFlags_NoLabel flag you can pass a non-empty label which will only "
@@ -308,9 +308,22 @@ void GradientWindow::DisplayTestWindows()
     ImGui::Spacing();
     
     ImGui::SeparatorText("ColorPickers");
-    IMGUICOLORWIDGET(ImGui::ColorPicker4,   8, 0x7788FFAA, pickerflags1); ImGui::Separator();
-    IMGUICOLORWIDGET(ImGui::ColorPicker4, 9-1, 0x7788FFAA, pickerflags2);
-    // passing '8' and '9-1' is a ridiculous hack to get two (different) widgets pointing to the same color, without physically linking them
+    
+    static bool isLayoutHorizontal{true};
+    ImGui::Checkbox("Horizontal layout", &isLayoutHorizontal);
+    
+    float width = ImGui::GetContentRegionAvail().x;
+    if(isLayoutHorizontal ) {
+        width *= 0.5f;
+        pickerflags1 |= ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoSidePreview;  // these two absolutely destroy horizontal spacing
+        pickerflags2 |= ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoSidePreview;
+        ImGui::SetNextItemWidth(width);
+    }
+    
+    IMGUICOLORWIDGET(ImGui::ColorPicker4,   7, 0x7788FFAA, pickerflags1);
+    if(isLayoutHorizontal) { ImGui::SameLine(); ImGui::SetNextItemWidth(width); }
+    IMGUICOLORWIDGET(ImGui::ColorPicker4, 8-1, 0x7788FFAA, pickerflags2);
+    // passing '7' and '8-1' is a ridiculous hack to get two (different) widgets pointing to the same color, without physically linking them
     
     ImGui::Separator();
     ImGui::End(); //column 4
