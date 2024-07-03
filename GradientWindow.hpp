@@ -4,6 +4,7 @@
 #include "Gradient.hpp"
 
 #include <array>
+#include <list>  // GradientView::segments
 
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/RenderTexture.hpp>
@@ -23,10 +24,24 @@ namespace GradientNS {
 
 struct GradientView: sf::Drawable
 {
-    const Gradient_T* const m_gradient;
-    sf::RenderTexture m_texture{};
-    sf::Sprite m_sprite{};
+    Gradient_T* const m_gradient;
+    sf::RenderTexture m_texture;
+    sf::Sprite m_sprite;
     const bool ownsPtr; // prevents the destructor from deleting pointers it does not own
+    
+    struct Segment {
+        enum Flag { None, First, Last }
+        const flag{None};
+        int index; //into gradient
+        sf::Color* color;
+        
+        Segment(int indexp, sf::Color& colorp, Flag flagp = None): 
+            flag{flagp}, index{indexp}, color{&colorp}
+        { ; }
+    };
+    
+    std::list<Segment> segments;
+    
     
     // implementing the SFML 'draw' function for this class
     virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override 
@@ -47,15 +62,24 @@ struct GradientView: sf::Drawable
         m_texture.display(); // must call .display before constructing sprite
     }
     
-    GradientView(const Gradient_T* const gradientPtr, const bool givenOwnership)
-    : sf::Drawable{}, m_gradient{gradientPtr}, ownsPtr{givenOwnership}
+    void DrawSegmentPoints() const; // visual indicators for the position of each segment-point
+    
+    #define last GradientNS::pixelCount-1
+    GradientView(Gradient_T* const gradientPtr, const bool givenOwnership)
+    : sf::Drawable{}, m_gradient{gradientPtr}, ownsPtr{givenOwnership}, 
+      segments { Segment(   0, m_gradient->gradientdata[0]   , Segment::First),
+                 Segment(512, m_gradient->gradientdata[512]),
+                 Segment(last, m_gradient->gradientdata[last], Segment::Last )}
     { using namespace GradientNS;
         m_texture.create(pixelCount, bandHeight);
         Redraw(true);
         const int next_height{ownsPtr? 0 : bandHeight+1}; // stacking the gradients vertically, with 1-pixel gap
         m_sprite = sf::Sprite(m_texture.getTexture());
         m_sprite.setPosition(0, next_height);
+        
+        
     }
+    #undef last
     
     ~GradientView() { if(ownsPtr) { delete m_gradient; } }
 };

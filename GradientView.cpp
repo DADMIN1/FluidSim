@@ -30,8 +30,8 @@ namespace ImGui {
     
     // draws an outline for each arrow (assuming they point up)
     void RenderArrowWithOutline(ImDrawList* draw_list, ImVec2 pos, ImVec2 half_sz, ImGuiDir direction, ImU32 color) {
-        ImGui::_RenderArrowPointingAt(draw_list, {pos.x, pos.y-4.f}, {half_sz.x+2.f, half_sz.y+6.f}, direction, ImGui::GetColorU32(IM_COL32(0X00, 0x00, 0X00, 0xFF)), 2.f);
         ImGui::_RenderArrowPointingAt(draw_list, pos, half_sz, direction, color);
+        ImGui::_RenderArrowPointingAt(draw_list, {pos.x, pos.y}, {half_sz.x, half_sz.y}, direction, ImGui::GetColorU32(IM_COL32(0XFF, 0xFF, 0XFF, 0xFF)), 2.f);
     }
     
     void RenderArrowWithOutline(ImDrawList* draw_list, ImVec2 pos, ImVec2 half_sz, ImGuiDir direction, ImU32 color, float thickness) {
@@ -84,6 +84,41 @@ void GradientWindow::CustomRenderingTest()
 }
 
 
+std::array<sf::RectangleShape, 3> vertical_lines;
+
+void GradientView::DrawSegmentPoints() const
+{
+    ImDrawList* drawlist = ImGui::GetForegroundDrawList(); // this can be drawn outside of any (imgui) window!!!
+    
+    int index{0};
+    for (const Segment& segment: segments) {
+        ImGui::RenderArrowWithOutline(
+            drawlist, 
+            {static_cast<float>(segment.index), GradientNS::bandHeight*2}, 
+            {8,16}, 
+            ImGuiDir_Up, 
+            ImGui::GetColorU32(ImVec4(*segment.color))
+        );
+        
+        // these get drawn UNDER the arrows, even though the arrows are drawn first
+        // because imgui.render is called at the very end of the frameloop
+        sf::RectangleShape line({1.5f, GradientNS::bandHeight});
+        line.setFillColor(sf::Color::Transparent);
+        line.setOutlineColor(sf::Color::White);
+        line.setOutlineThickness(0.5f);
+        line.setPosition({static_cast<float>(segment.index), GradientNS::bandHeight+1});
+        vertical_lines[index++] = line;
+    }
+    
+    
+    // TODO: display index / color of each slider
+    // TODO:    logic for splitting / joining segments
+    // TODO: controls for splitting / joining segments
+    // TODO: implement draggable-interaction
+    
+    return;
+}
+
 
 void GradientWindow::DrawGradients()
 {
@@ -92,10 +127,13 @@ void GradientWindow::DrawGradients()
     sf::RenderWindow::draw(gradientViews[0]);
     sf::RenderWindow::draw(gradientViews[1]);
     
-    ImDrawList* draw_list1 = ImGui::GetForegroundDrawList(); // this can be drawn outside of any (imgui) window!!!
-    ImGui::_RenderArrowPointingAt(draw_list1, { 512, GradientNS::bandHeight+1}, {8,16}, ImGuiDir_Up, ImGui::GetColorU32(IM_COL32(0xFF, 0X00, 0xFF, 0xFF)) /* , 2.f */ );
-    ImGui::_RenderArrowPointingAt(draw_list1, {   0, GradientNS::bandHeight+1}, {8,16}, ImGuiDir_Up, ImGui::GetColorU32(IM_COL32(0X00, 0xFF, 0X00, 0xFF)) /* , 2.f */ );
-    ImGui::_RenderArrowPointingAt(draw_list1, {1024, GradientNS::bandHeight+1}, {8,16}, ImGuiDir_Up, ImGui::GetColorU32(IM_COL32(0X00, 0x00, 0XFF, 0xFF)) /* , 2.f */ );
+    // Drawing the triangle indicators
+    GradientView& gradient = gradientViews[1];
+    gradient.DrawSegmentPoints();
+    
+    for (sf::RectangleShape& line: vertical_lines) {
+        sf::RenderWindow::draw(line);
+    }
     
     return;
 }
