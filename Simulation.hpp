@@ -165,12 +165,12 @@ class Simulation
             cell->density += 1.0;
         }
         RedrawGrid();
-        RedrawFluid();
+        RedrawFluid(true);
         return;
     }
     
     void RedrawGrid()  { diffusionField.Redraw(); }
-    void RedrawFluid() { fluid.Redraw(useTransparency); }
+    void RedrawFluid(const bool shouldClear) { fluid.Redraw(useTransparency, shouldClear); }
     auto GetSprites() { 
         struct Sprites{sf::Sprite gridSprite; sf::Sprite fluidSprite;};
         return Sprites{diffusionField.GetSprite(), fluid.GetSprite()};

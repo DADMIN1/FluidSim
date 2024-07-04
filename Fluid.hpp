@@ -84,9 +84,9 @@ class Fluid
     }
     
     sf::Sprite GetSprite() { return sf::Sprite(particle_texture.getTexture()); }
-    void Redraw(const bool useTransparency) 
+    void Redraw(const bool useTransparency, const bool shouldClear) 
     {
-        particle_texture.clear(sf::Color::Transparent);
+        if(shouldClear) particle_texture.clear(sf::Color::Transparent);
         for (Particle& particle: particles) {
             particle.UpdateColor(useTransparency);
             particle_texture.draw(particle);

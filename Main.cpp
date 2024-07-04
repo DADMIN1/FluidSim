@@ -287,7 +287,7 @@ int main(int argc, char** argv)
                     if(!simulation.ToggleTurbulence()) simulation.ToggleTurbulence();
                     if(previous_name == "turbulence") {
                         windowClearDisabled = !windowClearDisabled;
-                        std::cout << "window clears " << (windowClearDisabled ? "enabled" : "disabled") << "\n";
+                        std::cout << "window clears " << (windowClearDisabled ? "disabled" : "enabled") << "\n";
                     }
                 }
                 else { if(simulation.ToggleTurbulence()) simulation.ToggleTurbulence(); } // disabling
@@ -297,7 +297,7 @@ int main(int argc, char** argv)
             
             case sf::Keyboard::Pause:
                 windowClearDisabled = !windowClearDisabled;
-                std::cout << "window clears " << (windowClearDisabled ? "enabled" : "disabled") << "\n";
+                std::cout << "window clears " << (windowClearDisabled ? "disabled" : "enabled") << "\n";
             break;
             
             case sf::Keyboard::Add:
@@ -317,7 +317,7 @@ int main(int argc, char** argv)
     }; // End of HandleKeypress lambda
     
     // disables mainwindow, uses alternative minimal frameloop
-    #define TESTING_SECONDARY_WINDOWS
+    // #define TESTING_SECONDARY_WINDOWS
     #ifdef  TESTING_SECONDARY_WINDOWS
     gradientWindow.Create();
     gradientWindow.ToggleEnabled();
@@ -410,7 +410,7 @@ int main(int argc, char** argv)
             if (mouse.shouldDisplay) { mainwindow.draw(mouse); }
             
             simulation.Update();
-            simulation.RedrawFluid();
+            simulation.RedrawFluid(windowClearDisabled);
             mainwindow.draw(fluidSprite, Shader::current);
             
             // unlike the normal frameloop, here the mouse-outline is drawn even if the mouse is inactive;
@@ -447,7 +447,7 @@ int main(int argc, char** argv)
         } 
         else if (mouse.isActive()) { mouse.shouldDisplay = true; }
         
-        simulation.RedrawFluid();
+        simulation.RedrawFluid(!windowClearDisabled);
         mainwindow.draw(fluidSprite, Shader::current);
         if (mouse.shouldOutline) { mouse.RedrawOutlines(); mainwindow.draw(outlineOverlay); }
         if (mouse.shouldDisplay) { mainwindow.draw(mouse); }
