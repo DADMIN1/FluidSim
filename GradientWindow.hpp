@@ -5,6 +5,8 @@
 
 #include <array>
 #include <list>  // GradientView::segments
+//#include <memory> //smart-ptr
+//#include <iterator>
 
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/RenderTexture.hpp>
@@ -24,74 +26,111 @@ namespace GradientNS {
 
 struct GradientView: sf::Drawable
 {
-    Gradient_T* const m_gradient;
+    const Gradient_T& sourceRef;
     sf::RenderTexture m_texture;
     sf::Sprite m_sprite;
-    const bool ownsPtr; // prevents the destructor from deleting pointers it does not own
-    
-    struct Segment {
-        enum Flag { None, First, Last }
-        const flag{None};
-        int index; //into gradient
-        sf::Color* color;
-        
-        Segment(int indexp, sf::Color& colorp, Flag flagp = None): 
-            flag{flagp}, index{indexp}, color{&colorp}
-        { ; }
-    };
-    
-    std::list<Segment> segments;
-    
     
     // implementing the SFML 'draw' function for this class
     virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override 
     { target.draw(m_sprite, states); }
     
-    void Redraw(const bool useOriginal=false) // parameter selects between 'LookupDefault' and 'Lookup'
-    { using namespace GradientNS;
-        m_texture.clear();
-        for (std::size_t i{0}; i<pixelCount; ++i) 
-        {
-            sf::RectangleShape colorband(sf::Vector2f{1, bandHeight});
-            if (useOriginal)
-                 colorband.setFillColor(m_gradient->LookupDefault(i));
-            else colorband.setFillColor(m_gradient->Lookup(i));
+    void RedrawTexture(bool useOriginal=false) // parameter selects between 'LookupDefault' and 'Lookup'
+    {
+        m_texture.clear(sf::Color::Transparent);
+        sf::RectangleShape colorband(sf::Vector2f{1, GradientNS::bandHeight});
+        for (std::size_t i{0}; i<GradientNS::pixelCount; ++i) {
+            colorband.setFillColor(useOriginal? sourceRef.LookupDefault(i) : sourceRef.Lookup(i));
             colorband.setPosition(i,0);
             m_texture.draw(colorband);
         }
         m_texture.display(); // must call .display before constructing sprite
+        return;
     }
     
-    void DrawSegmentPoints() const; // visual indicators for the position of each segment-point
+    GradientView(const Gradient_T& gradientRef, bool useOriginal=false)
+        : sf::Drawable{}, sourceRef{gradientRef}, m_texture{}, m_sprite{}
+    {
+        m_texture.create(GradientNS::pixelCount, GradientNS::bandHeight);
+        RedrawTexture(useOriginal);
+        m_sprite = sf::Sprite(m_texture.getTexture());
+    }
+};
+
+
+// TODO: implement draggable-interaction
+// TODO: color-modifying controls
+// TODO:    logic for splitting / joining segments
+// TODO: controls for splitting / joining segments
+
+class GradientEditor
+{
+    friend class GradientWindow;
+    
+    Gradient_T m_gradient{};
+    GradientView viewCurrent{m_gradient};
+    GradientView viewWorking{m_gradient};
+    GradientView viewOverlay{m_gradient};
+    
+    struct Segment 
+    {
+        enum Index: int { Head = -1, Tail = -2, Held = -3 } const segNum;
+        int  color_index; //into gradient
+        sf::Color* color;
+        sf::RectangleShape vertical_outline;
+        
+        float Xposition() const { return static_cast<float>(color_index); }
+        
+        // TODO: retry incrementing segNum through default arg
+        Segment(int pNum, int indexp, sf::Color& colorp):
+          segNum{pNum}, color_index{indexp}, color{&colorp}, 
+          vertical_outline{sf::RectangleShape({2.f, GradientNS::bandHeight})}
+        { 
+            sf::Color outlineColor {sf::Color::Black};
+            switch(segNum) {
+              case Segment::Held: outlineColor=sf::Color{0xFFFFFFFF}; goto fallthrough;
+              case Segment::Head:
+              case Segment::Tail: /* outlineColor=sf::Color{0x000000}; */
+              fallthrough: [[fallthrough]];
+              default:
+                  vertical_outline.setFillColor(sf::Color::Transparent);
+                  vertical_outline.setOutlineColor(outlineColor);
+                  vertical_outline.setOutlineThickness(1.f);
+                  vertical_outline.setPosition(Xposition()-1.f, 0.f);
+                  // don't set Y-position (always 0 relative to vlines_texture)
+              break;
+            }
+        }
+    };
+    
+    //std::array<>
+    std::list<Segment*> segments;
+    // this works without heap allocations, but the plan is to store them outside of the list
+    // so that the ordering of indecies can be made independent from the list-order
     
     #define last GradientNS::pixelCount-1
-    GradientView(Gradient_T* const gradientPtr, const bool givenOwnership)
-    : sf::Drawable{}, m_gradient{gradientPtr}, ownsPtr{givenOwnership}, 
-      segments { Segment(   0, m_gradient->gradientdata[0]   , Segment::First),
-                 Segment(512, m_gradient->gradientdata[512]),
-                 Segment(last, m_gradient->gradientdata[last], Segment::Last )}
-    { using namespace GradientNS;
-        m_texture.create(pixelCount, bandHeight);
-        Redraw(true);
-        const int next_height{ownsPtr? 0 : bandHeight+1}; // stacking the gradients vertically, with 1-pixel gap
-        m_sprite = sf::Sprite(m_texture.getTexture());
-        m_sprite.setPosition(0, next_height);
-        
-        
+    GradientEditor() : m_gradient{}, viewCurrent{m_gradient, true}, viewWorking{m_gradient, true}, viewOverlay{m_gradient, true},
+      segments{ new Segment{Segment::Head,    0, m_gradient.gradientdata[0]   },
+                new Segment{            1,  512, m_gradient.gradientdata[512] },
+                new Segment{Segment::Tail, last, m_gradient.gradientdata[last]}}
+    {
+        viewOverlay.m_texture.clear(sf::Color::Transparent);
+        viewWorking.m_sprite.move(0, GradientNS::bandHeight+1);
+        viewOverlay.m_sprite.move(0, GradientNS::bandHeight+1);
+        //DrawSegmentations();  //Do not call within constructor! (requires active ImGui context; not initialized yet)
     }
     #undef last
     
-    ~GradientView() { if(ownsPtr) { delete m_gradient; } }
+    //~GradientEditor() { delete segments; }  // TODO: stop leaking memory
 };
 
 
 class GradientWindow: sf::RenderWindow
 {
-    Gradient_T* current_gradient;
-    std::array<GradientView, 2> gradientViews;
+    const Gradient_T MasterGradient{};
+    GradientEditor Editor;
     
     bool isEnabled{false};   // window visibility
-    int stored_xposition{0}; // matching mainwindow's x-position
+    int stored_xposition{0}; // matching mainwindow's x-position  // TODO: try storing a ref to the window position instead? (probably a bad idea)
     sf::Clock clock{}; // imgui-sfml 'Update()' requires deltatime
     
     
@@ -100,7 +139,7 @@ class GradientWindow: sf::RenderWindow
     void AdjustPosition() {sf::RenderWindow::setPosition({stored_xposition, 144});}
     
     // Internal draw functions
-    void DrawGradients();        // GradientView.cpp
+    void DrawSegmentations(); // visual guides for the definition-points of the gradient
     void DisplayTestWindows();   // GradientTestWindow.cpp
     void CustomRenderingTest();  // GradientView.cpp
     
@@ -113,11 +152,8 @@ class GradientWindow: sf::RenderWindow
     
     // constructors do not actually create the window; call '.create()' later
     //sf::RenderWindow(sf::VideoMode(1024, 512), "FLUIDSIM - Gradient", sf::Style::Default)
-    GradientWindow(): sf::RenderWindow{}, current_gradient{new Gradient_T()}, 
-      gradientViews{GradientView(current_gradient, true), GradientView(current_gradient, false)}
+    GradientWindow(): sf::RenderWindow{}
     { ; }
-    
-    //~GradientWindow() { delete current_gradient; }  // gradientView with ownership will free this in it's destructor
 };
 
 

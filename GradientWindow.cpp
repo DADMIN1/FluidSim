@@ -19,11 +19,6 @@ bool GradientWindow::Initialize(int xposition)
     stored_xposition = xposition;
     AdjustPosition();
     
-    if(!current_gradient) return false;
-    for(const GradientView& gv : gradientViews) {
-        if(!gv.m_gradient) return false;
-    }
-    
     if(!ImGui::SFML::Init(*this)) return false;
     ImGuiIO& imguiIO = ImGui::GetIO();
     
@@ -34,7 +29,7 @@ bool GradientWindow::Initialize(int xposition)
     
     imguiIO.ConfigFlags = ImGuiConfigFlags {
         ImGuiConfigFlags_None
-        | ImGuiConfigFlags_NavEnableKeyboard     // Master keyboard navigation enable flag. Enable full Tabbing + directional arrows + space/enter to activate.
+        //| ImGuiConfigFlags_NavEnableKeyboard     // Master keyboard navigation enable flag. Enable full Tabbing + directional arrows + space/enter to activate.
         | ImGuiConfigFlags_NavNoCaptureKeyboard  // Instruct navigation to not set the io.WantCaptureKeyboard flag when io.NavActive is set.
         | ImGuiConfigFlags_NoMouseCursorChange   // Prevent imgui from altering mouse visibility/shape
         //| ImGuiConfigFlags_IsSRGB // Application is SRGB-aware. NOT used by core Dear ImGui (only used by backends, maybe)
@@ -128,11 +123,16 @@ void GradientWindow::FrameLoop()
     if(!isEnabled || !isOpen()) { return; }
     
     sf::RenderWindow::setActive(); // required; otherwise closing the window completely blacks-out the mainwindow
+    sf::RenderWindow::clear(sf::Color::Transparent);
     ImGui::SFML::Update(*this, clock.restart()); // calls ImGui::NewFrame()
     EventLoop();
     
-    DrawGradients();       // GradientView.cpp
-    DisplayTestWindows();  // GradientTestWindow.cpp
+    DrawSegmentations(); // GradientView.cpp
+    sf::RenderWindow::draw(Editor.viewCurrent);
+    sf::RenderWindow::draw(Editor.viewWorking);
+    sf::RenderWindow::draw(Editor.viewOverlay);
+    
+    DisplayTestWindows(); // GradientTestWindow.cpp
     CustomRenderingTest(); // GradientView.cpp
     
     ImGui::SFML::Render(*this);

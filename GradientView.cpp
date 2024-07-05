@@ -31,7 +31,7 @@ namespace ImGui {
     // draws an outline for each arrow (assuming they point up)
     void RenderArrowWithOutline(ImDrawList* draw_list, ImVec2 pos, ImVec2 half_sz, ImGuiDir direction, ImU32 color) {
         ImGui::_RenderArrowPointingAt(draw_list, pos, half_sz, direction, color);
-        ImGui::_RenderArrowPointingAt(draw_list, {pos.x, pos.y}, {half_sz.x, half_sz.y}, direction, ImGui::GetColorU32(IM_COL32(0XFF, 0xFF, 0XFF, 0xFF)), 2.f);
+        ImGui::_RenderArrowPointingAt(draw_list, {pos.x, pos.y}, {half_sz.x, half_sz.y}, direction, ImGui::GetColorU32(IM_COL32(0XFF, 0xFF, 0XFF, 0xFF)), 1.f);
     }
     
     void RenderArrowWithOutline(ImDrawList* draw_list, ImVec2 pos, ImVec2 half_sz, ImGuiDir direction, ImU32 color, float thickness) {
@@ -84,56 +84,31 @@ void GradientWindow::CustomRenderingTest()
 }
 
 
-std::array<sf::RectangleShape, 3> vertical_lines;
-
-void GradientView::DrawSegmentPoints() const
+void GradientWindow::DrawSegmentations()
 {
     ImDrawList* drawlist = ImGui::GetForegroundDrawList(); // this can be drawn outside of any (imgui) window!!!
     
-    int index{0};
-    for (const Segment& segment: segments) {
+    using Segment = GradientEditor::Segment;
+    GradientView& viewOverlay = Editor.viewOverlay;
+    viewOverlay.m_texture.clear(sf::Color::Transparent);
+    
+    for (Segment* segmentPtr: Editor.segments)
+    {
+        if(!segmentPtr) continue;
+        Segment& segment {*segmentPtr};
         ImGui::RenderArrowWithOutline(
             drawlist, 
-            {static_cast<float>(segment.index), GradientNS::bandHeight*2}, 
+            {segment.Xposition(), GradientNS::bandHeight*2}, // intentionally off-by-one (high; slightly pushing arrow into the gradient)
             {8,16}, 
             ImGuiDir_Up, 
-            ImGui::GetColorU32(ImVec4(*segment.color))
+            ImGui::GetColorU32(ImVec4(*segment.color)) // required conversion, for some reason
         );
         
         // these get drawn UNDER the arrows, even though the arrows are drawn first
         // because imgui.render is called at the very end of the frameloop
-        sf::RectangleShape line({1.5f, GradientNS::bandHeight});
-        line.setFillColor(sf::Color::Transparent);
-        line.setOutlineColor(sf::Color::White);
-        line.setOutlineThickness(0.5f);
-        line.setPosition({static_cast<float>(segment.index), GradientNS::bandHeight+1});
-        vertical_lines[index++] = line;
+        viewOverlay.m_texture.draw(segment.vertical_outline);
     }
     
-    
-    // TODO: display index / color of each slider
-    // TODO:    logic for splitting / joining segments
-    // TODO: controls for splitting / joining segments
-    // TODO: implement draggable-interaction
-    
-    return;
-}
-
-
-void GradientWindow::DrawGradients()
-{
-    // performing SFML 'draw'-calls before 'Update' also activates the current context (sometimes)
-    sf::RenderWindow::clear();
-    sf::RenderWindow::draw(gradientViews[0]);
-    sf::RenderWindow::draw(gradientViews[1]);
-    
-    // Drawing the triangle indicators
-    GradientView& gradient = gradientViews[1];
-    gradient.DrawSegmentPoints();
-    
-    for (sf::RectangleShape& line: vertical_lines) {
-        sf::RenderWindow::draw(line);
-    }
-    
+    viewOverlay.m_texture.display();
     return;
 }
