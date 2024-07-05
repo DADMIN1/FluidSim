@@ -84,14 +84,14 @@ bool MainGUI::Initialize()
     
     ImGuiIO& imguiIO = ImGui::GetIO(); // required for configflags and framerate
     
-    imguiIO.ConfigInputTrickleEventQueue      = false; // spreads interactions (like simultaneous keypresses) across multiple frames
-    imguiIO.ConfigInputTextEnterKeepActive    = true ; // keep input focused after hitting enter
+    //imguiIO.ConfigInputTrickleEventQueue      = false; // spreads interactions (like simultaneous keypresses) across multiple frames
+    //imguiIO.ConfigInputTextEnterKeepActive    = true ; // keep input focused after hitting enter
     //imguiIO.ConfigWindowsResizeFromEdges      = false ; // can be annoying, and it requires BackendFlags_HasMouseCursors anyway
     imguiIO.ConfigWindowsMoveFromTitleBarOnly = true ;
     
     imguiIO.ConfigFlags = ImGuiConfigFlags {
         ImGuiConfigFlags_None
-        | ImGuiConfigFlags_NavEnableKeyboard     // Master keyboard navigation enable flag. Enable full Tabbing + directional arrows + space/enter to activate.
+        //| ImGuiConfigFlags_NavEnableKeyboard     // Master keyboard navigation enable flag. Enable full Tabbing + directional arrows + space/enter to activate.
         | ImGuiConfigFlags_NavNoCaptureKeyboard  // Instruct navigation to not set the io.WantCaptureKeyboard flag when io.NavActive is set.
         | ImGuiConfigFlags_NoMouseCursorChange   // Prevent imgui from altering mouse visibility/shape
         //| ImGuiConfigFlags_IsSRGB // Application is SRGB-aware. NOT used by core Dear ImGui (only used by backends, maybe)
@@ -119,7 +119,7 @@ bool MainGUI::Initialize()
 void MainGUI::Create()
 {
     if (isOpen()) { return; }
-    constexpr auto m_style = sf::Style::Titlebar | sf::Style::Resize | sf::Style::Close;
+    constexpr auto m_style = sf::Style::Close; // also implies titlebar
     // sf::Style::Default = Titlebar | Resize | Close
     sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "MainGUI [FLUIDSIM]", m_style);
     setVerticalSyncEnabled(usingVsync);

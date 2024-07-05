@@ -138,7 +138,11 @@ class Simulation
         grav = (noArg? (!grav) : false); return grav;
     }
     bool ToggleTransparency() { useTransparency = !useTransparency; return useTransparency; }
-    bool ToggleTurbulence() { fluid.isTurbulent = !fluid.isTurbulent; return fluid.isTurbulent; }
+    bool ToggleTurbulence() { 
+        fluid.isTurbulent = !fluid.isTurbulent;
+        fluid.viscosity = (fluid.isTurbulent? -1.f : 1.f) * abs(fluid.viscosity); 
+        return fluid.isTurbulent; 
+    }
     
     void Freeze() // sets all velocities to 0
     {

@@ -19,8 +19,8 @@ class Fluid
     float viscosity {0.005675};
     float fdensity {0.01975}; // controls 'force' of diffusion
     float bounceDampening {0.1915};
-    float speedcap_soft{100.0};
-    float speedcap_hard{200.0};
+    static constexpr float speedcap_soft{100.f};
+    static constexpr float speedcap_hard{200.f};
      bool isTurbulent{false};
     
     friend class Simulation;
@@ -53,6 +53,8 @@ class Fluid
         
         float Distance(const Particle& rh) const; // unused
         static float Distance(const Particle& lh, const Particle& rh); // unused
+        void ApplyViscosity(const float viscosity) { velocity *= (1.0f - (viscosity * timestepRatio)); } // ideally cell-density would be accounted for here
+        void ApplySpeedcap();
     };
     // calculates diffusion-force between particles within the same cell
     sf::Vector2f CalcLocalForce(const Particle& lh, const Particle& rh) const;
@@ -60,11 +62,6 @@ class Fluid
     
     sf::RenderTexture particle_texture;
     std::vector<Particle> particles;
-    
-    void ApplySpeedcap(sf::Vector2f& velocity); // modifies passed ref
-    void ApplyViscosity(sf::Vector2f& velocity) {
-        velocity *= (1.0f - (viscosity * timestepRatio));
-    }
     
     public:
     static bool ToggleParticleScaling() { 

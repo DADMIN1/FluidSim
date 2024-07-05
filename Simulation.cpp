@@ -102,8 +102,7 @@ DeltaMap Simulation::FindCellTransitions(const auto& particles_slice) const
 void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap)
 {
     std::lock_guard<std::mutex> pmGuard(write_mutex);
-    float rng = normalizedRNG();
-    rng += 0.95; // range 0.95-1.95
+    const float rng = (0.825f + normalizedRNG())*(0.825f + normalizedRNG());
     
     // 'auto&&' is definitely correct here; ~100 FPS difference (300->400)
     for (auto&& [cellID, delta]: cellmap)
@@ -170,19 +169,20 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
             pmemptycounter += 1;
             #endif
             
-            // stored momentum would otherwise not decrease for empty cells
-            cell.momentum -= cell.momentum*momentumDistribution;
-            // we don't erase the cell because we want to keep decreasing the momentum
-            
             // only erase if it's empty and has negligable momentum
             // TODO: collect stats on this to find a good minimum
-            constexpr float small_enough = 0.01;
-            if (abs(cell.momentum.x) < small_enough 
-             && abs(cell.momentum.y) < small_enough) {
+            constexpr float small_enough = 0.001;
+            if ((abs(cell.momentum.x) < small_enough) 
+             && (abs(cell.momentum.y) < small_enough)) {
                 // TODO: defer this erase or something
                 diffusionField.cells[cellID].momentum = {0.0, 0.0};
                 particleMap.erase(cellID);
+                continue;
              }
+             
+             // stored momentum would otherwise not decrease for empty cells
+            cell.momentum -= cell.momentum*momentumDistribution;
+            // we don't erase the cell because we want to keep decreasing the momentum
         }
     }
     

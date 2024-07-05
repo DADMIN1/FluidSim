@@ -36,7 +36,7 @@ void PrintSpeedcapInfo()
 }
 
 
-void Fluid::ApplySpeedcap(sf::Vector2f& velocity)
+void Fluid::Particle::ApplySpeedcap()
 {
     // TODO: figure out something better for the softcap
     if      (std::abs(velocity.x) > speedcap_hard) [[unlikely]] { velocity.x  = 0.0f; ++speedcap_counter[2]; }
@@ -172,8 +172,8 @@ void Fluid::UpdatePositions()
 {
     for (Particle& particle: particles) 
     {
-        ApplyViscosity(particle.velocity);
-        ApplySpeedcap(particle.velocity);
+        particle.ApplyViscosity(viscosity);
+        particle.ApplySpeedcap();
         
         sf::Vector2f nextPosition = particle.getPosition();
         nextPosition.x += particle.velocity.x * timestepRatio;
@@ -220,10 +220,10 @@ void Fluid::UpdatePositions(const std::vector<Particle>::iterator sliceStart, co
     for (std::vector<Particle>::iterator iter{sliceStart}; iter < sliceEnd; ++iter)
     {
         Particle& particle = *iter;
-        ApplyViscosity(particle.velocity);
+        particle.ApplyViscosity(viscosity);
         particle.velocity.y +=  tgravity*timestepRatio; // inlining gravity calc here
         particle.velocity.x += txgravity*timestepRatio;
-        ApplySpeedcap(particle.velocity);
+        particle.ApplySpeedcap();
         
         sf::Vector2f nextPosition = particle.getPosition();
         nextPosition.x += particle.velocity.x * timestepRatio;

@@ -27,7 +27,7 @@ bool GradientWindow::Initialize(int xposition)
     if(!ImGui::SFML::Init(*this)) return false;
     ImGuiIO& imguiIO = ImGui::GetIO();
     
-    imguiIO.ConfigInputTrickleEventQueue      = false; // spreads interactions (like simultaneous keypresses) across multiple frames
+    // imguiIO.ConfigInputTrickleEventQueue      = false; // spreads interactions (like simultaneous keypresses) across multiple frames
     imguiIO.ConfigInputTextEnterKeepActive    = true ; // keep input focused after hitting enter
     //imguiIO.ConfigWindowsResizeFromEdges      = false; // can be annoying, and it requires BackendFlags_HasMouseCursors anyway
     imguiIO.ConfigWindowsMoveFromTitleBarOnly = true ;

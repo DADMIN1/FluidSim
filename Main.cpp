@@ -363,10 +363,13 @@ int main(int argc, char** argv)
                     HandleKeypress(event.key.code);
                 break;
                 
+                case sf::Event::MouseButtonPressed:
+                    if((event.mouseButton.button==3)||(event.mouseButton.button==4)) // side-buttons
+                    { mouse.ClearPreservedOverlays(); break; } // manually handling this in case mouse isn't active
+                [[fallthrough]];
                 case sf::Event::MouseMoved:
                 //case sf::Event::MouseLeft:
                 //case sf::Event::MouseEntered:
-                case sf::Event::MouseButtonPressed:
                 case sf::Event::MouseButtonReleased:
                 case sf::Event::MouseWheelScrolled:
                     mouse.HandleEvent(event);
