@@ -44,7 +44,9 @@ namespace ImGui {
 // from Demo Window > Examples > Custom Rendering
 void GradientWindow::CustomRenderingTest()
 {
-    ImGui::Begin("GradientTest");
+    static bool gradientTestOpen{true};
+    if(!gradientTestOpen) return;
+    ImGui::Begin("GradientTest", &gradientTestOpen);
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     
     // [imgui/demo_window.cpp (line 8042)]
@@ -96,10 +98,12 @@ void GradientWindow::DrawSegmentations()
     {
         if(!segmentPtr) continue;
         Segment& segment {*segmentPtr};
+        //if(segment.index < 0) continue; // special indecies for Head/Tail/Held
+        
         ImGui::RenderArrowWithOutline(
             drawlist, 
             {segment.Xposition(), GradientNS::bandHeight*2}, // intentionally off-by-one (high; slightly pushing arrow into the gradient)
-            {8,16}, 
+            {GradientNS::triangle_halfsz, (GradientNS::triangle_halfsz*2)}, 
             ImGuiDir_Up, 
             ImGui::GetColorU32(ImVec4(*segment.color)) // required conversion, for some reason
         );

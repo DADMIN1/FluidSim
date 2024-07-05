@@ -4,9 +4,7 @@
 #include "Gradient.hpp"
 
 #include <array>
-#include <list>  // GradientView::segments
-//#include <memory> //smart-ptr
-//#include <iterator>
+#include <list>  // GradientEditor::segments
 
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/RenderTexture.hpp>
@@ -16,11 +14,16 @@
 
 namespace GradientNS {
     constexpr int pixelCount{1024};
-    constexpr int bandHeight  {32};
-    constexpr int headSpace{bandHeight*2 + 1};  // vertical space reserved for the first two gradients
+    constexpr int bandHeight  {64};
+    constexpr int triangle_halfsz{8}; // parameter for segment-slider handles
+    // vertical space reserved for the first two gradients, plus segment-sliders
+    constexpr int headSpace{(bandHeight*2 + 1) + triangle_halfsz*3};
     constexpr int windowWidth{1536};
     //constexpr int windowHeight{360};
     constexpr int windowHeight{640};
+    
+    constexpr int segmentCap{8};
+    constexpr int segmentLength{pixelCount/segmentCap};
 };
 
 
@@ -73,66 +76,74 @@ class GradientEditor
     
     struct Segment 
     {
-        enum Index: int { Head = -1, Tail = -2, Held = -3 } const segNum;
+        enum Index: int { Head = -1, Tail = -2, Held = -3 } const index;
+        static int nextindex;
         int  color_index; //into gradient
         sf::Color* color;
         sf::RectangleShape vertical_outline;
         
         float Xposition() const { return static_cast<float>(color_index); }
         
-        // TODO: retry incrementing segNum through default arg
-        Segment(int pNum, int indexp, sf::Color& colorp):
-          segNum{pNum}, color_index{indexp}, color{&colorp}, 
-          vertical_outline{sf::RectangleShape({2.f, GradientNS::bandHeight})}
+        Segment(int pNum = nextindex++):index{pNum},
+          color_index{ (nextindex*GradientNS::segmentLength) - (GradientNS::segmentLength/2) },
+          color{nullptr}, vertical_outline{sf::RectangleShape({2.0f, GradientNS::bandHeight})}
         { 
             sf::Color outlineColor {sf::Color::Black};
-            switch(segNum) {
-              case Segment::Held: outlineColor=sf::Color{0xFFFFFFFF}; goto fallthrough;
-              case Segment::Head:
-              case Segment::Tail: /* outlineColor=sf::Color{0x000000}; */
+            if (index < 0) { color_index=0; }
+            switch(index) {
+              case Segment::Held: outlineColor=sf::Color{0xFFFFFFFF};  goto fallthrough;
+              case Segment::Tail: color_index = GradientNS::pixelCount-1; [[fallthrough]];
+              case Segment::Head: outlineColor=sf::Color{0xFFFFFFFF};  /*sf::Color{0x00000000};*/
               fallthrough: [[fallthrough]];
               default:
                   vertical_outline.setFillColor(sf::Color::Transparent);
                   vertical_outline.setOutlineColor(outlineColor);
                   vertical_outline.setOutlineThickness(1.f);
-                  vertical_outline.setPosition(Xposition()-1.f, 0.f);
-                  // don't set Y-position (always 0 relative to vlines_texture)
+                  vertical_outline.setPosition(Xposition()-1.f, 0.f); // -1 because rectangle's-position is aligned to left edge
+                  // don't set Y-position (always 0 relative to viewOverlay's rendertexture)
               break;
             }
         }
     };
     
-    //std::array<>
+    std::array<Segment, GradientNS::segmentCap> segstore;
     std::list<Segment*> segments;
-    // this works without heap allocations, but the plan is to store them outside of the list
-    // so that the ordering of indecies can be made independent from the list-order
+    Segment* seg_held;
     
-    #define last GradientNS::pixelCount-1
-    GradientEditor() : m_gradient{}, viewCurrent{m_gradient, true}, viewWorking{m_gradient, true}, viewOverlay{m_gradient, true},
-      segments{ new Segment{Segment::Head,    0, m_gradient.gradientdata[0]   },
-                new Segment{            1,  512, m_gradient.gradientdata[512] },
-                new Segment{Segment::Tail, last, m_gradient.gradientdata[last]}}
+    GradientEditor(): m_gradient{}, viewCurrent{m_gradient, true}, viewWorking{m_gradient, true}, viewOverlay{m_gradient, true},
+      segstore{}, segments{ new Segment{Segment::Head}, new Segment{Segment::Tail} }, seg_held{ new Segment{Segment::Held} }
     {
         viewOverlay.m_texture.clear(sf::Color::Transparent);
         viewWorking.m_sprite.move(0, GradientNS::bandHeight+1);
         viewOverlay.m_sprite.move(0, GradientNS::bandHeight+1);
-        //DrawSegmentations();  //Do not call within constructor! (requires active ImGui context; not initialized yet)
+        
+        seg_held->color = &m_gradient.gradientdata[0];
+        for(Segment* seg : segments) { seg->color = &m_gradient.gradientdata[seg->color_index]; }
+        for(Segment& segr: segstore) { segr.color = &m_gradient.gradientdata[segr.color_index]; }
+        auto insertpoint = ++segments.cbegin();
+        for(int S{0}; S < GradientNS::segmentCap; ++S) { 
+            insertpoint = segments.insert(insertpoint, &segstore[S]);
+        }
     }
-    #undef last
     
-    //~GradientEditor() { delete segments; }  // TODO: stop leaking memory
+    ~GradientEditor() {
+        Segment* segfront = segments.front();
+        Segment* seg_back = segments.back();
+        if(segfront) delete segfront;
+        if(seg_back) delete seg_back;
+        if(seg_held) delete seg_held;
+    }
 };
 
 
 class GradientWindow: sf::RenderWindow
 {
     const Gradient_T MasterGradient{};
-    GradientEditor Editor;
+    GradientEditor Editor{};
     
     bool isEnabled{false};   // window visibility
     int stored_xposition{0}; // matching mainwindow's x-position  // TODO: try storing a ref to the window position instead? (probably a bad idea)
     sf::Clock clock{}; // imgui-sfml 'Update()' requires deltatime
-    
     
     bool Initialize(int xposition);
     void Create(); // calls sf::RenderWindow.create(...) with some arguments
@@ -142,7 +153,6 @@ class GradientWindow: sf::RenderWindow
     void DrawSegmentations(); // visual guides for the definition-points of the gradient
     void DisplayTestWindows();   // GradientTestWindow.cpp
     void CustomRenderingTest();  // GradientView.cpp
-    
     
     public:
     friend int main(int argc, char** argv);

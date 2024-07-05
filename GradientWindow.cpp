@@ -12,6 +12,8 @@
 // Main.cpp
 extern bool usingVsync;
 
+int GradientEditor::Segment::nextindex{0};
+
 
 bool GradientWindow::Initialize(int xposition)
 {
@@ -132,7 +134,7 @@ void GradientWindow::FrameLoop()
     sf::RenderWindow::draw(Editor.viewWorking);
     sf::RenderWindow::draw(Editor.viewOverlay);
     
-    DisplayTestWindows(); // GradientTestWindow.cpp
+    DisplayTestWindows();  // GradientTestWindow.cpp
     CustomRenderingTest(); // GradientView.cpp
     
     ImGui::SFML::Render(*this);

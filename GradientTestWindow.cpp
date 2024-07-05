@@ -160,9 +160,11 @@ void GradientWindow::DisplayTestWindows()
         constexpr float halfwidth = GradientNS::pixelCount/numcolumns;
         
         if(N >= 2){
+            float hspace = GradientNS::headSpace;
+            if(N == 3) {hspace = GradientNS::bandHeight;} // fourth column is beyond the end of gradient
             ImGui::Begin(columns[N]);
-            ImGui::SetWindowPos({(N+N-2)*halfwidth, GradientNS::headSpace}, ImGuiCond_Once);
-            ImGui::SetWindowSize({halfwidth*(numcolumns-N), GradientNS::windowHeight-GradientNS::headSpace}, ImGuiCond_Once);
+            ImGui::SetWindowPos({(N+N-2)*halfwidth, hspace}, ImGuiCond_Once);
+            ImGui::SetWindowSize({halfwidth*2, GradientNS::windowHeight-hspace}, ImGuiCond_Once);
             ImGui::End();
         } else {
             //if(demoToggleDisplayed) continue;
