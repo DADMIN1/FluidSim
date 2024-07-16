@@ -102,6 +102,46 @@ void GradientWindow::EventLoop()
             }
             break;
             
+            case sf::Event::MouseMoved:
+            {
+                const sf::RenderWindow& rw_ref {*this};
+                const sf::Vector2f mousePosition {static_cast<float>(sf::Mouse::getPosition(rw_ref).x), static_cast<float>(sf::Mouse::getPosition(rw_ref).y)};
+                
+                if(!Editor.hitbox.getLocalBounds().contains(mousePosition)) 
+                { Editor.hitbox.setOutlineColor(sf::Color::Blue); break; }
+                Editor.hitbox.setOutlineColor(sf::Color::Magenta);
+                
+                //if((*Editor.seg_hovered)->hitbox.getGlobalBounds().contains(mousePosition)) break;
+                for (std::list<GradientEditor::Segment*>::iterator segiter{Editor.segments.begin()}; segiter != Editor.segments.end(); ++segiter)
+                {
+                    GradientEditor::Segment* segptr{*segiter};
+                    segptr->hitbox.setOutlineColor(sf::Color::White);
+                    if(segptr->hitbox.getGlobalBounds().contains(mousePosition)) {
+                        segptr->hitbox.setOutlineColor(sf::Color::Magenta);
+                        Editor.seg_hovered = segiter;
+                        break;
+                    }
+                }
+            }
+            break;
+            
+            case sf::Event::MouseButtonPressed:
+                if(gw_event.mouseButton.button==0)
+                {
+                    const sf::RenderWindow& rw_ref {*this};
+                    const sf::Vector2f mousePosition {static_cast<float>(sf::Mouse::getPosition(rw_ref).x), static_cast<float>(sf::Mouse::getPosition(rw_ref).y)};
+                    GradientEditor::Segment* segptr{(*Editor.seg_hovered)};
+                    if(segptr->hitbox.getGlobalBounds().contains(mousePosition) && !segptr->isSelected)
+                    {
+                        segptr->isSelected = true;
+                        segptr->hitbox.setFillColor(sf::Color{0xFF, 0xFF, 0xFF, 0xCC});
+                        break;
+                    }
+                    segptr->isSelected = false;
+                    segptr->hitbox.setFillColor(sf::Color::Transparent);
+                }
+            break;
+            
             // prevents contents from scaling/moving on resize
             case sf::Event::Resized:
             {
@@ -120,6 +160,19 @@ void GradientWindow::EventLoop()
 }
 
 
+void GradientEditor::DrawHitboxes()
+{
+    hitboxLayer.clear(sf::Color::Transparent);
+    hitboxLayer.draw(hitbox);
+    
+    for (const Segment* seg: segments) {
+        hitboxLayer.draw(seg->hitbox);
+    }
+    
+    hitboxLayer.display();
+}
+
+
 void GradientWindow::FrameLoop()
 {
     if(!isEnabled || !isOpen()) { return; }
@@ -133,6 +186,9 @@ void GradientWindow::FrameLoop()
     sf::RenderWindow::draw(Editor.viewCurrent);
     sf::RenderWindow::draw(Editor.viewWorking);
     sf::RenderWindow::draw(Editor.viewOverlay);
+    Editor.DrawHitboxes();
+    static const sf::Sprite hitboxSprite{Editor.hitboxLayer.getTexture()};
+    draw(hitboxSprite);
     
     DisplayTestWindows();  // GradientTestWindow.cpp
     CustomRenderingTest(); // GradientView.cpp

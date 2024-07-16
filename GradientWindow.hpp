@@ -73,14 +73,19 @@ class GradientEditor
     GradientView viewCurrent{m_gradient};
     GradientView viewWorking{m_gradient};
     GradientView viewOverlay{m_gradient};
+    sf::RenderTexture hitboxLayer{};
+    sf::RectangleShape hitbox{{GradientNS::pixelCount, GradientNS::headSpace}}; // for editor region
+    void DrawHitboxes();
     
     struct Segment 
     {
+        bool isSelected{false};
         enum Index: int { Head = -1, Tail = -2, Held = -3 } const index;
-        static int nextindex;
+        static int nextindex; //only used for constructor's default arg
         int  color_index; //into gradient
         sf::Color* color;
         sf::RectangleShape vertical_outline;
+        sf::RectangleShape hitbox;
         
         float Xposition() const { return static_cast<float>(color_index); }
         
@@ -93,7 +98,7 @@ class GradientEditor
             switch(index) {
               case Segment::Held: outlineColor=sf::Color{0xFFFFFFFF};  goto fallthrough;
               case Segment::Tail: color_index = GradientNS::pixelCount-1; [[fallthrough]];
-              case Segment::Head: outlineColor=sf::Color{0xFFFFFFFF};  /*sf::Color{0x00000000};*/
+              case Segment::Head: outlineColor=sf::Color{0x00000000};
               fallthrough: [[fallthrough]];
               default:
                   vertical_outline.setFillColor(sf::Color::Transparent);
@@ -101,6 +106,16 @@ class GradientEditor
                   vertical_outline.setOutlineThickness(1.f);
                   vertical_outline.setPosition(Xposition()-1.f, 0.f); // -1 because rectangle's-position is aligned to left edge
                   // don't set Y-position (always 0 relative to viewOverlay's rendertexture)
+                  // hitbox covering only the triangle
+                  //hitbox = sf::RectangleShape{{GradientNS::triangle_halfsz*2, GradientNS::triangle_halfsz*2}};
+                  //hitbox.setOrigin(GradientNS::triangle_halfsz, GradientNS::triangle_halfsz);
+                  //hitbox.setPosition(Xposition(), (GradientNS::bandHeight*2) + GradientNS::triangle_halfsz);
+                  hitbox = sf::RectangleShape{{GradientNS::triangle_halfsz*2, GradientNS::headSpace-(GradientNS::bandHeight+GradientNS::triangle_halfsz)}};
+                  hitbox.setOrigin(GradientNS::triangle_halfsz, 0);
+                  hitbox.setFillColor(sf::Color::Transparent);
+                  hitbox.setOutlineColor(sf::Color::White);
+                  hitbox.setOutlineThickness(2.f);
+                  hitbox.setPosition(Xposition(), GradientNS::bandHeight+1);
               break;
             }
         }
@@ -109,19 +124,27 @@ class GradientEditor
     std::array<Segment, GradientNS::segmentCap> segstore;
     std::list<Segment*> segments;
     Segment* seg_held;
+    std::list<Segment*>::iterator seg_hovered;
     
     GradientEditor(): m_gradient{}, viewCurrent{m_gradient, true}, viewWorking{m_gradient, true}, viewOverlay{m_gradient, true},
-      segstore{}, segments{ new Segment{Segment::Head}, new Segment{Segment::Tail} }, seg_held{ new Segment{Segment::Held} }
+      segstore{}, segments{ new Segment{Segment::Head}, new Segment{Segment::Tail} }, seg_held{ new Segment{Segment::Held} }, seg_hovered{segments.begin()}
     {
         viewOverlay.m_texture.clear(sf::Color::Transparent);
         viewWorking.m_sprite.move(0, GradientNS::bandHeight+1);
         viewOverlay.m_sprite.move(0, GradientNS::bandHeight+1);
         
+        hitboxLayer.create(GradientNS::pixelCount, GradientNS::headSpace);
+        hitboxLayer.clear(sf::Color::Transparent);
+        
+        hitbox.setFillColor(sf::Color::Transparent);
+        hitbox.setOutlineThickness(-2.f);
+        hitbox.setOutlineColor(sf::Color::Blue);
+        
         seg_held->color = &m_gradient.gradientdata[0];
         for(Segment* seg : segments) { seg->color = &m_gradient.gradientdata[seg->color_index]; }
         for(Segment& segr: segstore) { segr.color = &m_gradient.gradientdata[segr.color_index]; }
         auto insertpoint = ++segments.cbegin();
-        for(int S{0}; S < GradientNS::segmentCap; ++S) { 
+        for(int S{GradientNS::segmentCap-1}; S >= 0; --S) { //looping backwards to match iterator order with (array) indecies
             insertpoint = segments.insert(insertpoint, &segstore[S]);
         }
     }
