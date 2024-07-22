@@ -60,7 +60,7 @@ struct GradientView: sf::Drawable
 };
 
 
-// TODO: implement draggable-interaction
+// TODO: refactor draggable-interaction
 // TODO: color-modifying controls
 // TODO:    logic for splitting / joining segments
 // TODO: controls for splitting / joining segments
@@ -74,7 +74,7 @@ class GradientEditor
     GradientView viewWorking{m_gradient};
     GradientView viewOverlay{m_gradient};
     sf::RenderTexture hitboxLayer{};
-    sf::RectangleShape hitbox{{GradientNS::pixelCount, GradientNS::headSpace}}; // for editor region
+    sf::RectangleShape inbounds{{GradientNS::pixelCount, GradientNS::headSpace}}; // for editor region
     void DrawHitboxes();
     
     struct Segment 
@@ -88,8 +88,11 @@ class GradientEditor
         sf::RectangleShape hitbox;
         
         float Xposition() const { return static_cast<float>(color_index); }
+        bool CheckHitbox(sf::Vector2f mousePosition) const {
+            return (index >= 0)? hitbox.getGlobalBounds().contains(mousePosition) : false;
+        }
         
-        Segment(int pNum = nextindex++):index{pNum},
+        Segment(int pIndex = nextindex++): index{pIndex},
           color_index{ (nextindex*GradientNS::segmentLength) - (GradientNS::segmentLength/2) },
           color{nullptr}, vertical_outline{sf::RectangleShape({2.0f, GradientNS::bandHeight})}
         { 
@@ -125,6 +128,13 @@ class GradientEditor
     std::list<Segment*> segments;
     Segment* seg_held;
     std::list<Segment*>::iterator seg_hovered;
+    bool isDraggingSegment{false};
+    
+    void RelocatePoint(Segment&, int target_colorindex);  // updates position and color-pointer
+    void GrabSegment();
+    void ReleaseHeld();
+    void HandleMousemove(const sf::Vector2f mousePosition); // updates seg_hovered, potentially moves seg_held
+    
     
     GradientEditor(): m_gradient{}, viewCurrent{m_gradient, true}, viewWorking{m_gradient, true}, viewOverlay{m_gradient, true},
       segstore{}, segments{ new Segment{Segment::Head}, new Segment{Segment::Tail} }, seg_held{ new Segment{Segment::Held} }, seg_hovered{segments.begin()}
@@ -136,9 +146,9 @@ class GradientEditor
         hitboxLayer.create(GradientNS::pixelCount, GradientNS::headSpace);
         hitboxLayer.clear(sf::Color::Transparent);
         
-        hitbox.setFillColor(sf::Color::Transparent);
-        hitbox.setOutlineThickness(-2.f);
-        hitbox.setOutlineColor(sf::Color::Blue);
+        inbounds.setFillColor(sf::Color::Transparent);
+        inbounds.setOutlineThickness(-2.f);
+        inbounds.setOutlineColor(sf::Color::Blue);
         
         seg_held->color = &m_gradient.gradientdata[0];
         for(Segment* seg : segments) { seg->color = &m_gradient.gradientdata[seg->color_index]; }
@@ -150,11 +160,11 @@ class GradientEditor
     }
     
     ~GradientEditor() {
-        Segment* segfront = segments.front();
-        Segment* seg_back = segments.back();
-        if(segfront) delete segfront;
-        if(seg_back) delete seg_back;
-        if(seg_held) delete seg_held;
+        Segment* seg_head = segments.front();
+        Segment* seg_tail = segments.back();
+        if(seg_head) delete seg_head;
+        if(seg_tail) delete seg_tail;
+        if(seg_held) delete seg_held; // this would be a problem with swapping; double-free if it's pointing into the array, right?
     }
 };
 

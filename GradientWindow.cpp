@@ -12,8 +12,6 @@
 // Main.cpp
 extern bool usingVsync;
 
-int GradientEditor::Segment::nextindex{0};
-
 
 bool GradientWindow::Initialize(int xposition)
 {
@@ -106,40 +104,32 @@ void GradientWindow::EventLoop()
             {
                 const sf::RenderWindow& rw_ref {*this};
                 const sf::Vector2f mousePosition {static_cast<float>(sf::Mouse::getPosition(rw_ref).x), static_cast<float>(sf::Mouse::getPosition(rw_ref).y)};
-                
-                if(!Editor.hitbox.getLocalBounds().contains(mousePosition)) 
-                { Editor.hitbox.setOutlineColor(sf::Color::Blue); break; }
-                Editor.hitbox.setOutlineColor(sf::Color::Magenta);
-                
-                //if((*Editor.seg_hovered)->hitbox.getGlobalBounds().contains(mousePosition)) break;
-                for (std::list<GradientEditor::Segment*>::iterator segiter{Editor.segments.begin()}; segiter != Editor.segments.end(); ++segiter)
-                {
-                    GradientEditor::Segment* segptr{*segiter};
-                    segptr->hitbox.setOutlineColor(sf::Color::White);
-                    if(segptr->hitbox.getGlobalBounds().contains(mousePosition)) {
-                        segptr->hitbox.setOutlineColor(sf::Color::Magenta);
-                        Editor.seg_hovered = segiter;
-                        break;
-                    }
-                }
+                Editor.HandleMousemove(mousePosition);
             }
             break;
             
             case sf::Event::MouseButtonPressed:
-                if(gw_event.mouseButton.button==0)
+                if(gw_event.mouseButton.button == sf::Mouse::Button::Left)
                 {
                     const sf::RenderWindow& rw_ref {*this};
                     const sf::Vector2f mousePosition {static_cast<float>(sf::Mouse::getPosition(rw_ref).x), static_cast<float>(sf::Mouse::getPosition(rw_ref).y)};
-                    GradientEditor::Segment* segptr{(*Editor.seg_hovered)};
-                    if(segptr->hitbox.getGlobalBounds().contains(mousePosition) && !segptr->isSelected)
+                    GradientEditor::Segment* hovered_seg{*Editor.seg_hovered};
+                    if(hovered_seg->CheckHitbox(mousePosition) && !hovered_seg->isSelected)
                     {
-                        segptr->isSelected = true;
-                        segptr->hitbox.setFillColor(sf::Color{0xFF, 0xFF, 0xFF, 0xCC});
+                        hovered_seg->isSelected = true;
+                        hovered_seg->hitbox.setFillColor(sf::Color{0xFF, 0xFF, 0xFF, 0xCC});
+                        Editor.isDraggingSegment = true;
+                        Editor.GrabSegment();
                         break;
                     }
-                    segptr->isSelected = false;
-                    segptr->hitbox.setFillColor(sf::Color::Transparent);
+                    hovered_seg->isSelected = false;
+                    hovered_seg->hitbox.setFillColor(sf::Color::Transparent);
                 }
+            break;
+            
+            case sf::Event::MouseButtonReleased:
+                if(gw_event.mouseButton.button == sf::Mouse::Button::Left)
+                    Editor.ReleaseHeld();
             break;
             
             // prevents contents from scaling/moving on resize
@@ -157,19 +147,6 @@ void GradientWindow::EventLoop()
     }
     
     return;
-}
-
-
-void GradientEditor::DrawHitboxes()
-{
-    hitboxLayer.clear(sf::Color::Transparent);
-    hitboxLayer.draw(hitbox);
-    
-    for (const Segment* seg: segments) {
-        hitboxLayer.draw(seg->hitbox);
-    }
-    
-    hitboxLayer.display();
 }
 
 
