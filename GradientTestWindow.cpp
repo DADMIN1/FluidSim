@@ -334,3 +334,19 @@ void GradientWindow::DisplayTestWindows()
     
     return;
 }
+
+
+//TODO: reposition this somewhere less annoying
+void GradientWindow::DisplaySelectionInfo()
+{
+    static bool isOpen{true};
+    if(!Editor.seg_range.isValid || !isOpen) return;
+    ImGui::Begin("Selection Info", &isOpen);
+    GradientEditor::Segment& segment = **Editor.seg_range.m_iter;
+    sf::Color* color = segment.color;
+    //ImGui::SeparatorText("Current Point");
+    ImGui::Text("Index:%d ColorIndex:%d", segment.index, segment.color_index);
+    ImGui::Text("R:%d G:%d B:%d", color->r, color->g, color->b);
+    ImGui::End();
+    return;
+}

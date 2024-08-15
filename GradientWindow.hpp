@@ -130,10 +130,65 @@ class GradientEditor
     std::list<Segment*>::iterator seg_hovered;
     bool isDraggingSegment{false};
     
+    // holds a slice of the gradient bounded by segments left and right of held
+    struct SegmentRange
+    {
+        using SegIterT = std::list<Segment*>::iterator;
+        SegIterT m_iter;
+        int colorindex_init, colorindex_held, colorindex_prev, colorindex_next;
+        bool isValid{false};
+        bool wasModified{false};
+        
+        // restrict the current point to that range (disallow overlapping hitboxes)
+        // or swap iterators every time you pass another point
+        std::pair<int,int> GetBounds() const {
+            int offset{GradientNS::triangle_halfsz*2};
+            return {colorindex_prev+offset, colorindex_next-offset};
+        }
+        
+        explicit SegmentRange() = default;
+        
+        // iter must be checked to not equal segments.end BEFORE calling this constructor
+        explicit SegmentRange(SegIterT iter): m_iter{iter}, 
+            colorindex_init{(**iter).color_index}, 
+            colorindex_held{(**iter).color_index}
+        { 
+            Segment* mptr = *iter;
+            if (!mptr) return;
+            switch(mptr->index)
+            {
+                case Segment::Held: return; //invalid
+                case Segment::Head:
+                    colorindex_prev = colorindex_init;
+                    colorindex_next = (**++iter).color_index;
+                break;
+                case Segment::Tail:
+                    colorindex_next = colorindex_init;
+                    colorindex_prev = (**--iter).color_index;
+                break;
+                
+                default:
+                {
+                    SegIterT previter{iter}, nextiter{++iter};
+                    previter = --previter;
+                    colorindex_prev = (**previter).color_index;
+                    colorindex_next = (**nextiter).color_index;
+                }
+                break;
+            }
+            isValid = true;
+        }
+    } seg_range;
+    
     void RelocatePoint(Segment&, int target_colorindex);  // updates position and color-pointer
     void GrabSegment();
     void ReleaseHeld();
     void HandleMousemove(const sf::Vector2f mousePosition); // updates seg_hovered, potentially moves seg_held
+    
+    // isolates the colors inside the segments left/right 
+    auto GetRangeIndecies(const SegmentRange&) const;
+    auto GetRangeContents(const SegmentRange&, const Gradient_T&) const;
+    auto GetRangeContentsMutable(const SegmentRange&, Gradient_T&) const; // allows directly modifying gradient through returned ranges
     
     
     GradientEditor(): m_gradient{}, viewCurrent{m_gradient, true}, viewWorking{m_gradient, true}, viewOverlay{m_gradient, true},
@@ -171,7 +226,7 @@ class GradientEditor
 
 class GradientWindow: sf::RenderWindow
 {
-    const Gradient_T MasterGradient{};
+    Gradient_T MasterGradient{};
     GradientEditor Editor{};
     
     bool isEnabled{false};   // window visibility
@@ -186,6 +241,7 @@ class GradientWindow: sf::RenderWindow
     void DrawSegmentations(); // visual guides for the definition-points of the gradient
     void DisplayTestWindows();   // GradientTestWindow.cpp
     void CustomRenderingTest();  // GradientView.cpp
+    void DisplaySelectionInfo(); // GradientTestWindow.cpp
     
     public:
     friend int main(int argc, char** argv);

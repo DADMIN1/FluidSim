@@ -88,6 +88,7 @@ int main(int argc, char** argv)
     
      mainwindowPtr = &mainwindow;
     gradientWinPtr = &gradientWindow;
+    Fluid::SetActiveGradient(&gradientWindow.MasterGradient);
     
     Simulation simulation{};
     if (!simulation.Initialize()) {

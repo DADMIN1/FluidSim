@@ -10,6 +10,7 @@
 #include <SFML/System/Time.hpp>
 
 #include "Globals.hpp"
+struct Gradient_T;
 
 
 class Fluid
@@ -30,6 +31,7 @@ class Fluid
     static bool isParticleScalingPositive;
     static float gradient_thresholdLow;   // speed at which gradient begins to apply
     static float gradient_thresholdHigh;  // speed that caps out the gradient
+    static Gradient_T* activeGradient;
     
     class Particle : public sf::CircleShape
     {
@@ -64,6 +66,7 @@ class Fluid
     std::vector<Particle> particles;
     
     public:
+    static void SetActiveGradient(Gradient_T* gptr) { activeGradient = gptr; }
     static bool ToggleParticleScaling() { 
         isParticleScalingPositive = !isParticleScalingPositive; 
         return isParticleScalingPositive; 

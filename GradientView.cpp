@@ -1,5 +1,7 @@
 #include "GradientWindow.hpp"
 
+#include <ranges> // GradientEditor::GetRangeContents
+
 #include <imgui.h>
 #include <imgui-SFML.h>
 
@@ -39,6 +41,9 @@ namespace ImGui {
         ImGui::_RenderArrowPointingAt(draw_list, {pos.x, pos.y-4.f}, {half_sz.x+2.f, half_sz.y+6.f}, direction, outline_color, 2.f);
         ImGui::_RenderArrowPointingAt(draw_list, pos, half_sz, direction, color, thickness);
     }
+    
+    //imgui_internal.h: line 479
+    ImVec4 ImLerp(const ImVec4& a, const ImVec4& b, float t) { return ImVec4(a.x+(b.x-a.x)*t, a.y+(b.y-a.y)*t, a.z+(b.z-a.z)*t, a.w+(b.w-a.w)*t); }
 }
 
 
@@ -94,6 +99,143 @@ void GradientWindow::CustomRenderingTest()
 
 int GradientEditor::Segment::nextindex{0}; // static member
 
+//#define DBG_PRINT_SEGMENTS
+#ifdef DBG_PRINT_SEGMENTS
+#include <iostream>
+#include <sstream> // formatting colors as hexadecimal triplets (RGB)
+
+std::string ColorChannelToString(sf::Uint8 sf_colorcomponent)
+{
+    unsigned int C {sf_colorcomponent}; //conversion is required
+    std::stringstream formatbuffer{""};
+    formatbuffer << std::hex << std::uppercase << C;
+    std::string prefix{(C < 0x10)? "0x0" : "0x"}; //single-digit (hex) numbers need padding
+    //'std::showbase' is also be affected by 'std::uppercase', resulting in "0X"; add prefix manually instead
+    // also 'showbase' won't add a prefix to zero, for some reason.
+    return prefix + formatbuffer.str();
+}
+#endif
+
+auto GradientEditor::GetRangeIndecies(const SegmentRange& seg_range) const
+{
+    const int colorindex_held {seg_range.colorindex_held};
+    const int colorindex_prev {seg_range.colorindex_prev};
+    const int colorindex_next {seg_range.colorindex_next};
+    
+    // inclusive
+    auto indecies = std::pair {
+        std::views::iota(colorindex_prev, colorindex_held+1),
+        std::views::iota(colorindex_held, colorindex_next+1),
+    };
+    
+    // non-inclusive
+    /* auto indecies = std::pair {
+        std::views::iota(colorindex_prev+1, colorindex_held),
+        std::views::iota(colorindex_held+1, colorindex_next),
+    }; */
+    
+    #ifdef DBG_PRINT_SEGMENTS
+    std::cout << "Indecies " << std::dec        << "\n";
+    std::cout << "left   : " << colorindex_prev << "\n";
+    std::cout << "right  : " << colorindex_next << "\n";
+    std::cout << "center : " << colorindex_held << "\n";
+    std::cout << '\n' << '\n';
+    
+    auto [left, right] = indecies;
+    for (auto range: {left, right}) {
+        for (int i: range) { std::cout << i << " "; }
+        std::cout << '\n' << '\n';
+    }
+    std::cout << '\n' << '\n';
+    #endif
+    
+    return indecies;
+}
+
+
+// isolates the colors inside the segments left/right 
+auto GradientEditor::GetRangeContents(const SegmentRange& seg_range, const Gradient_T& m_gradient) const
+{
+    const int colorindex_held {seg_range.colorindex_held};
+    const int colorindex_prev {seg_range.colorindex_prev};
+    const int colorindex_next {seg_range.colorindex_next};
+    
+    auto filter_all   = [=](auto&& pair)->bool { const auto&[index,element]=pair; return {(index >= colorindex_prev) && (index <= colorindex_next)}; };
+    auto filter_left  = [=](auto&& pair)->bool { const auto&[index,element]=pair; return {(index >= colorindex_prev) && (index <= colorindex_held)}; };
+    auto filter_right = [=](auto&& pair)->bool { const auto&[index,element]=pair; return {(index >= colorindex_held) && (index <= colorindex_next)}; };
+    
+    auto range_all    = std::ranges::filter_view(std::views::enumerate(m_gradient.gradientdata), filter_all  );
+    auto range_left   = std::ranges::filter_view(std::views::enumerate(m_gradient.gradientdata), filter_left );
+    auto range_right  = std::ranges::filter_view(std::views::enumerate(m_gradient.gradientdata), filter_right);
+    
+    #ifdef DBG_PRINT_SEGMENTS
+    std::cout << "Indecies " << std::dec        << "\n";
+    std::cout << "left   : " << colorindex_prev << "\n";
+    std::cout << "right  : " << colorindex_next << "\n";
+    std::cout << "center : " << colorindex_held << "\n";
+    
+    std::cout << "\nRanges \n";
+    auto PrintRange = [&](auto& range) -> void {
+        for (int count{1}; const auto& [index, color]: range) { 
+            //setting up left-padding for printing index
+            auto oldfill = std::cout.fill('0');
+            auto oldwidth = std::cout.width((colorindex_next>999)? 4:3);
+            std::cout << std::dec << std::right << index << ":";
+            //std::cout << '[' << index << ", " << std::hex << color.toInteger() << ']';
+            std::cout.fill(oldfill); //unsetting
+            std::cout.width(oldwidth);
+            
+            // printing the colors' components individually
+            std::string R{ColorChannelToString(color.r)}, G{ColorChannelToString(color.g)}, B{ColorChannelToString(color.b)};
+            std::cout << "[" << R << " " << G << " " << B << "]";
+            std::cout << (((count++%5)==0)? "\n": " ");
+        }
+        std::cout << '\n' << '\n' << std::dec;
+    };
+    
+    std::cout << "All   \n"; PrintRange(range_all);
+    std::cout << "Left  \n"; PrintRange(range_left);
+    std::cout << "Right \n"; PrintRange(range_right);
+    #endif
+    
+    return std::tuple{range_left, range_right, range_all};
+}
+
+
+// allows directly modifying gradient through returned ranges
+auto GradientEditor::GetRangeContentsMutable(const SegmentRange& seg_range, Gradient_T& m_gradient) const
+{
+    const int colorindex_held {seg_range.colorindex_held};
+    const int colorindex_prev {seg_range.colorindex_prev};
+    const int colorindex_next {seg_range.colorindex_next};
+    auto filter_all   = [=](auto&& pair)->bool { const auto&[index,element]=pair; return {(index >= colorindex_prev) && (index <= colorindex_next)}; };
+    auto filter_left  = [=](auto&& pair)->bool { const auto&[index,element]=pair; return {(index >= colorindex_prev) && (index <= colorindex_held)}; };
+    auto filter_right = [=](auto&& pair)->bool { const auto&[index,element]=pair; return {(index >= colorindex_held) && (index <= colorindex_next)}; };
+    auto range_all    = std::ranges::filter_view(std::views::enumerate(m_gradient.gradientdata), filter_all  );
+    auto range_left   = std::ranges::filter_view(std::views::enumerate(m_gradient.gradientdata), filter_left );
+    auto range_right  = std::ranges::filter_view(std::views::enumerate(m_gradient.gradientdata), filter_right);
+    return std::tuple{range_left, range_right, range_all};
+}
+
+
+// takes and returns a range (std::views::enumerate) of {index, color}
+auto InterpolateSegment(auto enumerated_segment) // not reference
+{
+    auto segment = std::views::values(enumerated_segment);
+    auto indecies = std::views::keys(enumerated_segment);
+    const auto length = std::distance(segment.begin(), segment.end()) - 1;
+    const ImVec4 color_begin = ImVec4(*segment.begin());
+    const ImVec4 color_final = ImVec4(*--segment.end());
+    
+    for (auto[offset, color]: std::views::enumerate(segment)) {
+        color = sf::Color(ImGui::ImLerp(color_begin, color_final, float(offset)/float(length)));
+    }
+    
+    return std::views::zip(indecies, segment);
+}
+
+#undef PRINT_RANGE_CONTENTS
+
 
 void GradientEditor::RelocatePoint(Segment& segment, int target_colorindex)
 {
@@ -108,13 +250,17 @@ void GradientEditor::RelocatePoint(Segment& segment, int target_colorindex)
 
 void GradientEditor::GrabSegment()
 {
+    seg_range.isValid = false;
     if(seg_hovered == segments.end()) return;
     isDraggingSegment = true;
     const Segment& hovered_seg{**seg_hovered};
     if(hovered_seg.index < 0) { isDraggingSegment = false; return; }
     
+    seg_range = SegmentRange(seg_hovered);
+    if(!seg_range.isValid) { isDraggingSegment = false; return; }
+    
     RelocatePoint(*seg_held, hovered_seg.color_index);
-    auto held_iter = segments.insert(seg_hovered, seg_held);
+    /* auto held_iter = */ segments.insert(seg_hovered, seg_held);
     return;
 }
 
@@ -125,6 +271,23 @@ void GradientEditor::ReleaseHeld()
     isDraggingSegment = false;
     RelocatePoint(**seg_hovered, seg_held->color_index); // updating color
     segments.remove(seg_held);
+    
+    if(seg_range.isValid) {
+        seg_range.wasModified = true;
+        seg_range.colorindex_held = seg_held->color_index;
+        
+        GetRangeIndecies(seg_range);
+        #ifdef DBG_PRINT_SEGMENTS
+        GetRangeContents(seg_range, m_gradient);
+        #else
+        auto[left, right, all] = GetRangeContentsMutable(seg_range, m_gradient);
+        //InterpolateSegment(all);
+        InterpolateSegment(left);
+        InterpolateSegment(right);
+        viewWorking.RedrawTexture();
+        #endif
+    }
+    
     return;
 }
 
@@ -134,9 +297,15 @@ void GradientEditor::HandleMousemove(sf::Vector2f mousePosition)
     if(!inbounds.getLocalBounds().contains(mousePosition))
     { inbounds.setOutlineColor(sf::Color::Blue); return; }
     inbounds.setOutlineColor(sf::Color::Magenta);
-
+    
     // simply update the point if we're dragging something
-    if(isDraggingSegment) { RelocatePoint(*seg_held, mousePosition.x); return; }
+    if(isDraggingSegment && seg_range.isValid) {
+        int target = mousePosition.x; //restricting placement to current segment
+        auto [lowerBound, upperBound] = seg_range.GetBounds();
+        if (target < lowerBound) target = lowerBound;
+        if (target > upperBound) target = upperBound;
+        RelocatePoint(*seg_held, target); return;
+    }
     
     // search for hovered_seg otherwise
     for(std::list<Segment*>::iterator segiter{segments.begin()}; segiter != segments.end(); ++segiter)

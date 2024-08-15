@@ -60,8 +60,9 @@ void Fluid::Particle::ApplySpeedcap()
 }
 
 
-float Fluid::gradient_thresholdLow{0.75f};  // speed at which gradient begins to apply
-float Fluid::gradient_thresholdHigh{40.75f};  // caps out the gradient
+float Fluid::gradient_thresholdLow{0.75f};   // speed at which gradient begins to apply
+float Fluid::gradient_thresholdHigh{40.75f}; // caps out the gradient
+Gradient_T* Fluid::activeGradient{nullptr};
 
 
 void Fluid::Particle::UpdateColor(const bool useTransparency)
@@ -85,7 +86,7 @@ void Fluid::Particle::UpdateColor(const bool useTransparency)
         float scale = 1.0f + ((Fluid::isParticleScalingPositive)? particleScaling : -particleScaling);
         setScale({scale, scale});
     }
-    const auto&&[r, g, b, a] = Gradient_T::LookupDefault(speedindex);
+    const auto[r, g, b, a] = activeGradient->Lookup(speedindex);
     setFillColor({r,g,b,alpha});
     return;
 }
@@ -100,6 +101,7 @@ static constexpr float INITIALOFFSETY {(INITIALSPACINGY/2.0f) - DEFAULTRADIUS};
 bool Fluid::Initialize()
 {
     assert((bounceDampening >= 0.0) && (bounceDampening <= 1.0) && "collision-damping must be between 0 and 1");
+    assert((activeGradient != nullptr) && "Fluid's gradient was never set");
     
     if (!particle_texture.create(BOXWIDTH, BOXHEIGHT))
         return false;

@@ -114,7 +114,8 @@ void GradientWindow::EventLoop()
                     const sf::RenderWindow& rw_ref {*this};
                     const sf::Vector2f mousePosition {static_cast<float>(sf::Mouse::getPosition(rw_ref).x), static_cast<float>(sf::Mouse::getPosition(rw_ref).y)};
                     GradientEditor::Segment* hovered_seg{*Editor.seg_hovered};
-                    if(hovered_seg->CheckHitbox(mousePosition) && !hovered_seg->isSelected)
+                    // the 'isSelected' check provided a mechanism for de-selecting segments. But it prevents dragging them twice
+                    if(hovered_seg->CheckHitbox(mousePosition) /* && !hovered_seg->isSelected */)
                     {
                         hovered_seg->isSelected = true;
                         hovered_seg->hitbox.setFillColor(sf::Color{0xFF, 0xFF, 0xFF, 0xCC});
@@ -129,7 +130,14 @@ void GradientWindow::EventLoop()
             
             case sf::Event::MouseButtonReleased:
                 if(gw_event.mouseButton.button == sf::Mouse::Button::Left)
+                {
                     Editor.ReleaseHeld();
+                    if(Editor.seg_range.isValid && Editor.seg_range.wasModified)
+                    {
+                        MasterGradient.gradientdata = Editor.m_gradient.gradientdata;
+                        Editor.seg_range.wasModified = false;
+                    }
+                }
             break;
             
             // prevents contents from scaling/moving on resize
@@ -167,8 +175,9 @@ void GradientWindow::FrameLoop()
     static const sf::Sprite hitboxSprite{Editor.hitboxLayer.getTexture()};
     draw(hitboxSprite);
     
-    DisplayTestWindows();  // GradientTestWindow.cpp
-    CustomRenderingTest(); // GradientView.cpp
+    DisplayTestWindows();   // GradientTestWindow.cpp
+    CustomRenderingTest();  // GradientView.cpp
+    DisplaySelectionInfo(); // GradientView.cpp
     
     ImGui::SFML::Render(*this);
     sf::RenderWindow::display();
