@@ -234,7 +234,22 @@ auto InterpolateSegment(auto enumerated_segment) // not reference
     return std::views::zip(indecies, segment);
 }
 
-#undef PRINT_RANGE_CONTENTS
+void GradientEditor::InterpolateCurrentSegment() {
+    seg_range.wasModified = true;
+    GetRangeIndecies(seg_range);
+    #ifdef DBG_PRINT_SEGMENTS
+    GetRangeContents(seg_range, m_gradient);
+    #else
+    auto[left, right, all] = GetRangeContentsMutable(seg_range, m_gradient);
+    //InterpolateSegment(all);
+    InterpolateSegment(left);
+    InterpolateSegment(right);
+    viewWorking.RedrawTexture();
+    #endif
+    return;
+}
+
+#undef DBG_PRINT_SEGMENTS
 
 
 void GradientEditor::RelocatePoint(Segment& segment, int target_colorindex)
@@ -273,19 +288,7 @@ void GradientEditor::ReleaseHeld()
     segments.remove(seg_held);
     
     if(seg_range.isValid) {
-        seg_range.wasModified = true;
         seg_range.colorindex_held = seg_held->color_index;
-        
-        GetRangeIndecies(seg_range);
-        #ifdef DBG_PRINT_SEGMENTS
-        GetRangeContents(seg_range, m_gradient);
-        #else
-        auto[left, right, all] = GetRangeContentsMutable(seg_range, m_gradient);
-        //InterpolateSegment(all);
-        InterpolateSegment(left);
-        InterpolateSegment(right);
-        viewWorking.RedrawTexture();
-        #endif
     }
     
     return;
@@ -294,9 +297,16 @@ void GradientEditor::ReleaseHeld()
 
 void GradientEditor::HandleMousemove(sf::Vector2f mousePosition)
 {
+    #ifdef DBG_GRADIENTWINDOW_DRAW_HITBOXES
     if(!inbounds.getLocalBounds().contains(mousePosition))
     { inbounds.setOutlineColor(sf::Color::Blue); return; }
     inbounds.setOutlineColor(sf::Color::Magenta);
+    #else
+    if((mousePosition.x > GradientNS::pixelCount) || (mousePosition.x < 0) ||
+       (mousePosition.y > GradientNS::headSpace ) || (mousePosition.y < 0) ){
+        return;
+    }
+    #endif
     
     // simply update the point if we're dragging something
     if(isDraggingSegment && seg_range.isValid) {
@@ -324,6 +334,7 @@ void GradientEditor::HandleMousemove(sf::Vector2f mousePosition)
 }
 
 
+#ifdef DBG_GRADIENTWINDOW_DRAW_HITBOXES
 void GradientEditor::DrawHitboxes()
 {
     hitboxLayer.clear(sf::Color::Transparent);
@@ -337,6 +348,7 @@ void GradientEditor::DrawHitboxes()
     hitboxLayer.display();
     return;
 }
+#endif
 
 
 void GradientWindow::DrawSegmentations()

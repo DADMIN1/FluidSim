@@ -63,7 +63,7 @@ constexpr static const std::array<const char*, 8> colornames {
     color_c_str<5>, color_c_str<6>, color_c_str<7>, color_c_str<8>,
 };
 
-// allocating 10 seperate instances of Vec4Color (directly using Vec4Color with equivalent values would reference the same instance)
+// allocating 8 seperate instances of Vec4Color (directly using Vec4Color with equivalent values would reference the same instance)
 constexpr static const std::array<float* const, 8> colors {
     Vec4Color<0xFFFFFF00>, Vec4Color<0xFFFFFF01>, Vec4Color<0xFFFFFF02>, Vec4Color<0xFFFFFF03>,
     Vec4Color<0xFFFFFF04>, Vec4Color<0xFFFFFF05>, Vec4Color<0xFFFFFF06>, Vec4Color<0xFFFFFF07>,
@@ -159,16 +159,16 @@ void GradientWindow::DisplayTestWindows()
     {
         constexpr float halfwidth = GradientNS::pixelCount/numcolumns;
         
-        if(N >= 2){
+        if(N >= 2) {
             float hspace = GradientNS::headSpace;
             if(N == 3) {hspace = GradientNS::bandHeight;} // fourth column is beyond the end of gradient
-            ImGui::Begin(columns[N]);
+            ImGui::Begin(columns[N], nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoBringToFrontOnFocus);
             ImGui::SetWindowPos({(N+N-2)*halfwidth, hspace}, ImGuiCond_Once);
             ImGui::SetWindowSize({halfwidth*2, GradientNS::windowHeight-hspace}, ImGuiCond_Once);
             ImGui::End();
         } else {
             //if(demoToggleDisplayed) continue;
-            ImGui::Begin(columns[N]);
+            ImGui::Begin(columns[N], nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoBringToFrontOnFocus);
             ImGui::SetWindowPos({N*halfwidth, GradientNS::headSpace}, ImGuiCond_Once);
             ImGui::SetWindowSize({halfwidth, GradientNS::windowHeight-GradientNS::headSpace}, ImGuiCond_Once);
             ImGui::End();
@@ -315,12 +315,21 @@ void GradientWindow::DisplayTestWindows()
     ImGui::Checkbox("Horizontal layout", &isLayoutHorizontal);
     
     float width = ImGui::GetContentRegionAvail().x;
-    if(isLayoutHorizontal ) {
+    if(isLayoutHorizontal) {
         width *= 0.5f;
         pickerflags1 |= ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoSidePreview;  // these two absolutely destroy horizontal spacing
         pickerflags2 |= ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoSidePreview;
         ImGui::SetNextItemWidth(width);
     }
+    
+    // updating color-controls to match last-moved segment
+    if(heldSegmentWasChanged && Editor.seg_range.isValid) {
+        const sf::Color& colorRef = Editor.m_gradient.Lookup(Editor.seg_range.colorindex_held);
+        float* const color7 = colors[7];
+        const ImVec4 newcolor = ImGui::ColorConvertU32ToFloat4(IM_COL32(colorRef.r, colorRef.g, colorRef.b, 0xFF));
+        color7[0]=newcolor.x; color7[1]=newcolor.y; color7[2]=newcolor.z; color7[3]=newcolor.w;
+        heldSegmentWasChanged = false;
+    } //TODO: refactor this into a function
     
     IMGUICOLORWIDGET(ImGui::ColorPicker4,   7, 0x7788FFAA, pickerflags1);
     if(isLayoutHorizontal) { ImGui::SameLine(); ImGui::SetNextItemWidth(width); }
@@ -328,6 +337,26 @@ void GradientWindow::DisplayTestWindows()
     // passing '7' and '8-1' is a ridiculous hack to get two (different) widgets pointing to the same color, without physically linking them
     
     ImGui::Separator();
+    ImGui::BeginDisabled(!Editor.seg_range.isValid);
+    
+    if(ImGui::Button("Apply")) {
+        float* const color7 = colors[7];
+        sf::Color& colorRef = Editor.m_gradient.gradientdata[Editor.seg_range.colorindex_held];
+        colorRef = sf::Color{ImVec4{color7[0],color7[1],color7[2],color7[3]}};
+        Editor.InterpolateCurrentSegment();
+    } ImGui::SameLine(); ImGui::HelpMarker("Applies color to segment and interpolates");
+    
+    ImGui::SameLine();
+    
+    if(ImGui::Button("Reset")) {
+        const sf::Color& colorRef = Editor.m_gradient.Lookup(Editor.seg_range.colorindex_held);
+        float* const color7 = colors[7];
+        const ImVec4 newcolor = ImGui::ColorConvertU32ToFloat4(IM_COL32(colorRef.r, colorRef.g, colorRef.b, 0xFF));
+        color7[0]=newcolor.x; color7[1]=newcolor.y; color7[2]=newcolor.z; color7[3]=newcolor.w;
+    } ImGui::SameLine(); ImGui::HelpMarker("Reset editor color to current segment");
+    
+    ImGui::EndDisabled();
+    
     ImGui::End(); //column 4
     
     if(demoToggleDisplayed) { DisplayDemoToggle(); }
@@ -336,17 +365,22 @@ void GradientWindow::DisplayTestWindows()
 }
 
 
-//TODO: reposition this somewhere less annoying
 void GradientWindow::DisplaySelectionInfo()
 {
     static bool isOpen{true};
     if(!Editor.seg_range.isValid || !isOpen) return;
-    ImGui::Begin("Selection Info", &isOpen);
-    GradientEditor::Segment& segment = **Editor.seg_range.m_iter;
-    sf::Color* color = segment.color;
+    ImGui::SetNextWindowPos({512, 512}, ImGuiCond_Once);
+    ImGui::Begin("Selection Info", &isOpen, ImGuiWindowFlags_NoBackground);
+    const GradientEditor::Segment& segment = **Editor.seg_range.m_iter;
+    sf::Color* const color = segment.color;
     //ImGui::SeparatorText("Current Point");
     ImGui::Text("Index:%d ColorIndex:%d", segment.index, segment.color_index);
     ImGui::Text("R:%d G:%d B:%d", color->r, color->g, color->b);
+    
+    float* const color7 = colors[7];
+    ImGui::Text("Color7");
+    ImGui::Text("R:%f G:%f B:%f", color7[0], color7[1], color7[2]);
     ImGui::End();
+    
     return;
 }

@@ -12,6 +12,9 @@
 #include <SFML/Graphics/RenderWindow.hpp>
 
 
+// visuals for mouse-detection/interaction
+//#define DBG_GRADIENTWINDOW_DRAW_HITBOXES
+
 namespace GradientNS {
     constexpr int pixelCount{1024};
     constexpr int bandHeight  {64};
@@ -61,7 +64,6 @@ struct GradientView: sf::Drawable
 
 
 // TODO: refactor draggable-interaction
-// TODO: color-modifying controls
 // TODO:    logic for splitting / joining segments
 // TODO: controls for splitting / joining segments
 
@@ -73,9 +75,11 @@ class GradientEditor
     GradientView viewCurrent{m_gradient};
     GradientView viewWorking{m_gradient};
     GradientView viewOverlay{m_gradient};
+    #ifdef DBG_GRADIENTWINDOW_DRAW_HITBOXES
     sf::RenderTexture hitboxLayer{};
     sf::RectangleShape inbounds{{GradientNS::pixelCount, GradientNS::headSpace}}; // for editor region
     void DrawHitboxes();
+    #endif
     
     struct Segment 
     {
@@ -189,7 +193,7 @@ class GradientEditor
     auto GetRangeIndecies(const SegmentRange&) const;
     auto GetRangeContents(const SegmentRange&, const Gradient_T&) const;
     auto GetRangeContentsMutable(const SegmentRange&, Gradient_T&) const; // allows directly modifying gradient through returned ranges
-    
+    void InterpolateCurrentSegment();
     
     GradientEditor(): m_gradient{}, viewCurrent{m_gradient, true}, viewWorking{m_gradient, true}, viewOverlay{m_gradient, true},
       segstore{}, segments{ new Segment{Segment::Head}, new Segment{Segment::Tail} }, seg_held{ new Segment{Segment::Held} }, seg_hovered{segments.begin()}
@@ -198,12 +202,14 @@ class GradientEditor
         viewWorking.m_sprite.move(0, GradientNS::bandHeight+1);
         viewOverlay.m_sprite.move(0, GradientNS::bandHeight+1);
         
+        #ifdef DBG_GRADIENTWINDOW_DRAW_HITBOXES
         hitboxLayer.create(GradientNS::pixelCount, GradientNS::headSpace);
         hitboxLayer.clear(sf::Color::Transparent);
         
         inbounds.setFillColor(sf::Color::Transparent);
         inbounds.setOutlineThickness(-2.f);
         inbounds.setOutlineColor(sf::Color::Blue);
+        #endif
         
         seg_held->color = &m_gradient.gradientdata[0];
         for(Segment* seg : segments) { seg->color = &m_gradient.gradientdata[seg->color_index]; }
@@ -232,6 +238,7 @@ class GradientWindow: sf::RenderWindow
     bool isEnabled{false};   // window visibility
     int stored_xposition{0}; // matching mainwindow's x-position  // TODO: try storing a ref to the window position instead? (probably a bad idea)
     sf::Clock clock{}; // imgui-sfml 'Update()' requires deltatime
+    bool heldSegmentWasChanged{false}; // indicates that color-controls need to re-check the segment-color
     
     bool Initialize(int xposition);
     void Create(); // calls sf::RenderWindow.create(...) with some arguments

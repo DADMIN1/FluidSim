@@ -109,14 +109,29 @@ void GradientWindow::EventLoop()
             break;
             
             case sf::Event::MouseButtonPressed:
+            {
+                const sf::RenderWindow& rw_ref {*this};
+                const sf::Vector2f mousePosition {static_cast<float>(sf::Mouse::getPosition(rw_ref).x), static_cast<float>(sf::Mouse::getPosition(rw_ref).y)};
+                
+                // early-exit if not inbounds (of GradientEditor)
+                #ifdef DBG_GRADIENTWINDOW_DRAW_HITBOXES
+                if(!Editor.inbounds.getLocalBounds().contains(mousePosition)) break;
+                #else
+                if((mousePosition.x > GradientNS::pixelCount) || (mousePosition.x < 0) ||
+                   (mousePosition.y > GradientNS::headSpace ) || (mousePosition.y < 0) ){
+                    break;
+                }
+                #endif
+                
                 if(gw_event.mouseButton.button == sf::Mouse::Button::Left)
                 {
-                    const sf::RenderWindow& rw_ref {*this};
-                    const sf::Vector2f mousePosition {static_cast<float>(sf::Mouse::getPosition(rw_ref).x), static_cast<float>(sf::Mouse::getPosition(rw_ref).y)};
                     GradientEditor::Segment* hovered_seg{*Editor.seg_hovered};
-                    // the 'isSelected' check provided a mechanism for de-selecting segments. But it prevents dragging them twice
-                    if(hovered_seg->CheckHitbox(mousePosition) /* && !hovered_seg->isSelected */)
+                    if(hovered_seg->CheckHitbox(mousePosition))
                     {
+                        static GradientEditor::Segment* last_selected {nullptr};
+                        if(last_selected) { last_selected->isSelected = false; }
+                        last_selected = hovered_seg;
+                        
                         hovered_seg->isSelected = true;
                         hovered_seg->hitbox.setFillColor(sf::Color{0xFF, 0xFF, 0xFF, 0xCC});
                         Editor.isDraggingSegment = true;
@@ -126,16 +141,25 @@ void GradientWindow::EventLoop()
                     hovered_seg->isSelected = false;
                     hovered_seg->hitbox.setFillColor(sf::Color::Transparent);
                 }
+                else if(gw_event.mouseButton.button == sf::Mouse::Button::Right)
+                { // deselect all points/segments
+                    Editor.ReleaseHeld();
+                    Editor.isDraggingSegment = false;
+                    Editor.seg_range.isValid = false;
+                    for (auto& segment: Editor.segments) {
+                        segment->isSelected = false;
+                        segment->hitbox.setFillColor(sf::Color::Transparent);
+                    }
+                }
+            }
             break;
             
             case sf::Event::MouseButtonReleased:
                 if(gw_event.mouseButton.button == sf::Mouse::Button::Left)
                 {
-                    Editor.ReleaseHeld();
-                    if(Editor.seg_range.isValid && Editor.seg_range.wasModified)
-                    {
-                        MasterGradient.gradientdata = Editor.m_gradient.gradientdata;
-                        Editor.seg_range.wasModified = false;
+                    if(Editor.seg_range.isValid && Editor.isDraggingSegment) {
+                        Editor.ReleaseHeld();
+                        heldSegmentWasChanged = true;
                     }
                 }
             break;
@@ -171,13 +195,20 @@ void GradientWindow::FrameLoop()
     sf::RenderWindow::draw(Editor.viewCurrent);
     sf::RenderWindow::draw(Editor.viewWorking);
     sf::RenderWindow::draw(Editor.viewOverlay);
+    #ifdef DBG_GRADIENTWINDOW_DRAW_HITBOXES
     Editor.DrawHitboxes();
     static const sf::Sprite hitboxSprite{Editor.hitboxLayer.getTexture()};
     draw(hitboxSprite);
+    #endif
     
     DisplayTestWindows();   // GradientTestWindow.cpp
-    CustomRenderingTest();  // GradientView.cpp
-    DisplaySelectionInfo(); // GradientView.cpp
+    //CustomRenderingTest();  // GradientView.cpp
+    //DisplaySelectionInfo(); // GradientView.cpp
+    
+    if(Editor.seg_range.isValid && Editor.seg_range.wasModified) {
+        MasterGradient.gradientdata = Editor.m_gradient.gradientdata;
+        Editor.seg_range.wasModified = false;
+    }
     
     ImGui::SFML::Render(*this);
     sf::RenderWindow::display();
