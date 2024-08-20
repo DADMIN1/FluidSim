@@ -96,7 +96,13 @@ class Simulation
     std::mutex write_mutex;
     std::random_device RNG; // TODO: savestates
     float normalizedRNG() {
-        return RNG() / RNG.max();
+        static float last{0.0f};
+        float rng = RNG() / RNG.max();
+        bool sign {rng > last};
+        if(!sign) rng *= -last; // * -2?
+        last += last*rng;
+        return (sign? rng : -rng);
+        //TODO: figure out how to get 3 rings again
     }
     
     bool hasGravity {false};
@@ -106,7 +112,7 @@ class Simulation
     friend int main(int argc, char** argv); // only so that the turbulence render block can check 'isPaused'
     
     // TODO: scale these based on density
-    float momentumTransfer{0.165}; // percentage of velocity transferred to cell (and lost) by particle
+    float momentumTransfer{0.375}; // percentage of velocity transferred to cell (and lost) by particle
     float momentumDistribution{0.25}; // percentage of cell's total momentum distributed to local particles per timestep
     
     // identifies Particles that have crossed a cell-boundary

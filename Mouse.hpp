@@ -18,7 +18,7 @@ struct CellState_T;
 
 // TODO: multi-layered, stacked overlays
 // Provides mouse-related interactions for the simulation
-class Mouse_T: private sf::Mouse, public sf::CircleShape
+class Mouse_T: private sf::Mouse, private sf::CircleShape
 {
     enum Mode {
         Disabled,
@@ -44,7 +44,7 @@ class Mouse_T: private sf::Mouse, public sf::CircleShape
     
     
     sf::RenderWindow& window; // TODO: refactor this out
-    float strength {96.0};  // for push/pull modes
+    float strength {64.0};  // for push/pull modes
     int radialDist {defaultRD};  // orthogonal distance of adjacent cells included in effect
     
     DiffusionField* fieldptr; // &fluid.DiffusionField

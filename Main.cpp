@@ -36,7 +36,8 @@ bool windowClearDisabled{false};  // option used by the turbulence shader
 // for MainGUI.cpp (controlling VSync)
 sf::RenderWindow* mainwindowPtr {nullptr};
 sf::RenderWindow* gradientWinPtr{nullptr}; // pointing to base-class, not 'GradientWindow*'; otherwise MainGUI would require definition
-bool usingVsync {true};
+bool usingVsync {false}; //bugged?
+constexpr const int framerateCap{300};
 
 // cell-grid
 bool shouldDrawGrid {false};
@@ -75,7 +76,7 @@ int main(int argc, char** argv)
     constexpr auto mainstyle = sf::Style::Close;  // disabling resizing
     sf::RenderWindow mainwindow (sf::VideoMode(BOXWIDTH, BOXHEIGHT), "FLUIDSIM", mainstyle);
     mainwindow.setPosition({2600, 0}); // move to right monitor
-    // mainwindow.setFramerateLimit(framerateCap);
+    mainwindow.setFramerateLimit(framerateCap);
     mainwindow.setVerticalSyncEnabled(usingVsync);
     
     GradientWindow gradientWindow{};
@@ -420,7 +421,7 @@ int main(int argc, char** argv)
             // unlike the normal frameloop, here the mouse-outline is drawn even if the mouse is inactive;
             // without it, there's no visual indicator that the mouse is enabled, and no position.
             mainwindow.display();
-            timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
+            timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() * 0.00006667);
             timestepRatio *= timestepMultiplier;
             continue;
         }
@@ -458,7 +459,9 @@ int main(int argc, char** argv)
         
         mainwindow.display();
         
-        timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
+        // this is assuming 60FPS?
+        //timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() / 16666.66667);
+        timestepRatio = float(frametimer.getElapsedTime().asMicroseconds() * 0.00006667);
         timestepRatio *= timestepMultiplier;
     }
     

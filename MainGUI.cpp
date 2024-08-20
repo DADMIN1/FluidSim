@@ -11,6 +11,7 @@
 
 // Main.cpp
 extern bool usingVsync;
+extern const int framerateCap;
 extern sf::RenderWindow* mainwindowPtr;
 extern sf::RenderWindow* gradientWinPtr; // only for windowcount and setting vsync
 // required for Mouse controls (when painting-debug is toggled)
@@ -86,7 +87,7 @@ bool MainGUI::Initialize()
     
     //imguiIO.ConfigInputTrickleEventQueue      = false; // spreads interactions (like simultaneous keypresses) across multiple frames
     //imguiIO.ConfigInputTextEnterKeepActive    = true ; // keep input focused after hitting enter
-    //imguiIO.ConfigWindowsResizeFromEdges      = false ; // can be annoying, and it requires BackendFlags_HasMouseCursors anyway
+    imguiIO.ConfigWindowsResizeFromEdges      = false ; // can be annoying, and it requires BackendFlags_HasMouseCursors anyway
     imguiIO.ConfigWindowsMoveFromTitleBarOnly = true ;
     
     imguiIO.ConfigFlags = ImGuiConfigFlags {
@@ -97,7 +98,7 @@ bool MainGUI::Initialize()
         //| ImGuiConfigFlags_IsSRGB // Application is SRGB-aware. NOT used by core Dear ImGui (only used by backends, maybe)
     };
     
-    imguiIO.BackendFlags = ImGuiBackendFlags_HasMouseCursors;  // required for 'ResizeFromEdges'
+    //imguiIO.BackendFlags = ImGuiBackendFlags_HasMouseCursors;  // required for 'ResizeFromEdges'
     imguiIO.IniFilename = NULL; // disable autosaving of the 'imgui.ini' config file (just stores window states)
     
     // shaders must be initialized before this!
@@ -123,6 +124,7 @@ void MainGUI::Create()
     // sf::Style::Default = Titlebar | Resize | Close
     sf::RenderWindow::create(sf::VideoMode(m_width, m_height), "MainGUI [FLUIDSIM]", m_style);
     setVerticalSyncEnabled(usingVsync);
+    setFramerateLimit(framerateCap);
     clock.restart();
     return;
 }
@@ -180,8 +182,12 @@ int NumWindowsOpen() {
 void MainGUI::DrawFPS_Section() // FPS display and VSync
 {
     // the framerate is reported as divided among each window, so we compensate
-    float framerate = ImGui::GetIO().Framerate * NumWindowsOpen();
+    // can't tell if the Nvidia overlay is wrong or ImGui? I'm assuming the latter, since Nvidia's matches VSync.
+    float framerate = ImGui::GetIO().Framerate;
+    float framerate_adj = framerate * NumWindowsOpen();
+    
     ImGui::Text("%.1f FPS (%.3f ms/frame)", framerate, 1000.0f/framerate);
+    ImGui::Text("%.1f FPS (actual) (%.3f ms/frame)", framerate_adj, 1000.0f/framerate_adj);
     ImGui::Separator();
     
     if (ImGui::Checkbox("VSync:", &usingVsync)) // returns true if state has changed

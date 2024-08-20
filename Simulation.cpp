@@ -102,7 +102,8 @@ DeltaMap Simulation::FindCellTransitions(const auto& particles_slice) const
 void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap)
 {
     std::lock_guard<std::mutex> pmGuard(write_mutex);
-    const float rng = (0.825f + normalizedRNG())*(0.825f + normalizedRNG());
+    constexpr float turbulence_offset = { 50.f / float(NUMROWS+NUMCOLUMNS)};
+    const float rng = (turbulence_offset+normalizedRNG())*(turbulence_offset+normalizedRNG());
     
     // 'auto&&' is definitely correct here; ~100 FPS difference (300->400)
     for (auto&& [cellID, delta]: cellmap)
@@ -132,7 +133,7 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
             particle.cellID = cellID;
         }
         
-        if (fluid.isTurbulent) {
+        /* if (fluid.isTurbulent) {
             // applying momentumSmoothing to leaving particles
             for (const int particleID: delta.particlesRemoved)
             {
@@ -141,7 +142,7 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
                 //cell.momentum -= momentumSmoothing*momentumDistribution;
                 //Cell& newCell = diffusionField.cells[cellID];
             }
-        }
+        } */
         
         // transferring momentum to cell and updating particle's cellID
         /* for (const int particleID: delta.particlesAdded) 

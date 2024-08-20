@@ -60,8 +60,8 @@ void Fluid::Particle::ApplySpeedcap()
 }
 
 
-float Fluid::gradient_thresholdLow{0.75f};   // speed at which gradient begins to apply
-float Fluid::gradient_thresholdHigh{40.75f}; // caps out the gradient
+float Fluid::gradient_thresholdLow{0.00f};   // speed at which gradient begins to apply
+float Fluid::gradient_thresholdHigh{32.00f}; // caps out the gradient
 Gradient_T* Fluid::activeGradient{nullptr};
 
 

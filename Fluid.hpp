@@ -17,8 +17,8 @@ class Fluid
 {
     float gravity {0.295};
     float xgravity {0.295};
-    float viscosity {0.005675};
-    float fdensity {0.01975}; // controls 'force' of diffusion
+    float viscosity {0.00275};
+    float fdensity {0.02175}; // controls 'force' of diffusion
     float bounceDampening {0.1915};
     static constexpr float speedcap_soft{100.f};
     static constexpr float speedcap_hard{200.f};

@@ -11,6 +11,7 @@
 
 // Main.cpp
 extern bool usingVsync;
+extern int framerateCap;
 
 
 bool GradientWindow::Initialize(int xposition)
@@ -24,7 +25,7 @@ bool GradientWindow::Initialize(int xposition)
     
     // imguiIO.ConfigInputTrickleEventQueue      = false; // spreads interactions (like simultaneous keypresses) across multiple frames
     imguiIO.ConfigInputTextEnterKeepActive    = true ; // keep input focused after hitting enter
-    //imguiIO.ConfigWindowsResizeFromEdges      = false; // can be annoying, and it requires BackendFlags_HasMouseCursors anyway
+    imguiIO.ConfigWindowsResizeFromEdges      = false; // can be annoying, and it requires BackendFlags_HasMouseCursors anyway
     imguiIO.ConfigWindowsMoveFromTitleBarOnly = true ;
     
     imguiIO.ConfigFlags = ImGuiConfigFlags {
@@ -35,7 +36,7 @@ bool GradientWindow::Initialize(int xposition)
         //| ImGuiConfigFlags_IsSRGB // Application is SRGB-aware. NOT used by core Dear ImGui (only used by backends, maybe)
     };
     
-    imguiIO.BackendFlags = ImGuiBackendFlags_HasMouseCursors;  // required for 'ResizeFromEdges'
+    //imguiIO.BackendFlags = ImGuiBackendFlags_HasMouseCursors;  // required for 'ResizeFromEdges'
     imguiIO.IniFilename = NULL; // disable autosaving of the 'imgui.ini' config file (just stores window states)
     
     return true;
@@ -48,6 +49,7 @@ void GradientWindow::Create()
     constexpr auto m_style = sf::Style::Titlebar | sf::Style::Resize | sf::Style::Close;
     sf::RenderWindow::create(sf::VideoMode(GradientNS::windowWidth, GradientNS::windowHeight), "GradientWindow [FLUIDSIM]", m_style);
     setVerticalSyncEnabled(usingVsync);
+    setFramerateLimit(framerateCap);
     AdjustPosition();
     setVisible(isEnabled);
     clock.restart();
