@@ -234,13 +234,24 @@ auto InterpolateSegment(auto enumerated_segment) // not reference
     return std::views::zip(indecies, segment);
 }
 
-void GradientEditor::InterpolateCurrentSegment() {
+void GradientEditor::InterpolateCurrentSegment()
+{
     seg_range.wasModified = true;
-    GetRangeIndecies(seg_range);
     #ifdef DBG_PRINT_SEGMENTS
+    GetRangeIndecies(seg_range);
     GetRangeContents(seg_range, m_gradient);
     #else
     auto[left, right, all] = GetRangeContentsMutable(seg_range, m_gradient);
+    
+    // extending color to gradient endpoints for edge segments
+    Segment& current = **seg_range.m_iter;
+    std::list<Segment*>::iterator iter = seg_range.m_iter;
+    Segment& leftSeg = **--iter;  iter = seg_range.m_iter;
+    Segment& rghtSeg = **++iter;
+    if(leftSeg.index == Segment::Index::Head) { *leftSeg.color = *current.color;}
+    if(rghtSeg.index == Segment::Index::Tail) { *rghtSeg.color = *current.color;}
+    // TODO: should set defaults for endpoints instead during 'reset' actions
+    
     //InterpolateSegment(all);
     InterpolateSegment(left);
     InterpolateSegment(right);

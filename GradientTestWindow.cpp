@@ -322,14 +322,6 @@ void GradientWindow::DisplayTestWindows()
         ImGui::SetNextItemWidth(width);
     }
     
-    // updating color-controls to match last-moved segment
-    if(heldSegmentWasChanged && Editor.seg_range.isValid) {
-        const sf::Color& colorRef = Editor.m_gradient.Lookup(Editor.seg_range.colorindex_held);
-        float* const color7 = colors[7];
-        const ImVec4 newcolor = ImGui::ColorConvertU32ToFloat4(IM_COL32(colorRef.r, colorRef.g, colorRef.b, 0xFF));
-        color7[0]=newcolor.x; color7[1]=newcolor.y; color7[2]=newcolor.z; color7[3]=newcolor.w;
-        heldSegmentWasChanged = false;
-    } //TODO: refactor this into a function
     
     IMGUICOLORWIDGET(ImGui::ColorPicker4,   7, 0x7788FFAA, pickerflags1);
     if(isLayoutHorizontal) { ImGui::SameLine(); ImGui::SetNextItemWidth(width); }
@@ -337,25 +329,7 @@ void GradientWindow::DisplayTestWindows()
     // passing '7' and '8-1' is a ridiculous hack to get two (different) widgets pointing to the same color, without physically linking them
     
     ImGui::Separator();
-    ImGui::BeginDisabled(!Editor.seg_range.isValid);
-    
-    if(ImGui::Button("Apply")) {
-        float* const color7 = colors[7];
-        sf::Color& colorRef = Editor.m_gradient.gradientdata[Editor.seg_range.colorindex_held];
-        colorRef = sf::Color{ImVec4{color7[0],color7[1],color7[2],color7[3]}};
-        Editor.InterpolateCurrentSegment();
-    } ImGui::SameLine(); ImGui::HelpMarker("Applies color to segment and interpolates");
-    
-    ImGui::SameLine();
-    
-    if(ImGui::Button("Reset")) {
-        const sf::Color& colorRef = Editor.m_gradient.Lookup(Editor.seg_range.colorindex_held);
-        float* const color7 = colors[7];
-        const ImVec4 newcolor = ImGui::ColorConvertU32ToFloat4(IM_COL32(colorRef.r, colorRef.g, colorRef.b, 0xFF));
-        color7[0]=newcolor.x; color7[1]=newcolor.y; color7[2]=newcolor.z; color7[3]=newcolor.w;
-    } ImGui::SameLine(); ImGui::HelpMarker("Reset editor color to current segment");
-    
-    ImGui::EndDisabled();
+    DisplayEditorButtons();
     
     ImGui::End(); //column 4
     
@@ -384,3 +358,103 @@ void GradientWindow::DisplaySelectionInfo()
     
     return;
 }
+
+// TODO: create an alt-version of this file without the test stuff
+
+// reads the held_seg into the stored color, or writes the stored color into held_seg
+// 'stored_color_index' corresponds to the 'colors' array at the top of this file (index 7 belongs to colorpickers/wheel in COLUMN4)
+void GradientEditor::UpdateColorControls(bool write=false, unsigned int stored_color_index=7, bool lookupDefault=false)
+{
+    assert((stored_color_index < colors.size()) && "stored_color_index is too large!");
+    float* const stored = colors[stored_color_index];
+    if (write) {
+        sf::Color& colorRefMutable = m_gradient.gradientdata[seg_range.colorindex_held];
+        colorRefMutable = sf::Color{ImVec4{stored[0],stored[1],stored[2],stored[3]}};
+    }
+    else {
+        const sf::Color& colorRef = lookupDefault? 
+            m_gradient.LookupDefault(seg_range.colorindex_held):
+            m_gradient.Lookup(seg_range.colorindex_held);
+        const ImVec4 newcolor = ImGui::ColorConvertU32ToFloat4(IM_COL32(colorRef.r, colorRef.g, colorRef.b, 0xFF));
+        stored[0]=newcolor.x; stored[1]=newcolor.y; stored[2]=newcolor.z; stored[3]=newcolor.w;
+    }
+    return;
+}
+
+
+// color7: main editing var (colorpicker/wheel pair)
+// color6: last color applied (coloredit3)
+// color5: current color of selected segment (coloredit4)
+
+// This is how the IMGUICOLORWIDGET macro references the colors:
+/*
+    static auto& backupColor {colors[6]};
+    ImGui::ColorEdit3("backupColor", backupColor);
+*/
+
+void GradientWindow::DisplayEditorButtons()
+{
+    static bool disableUpdatesFromSlider{false};
+    ImGui::Checkbox("Lock Editor", &disableUpdatesFromSlider);
+    ImGui::SameLine(); ImGui::HelpMarker("Prevent color-editor from updating upon segment selection");
+    
+    // updating color-controls to match last-moved segment
+    if(heldSegmentWasChanged && Editor.seg_range.isValid) {
+        if(!disableUpdatesFromSlider) {
+            Editor.UpdateColorControls(false);    // reads from segment into color7
+            Editor.UpdateColorControls(false, 5); // reads into color5
+        } // maybe we should always keep color5 synced with segment?
+        heldSegmentWasChanged = false;
+    }
+    
+    // Disable controls operating on a single segment until there is a selection
+    ImGui::BeginDisabled(!Editor.seg_range.isValid);
+    
+    if(ImGui::Button("Apply")) {
+        Editor.UpdateColorControls(false, 5); // reads the old (current) color and backs it up in color5
+        Editor.UpdateColorControls(true);     // writes to segment from color7
+        Editor.UpdateColorControls(false, 6); // reads the new color back into color6
+        Editor.InterpolateCurrentSegment();
+    } /*ImGui::SameLine(); ImGui::HelpMarker("Applies color to segment and interpolates");*/
+    
+    ImGui::SameLine();
+    
+    // held_seg, color7, color6 are all the same after 'apply', though color7 may change later (user interaction)
+    // color5 holds previous color of held_seg, but will change after any user-interaction with the segments (intended, since changing the held_seg breaks the logic)
+    // held_seg and color7 need to be set to color5.
+    // color6 will then have the 'old new' color, which we want to swap into color5 to set-up for another potential undo
+    if(ImGui::Button("Undo/Revert")) {
+        Editor.UpdateColorControls(true, 5);  // moves color5 into seg_held (temp)
+        Editor.UpdateColorControls(false);    // re-reads seg_held into color7
+        Editor.UpdateColorControls(true, 6);  // stores color6 in seg_held (temp)
+        Editor.UpdateColorControls(false, 5); // writes color6 from seg_held into color5
+        Editor.UpdateColorControls(true);     // re-writes color5 from color7 into seg_held
+        Editor.UpdateColorControls(false, 6); // finishes swap of color6 and color5
+        Editor.UpdateColorControls(true);     // re-writes color5 from color7 into seg_held
+        Editor.InterpolateCurrentSegment();
+    } /*ImGui::SameLine(); ImGui::HelpMarker("Undo a color change");*/
+    
+    //ImGui::Separator();
+    
+    if(ImGui::Button("Reset")) {
+        // moving the last-set color into color5; setting up for an 'undo'
+        Editor.UpdateColorControls(true,  6); // moving color6 into seg_held (temp)
+        Editor.UpdateColorControls(false, 5); // finishes moving color6 into color5
+        Editor.UpdateColorControls(false, 6, true); // overwrites color6 with default
+        // resetting color
+        Editor.UpdateColorControls(false, 7, true); // overwrites color7 with default
+        Editor.UpdateColorControls(true);           // writes default to segment
+        Editor.InterpolateCurrentSegment();
+    } /*ImGui::SameLine(); ImGui::HelpMarker("Reset segment to it's original color");*/
+    
+    ImGui::SameLine();
+    ImGui::EndDisabled(); // "Reset-all" does not require a selection
+    
+    if(ImGui::Button("Reset-All")) {
+        Editor.m_gradient.Reset();
+        Editor.viewWorking.RedrawTexture(true);
+    }
+    
+    return;
+}
+

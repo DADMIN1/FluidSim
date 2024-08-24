@@ -42,6 +42,7 @@ struct Gradient_T
     std::array<sf::Color, 1024> gradientdata{};
     const sf::Color& Lookup(const unsigned int index) const {return gradientdata[index];}
     
+    void Reset() { for (std::size_t i{0}; i<1024; ++i) { gradientdata[i] = LookupDefault(i); } }
     Gradient_T() { for (std::size_t i{0}; i<1024; ++i) { gradientdata[i] = LookupDefault(i); } }
 };
 

@@ -193,7 +193,8 @@ class GradientEditor
     auto GetRangeIndecies(const SegmentRange&) const;
     auto GetRangeContents(const SegmentRange&, const Gradient_T&) const;
     auto GetRangeContentsMutable(const SegmentRange&, Gradient_T&) const; // allows directly modifying gradient through returned ranges
-    void InterpolateCurrentSegment();
+    void InterpolateCurrentSegment();  // GradientView.cpp
+    void UpdateColorControls(bool write, unsigned int stored_color_index, bool lookupDefault); // GradientTestWindow.cpp
     
     GradientEditor(): m_gradient{}, viewCurrent{m_gradient, true}, viewWorking{m_gradient, true}, viewOverlay{m_gradient, true},
       segstore{}, segments{ new Segment{Segment::Head}, new Segment{Segment::Tail} }, seg_held{ new Segment{Segment::Held} }, seg_hovered{segments.begin()}
@@ -249,6 +250,7 @@ class GradientWindow: sf::RenderWindow
     void DisplayTestWindows();   // GradientTestWindow.cpp
     void CustomRenderingTest();  // GradientView.cpp
     void DisplaySelectionInfo(); // GradientTestWindow.cpp
+    void DisplayEditorButtons(); // GradientTestWindow.cpp
     
     public:
     friend int main(int argc, char** argv);
