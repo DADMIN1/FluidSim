@@ -37,9 +37,20 @@ namespace ImGui {
     }
     
     // overload for unfilled triangles
-    void RenderArrowWithOutline(ImDrawList* draw_list, ImVec2 pos, ImVec2 half_sz, ImGuiDir direction, ImU32 color, float thickness, ImU32 outline_color=ImGui::GetColorU32(IM_COL32(0X00, 0x00, 0X00, 0xFF))) {
-        ImGui::_RenderArrowPointingAt(draw_list, {pos.x, pos.y-4.f}, {half_sz.x+2.f, half_sz.y+6.f}, direction, outline_color, 2.f);
-        ImGui::_RenderArrowPointingAt(draw_list, pos, half_sz, direction, color, thickness);
+    void RenderArrowWithOutline(ImDrawList* draw_list, ImVec2 pos, ImVec2 half_sz, ImGuiDir direction, ImU32 inner_color, ImU32 outer_color, float inner_thickness, float outer_thickness=2.f) {
+        ImGui::_RenderArrowPointingAt(draw_list, {pos.x, pos.y-4.f}, {half_sz.x+2.f, half_sz.y+6.f}, direction, outer_color, outer_thickness);
+        ImGui::_RenderArrowPointingAt(draw_list, pos, half_sz, direction, inner_color, inner_thickness);
+    }
+    
+    // wrapper for easier conditional-logic; toggles filled/unfilled triangles; filled has an additional toggle for outline
+    void RenderArrowConditional(bool fillCondition, bool outlineCodition, ImDrawList* draw_list, ImVec2 pos, ImVec2 half_sz, ImGuiDir direction, ImU32 color, ImU32 outline_color, float thickness) {
+        if (fillCondition) {
+            ImGui::_RenderArrowPointingAt(draw_list, pos, half_sz, direction, color);
+            if(outlineCodition) { ImGui::_RenderArrowPointingAt(draw_list, {pos.x, pos.y}, {half_sz.x, half_sz.y}, direction, outline_color, thickness); } // outline (unfilled)
+        } else {
+            ImGui::_RenderArrowPointingAt(draw_list, pos, half_sz, direction, color, thickness);
+            //if(outlineCodition) ImGui::_RenderArrowPointingAt(draw_list, {pos.x, pos.y-4.f}, {half_sz.x+2.f, half_sz.y+6.f}, direction, outline_color, thickness*2.f);
+        }
     }
     
     //imgui_internal.h: line 479
@@ -98,6 +109,141 @@ void GradientWindow::CustomRenderingTest()
 
 
 int GradientEditor::Segment::nextindex{0}; // static member
+
+/* ---- stack operations ---- */
+
+// stores a (removed) pointer into segmentStack, roughly ordered by index
+void GradientEditor::StackPush(Segment* const segptr)
+{
+    assert((segptr != nullptr) && "GradientEditor: StackPush called on nullptr");
+    if(segmentStack.empty()) { segmentStack.emplace_back(segptr); return; }
+    const Segment& front{*segmentStack.front()};
+    const Segment& back {*segmentStack.back()};
+    const int index = segptr->index;
+    
+    if (index > back.index)       segmentStack.emplace_back(segptr);
+    else if (index < front.index) segmentStack.emplace_front(segptr);
+    else { // when neither placement works, swap and insert into the smaller end
+        const bool frontSmaller {front.index < back.index};
+        Segment* const oldptr  {(frontSmaller? segmentStack.front(): segmentStack.back())};
+        if (frontSmaller) {
+            segmentStack.pop_front();
+            segmentStack.emplace_front(segptr);
+            segmentStack.emplace_front(oldptr);
+        } else {
+            segmentStack.pop_back();
+            segmentStack.emplace_back(segptr);
+            segmentStack.emplace_back(oldptr);
+        }
+    }
+    return;
+}
+
+
+// re-inserts a removed point from segmentStack; pulls from front/back depending on which side
+GradientEditor::SegIterT GradientEditor::StackPull(const SegIterT atIter, bool rightSide)
+{
+    assert(!segmentStack.empty() && "GradientEditor: StackPull called on empty stack");
+    SegIterT newIter = segments.insert(atIter, (rightSide? segmentStack.back(): segmentStack.front()));
+    if(rightSide) { segmentStack.pop_back(); } else { segmentStack.pop_front(); }
+    return newIter;
+}
+
+
+/* ---- segment operations ---- */
+
+// changes selection to right/left segment
+void GradientEditor::SwitchSegment(bool right)
+{
+    if(!seg_range.isValid || isDraggingSegment) return;
+    SegIterT selectedIter {right? seg_range.nextIter : seg_range.prevIter};
+    if((*selectedIter)->index < 0) return;
+    
+    (*seg_range.m_iter)->isSelected = false;
+    (*selectedIter)->isSelected = true;
+    seg_range = SegmentRange(selectedIter);
+    return;
+}
+
+
+// subdivides one side of the current segment by inserting a new midpoint
+void GradientEditor::SplitSegment(bool right)
+{
+    if(!seg_range.isValid || isDraggingSegment || segmentStack.empty()) return;
+    if((*seg_range.m_iter)->index < 0) return;
+    
+    const SegIterT outsidePoint {right? seg_range.nextIter : seg_range.prevIter};
+    const int colorIndexOriginal = (*seg_range.m_iter)->color_index;
+    const int colorIndexEndpoint = (*outsidePoint)->color_index;
+    const int colorIndexMidpoint = (colorIndexOriginal+colorIndexEndpoint)/2;
+    if(std::abs(colorIndexEndpoint-colorIndexMidpoint) <= (GradientNS::triangle_halfsz*2)) return; // not enough space
+    
+    const Segment* const backupPtr = *seg_range.m_iter;
+    assert((backupPtr != nullptr) && "SplitSegment: seg_range is holding nullptr");
+    
+    seg_range.isValid = false;
+    seg_hovered = segments.end();
+    SegIterT insertedPoint = StackPull((right? seg_range.nextIter : seg_range.m_iter), right);
+    RelocatePoint(**insertedPoint, colorIndexMidpoint);
+    
+    assert((backupPtr == *seg_range.m_iter) && "SplitSegment: iterator was invalidated");
+    
+    if (preserveSelection) {
+        seg_range = SegmentRange(seg_range.m_iter);
+    } else {
+        (*seg_range.m_iter)->isSelected = false;
+        (*insertedPoint)->isSelected = true;
+        seg_range = SegmentRange(insertedPoint);
+    }
+    
+    /*
+    Segment& oldMidpoint {**(right? seg_range.prevIter : seg_range.nextIter)}; // previous midpoint becomes endpoint
+    Segment& oldEndpoint {**(right? seg_range.nextIter : seg_range.prevIter)};
+    Segment& newMidpoint {**seg_range.m_iter};
+    
+    RelocatePoint(oldMidpoint, colorIndexOriginal);
+    RelocatePoint(oldEndpoint, colorIndexEndpoint);
+    RelocatePoint(newMidpoint, colorIndexMidpoint);
+    */
+    return;
+}
+
+
+// removes middle segment-point, then expands to new endpoint
+void GradientEditor::JoinSegment(bool right)
+{
+    if(!seg_range.isValid || isDraggingSegment) return;
+    if((*seg_range.m_iter)->index < 0) return;
+    SegIterT outsidePoint {right? seg_range.nextIter : seg_range.prevIter};
+    if((*outsidePoint)->index < 0) return;
+    /*if((*outsidePoint)->index < 0) {
+        outsidePoint = (right? seg_range.prevIter : seg_range.nextIter); // try to flip the other way
+        if((*outsidePoint)->index < 0) return;  // fail if the current segment is the only one (that isn't an endpoint)
+    }*/
+    
+    const SegIterT selection { preserveSelection? outsidePoint : seg_range.m_iter };
+    const SegIterT successor { preserveSelection? seg_range.m_iter : outsidePoint };
+    const Segment* const backupPtr = *successor;
+    assert((backupPtr != nullptr) && "JoinSegment: seg_range is holding nullptr");
+    assert((*selection != *successor) && "JoinSegment: erased segment is current");
+    
+    seg_range.isValid = false;
+    seg_hovered = segments.end();
+    if (!preserveSelection) {
+        (*selection)->isSelected = false;
+        (*successor)->isSelected = true;
+    }
+    StackPush(*selection);
+    segments.erase(selection);
+    
+    assert((backupPtr == *successor) && "JoinSegment: iterator was invalidated");
+    seg_range = SegmentRange(successor);
+    
+    return;
+}
+
+
+/* ---- range operations ---- */
 
 //#define DBG_PRINT_SEGMENTS
 #ifdef DBG_PRINT_SEGMENTS
@@ -277,7 +423,7 @@ void GradientEditor::RelocatePoint(Segment& segment, int target_colorindex)
 void GradientEditor::GrabSegment()
 {
     seg_range.isValid = false;
-    if(seg_hovered == segments.end()) return;
+    assert((seg_hovered != segments.end()) && "GradientEditor: GrabSegment called with bad seg_hovered");
     isDraggingSegment = true;
     const Segment& hovered_seg{**seg_hovered};
     if(hovered_seg.index < 0) { isDraggingSegment = false; return; }
@@ -295,6 +441,7 @@ void GradientEditor::ReleaseHeld()
 {
     if(!isDraggingSegment) return;
     isDraggingSegment = false;
+    assert((seg_hovered != segments.end()) && "GradientEditor: ReleaseHeld called with bad seg_hovered");
     RelocatePoint(**seg_hovered, seg_held->color_index); // updating color
     segments.remove(seg_held);
     
@@ -337,9 +484,11 @@ void GradientEditor::HandleMousemove(sf::Vector2f mousePosition)
         if(segptr->CheckHitbox(mousePosition)) {
             segptr->hitbox.setOutlineColor(sf::Color::Magenta);
             seg_hovered = segiter;
-            break;
+            return;
         }
     }
+    
+    seg_hovered = segments.end(); // invalidated
     
     return;
 }
@@ -372,31 +521,51 @@ void GradientWindow::DrawSegmentations()
     
     for (Segment* segment: Editor.segments)
     {
+        bool fillCondition {segment->isSelected};
+        bool outlineCondition {fillCondition};
+        
+        // color-variables for the triangle
+        ImVec4 fillcolor = ImVec4(*segment->color);
+        ImVec4 outlinecolor = ImVec4(segment->isSelected? sf::Color{0xFFFFFFCC} : sf::Color{0x00000033});
+        // outlinecolor also applies to vertical-outline for non-special segments
+        
         switch(segment->index)
         {
-            case Segment::Held: if(Editor.isDraggingSegment) break;
+            case Segment::Held: if(!Editor.isDraggingSegment) continue; [[fallthrough]];
             case Segment::Head:
             case Segment::Tail:
-            continue;
+                fillCondition = true;
+                outlineCondition = true;
+                
+                // head/tail segments store the original color in outline, and is never changed (held is white)
+                // the end-segments display the endpoint-color in their fill, and current-color in outlines instead
+                if (segment->index != Segment::Held) {
+                    outlinecolor = ImVec4(*segment->color);
+                    fillcolor = ImVec4(segment->vertical_outline.getOutlineColor());
+                } else {
+                    // TODO: set held-segment's outline-color in the opposite way (fill=current, outlines=original-fill)
+                    outlinecolor = ImVec4(segment->vertical_outline.getOutlineColor());
+                }
+                
+                viewOverlay.m_texture.draw(segment->vertical_outline);
+            break;
             
-            default: break;
+            default:
+                segment->vertical_outline.setOutlineColor(outlinecolor);
+                viewOverlay.m_texture.draw(segment->vertical_outline);
+            break;
         }
         
-        ImVec4 outlinecolor = ImVec4(*segment->color);
-        if(segment->isSelected) outlinecolor = ImVec4(0xFF, 0xFF, 0xFF, 0xFF);
-        
-        ImGui::RenderArrowWithOutline(
+        ImGui::RenderArrowConditional(fillCondition, outlineCondition,
             drawlist, 
             {segment->Xposition(), GradientNS::bandHeight*2}, // intentionally off-by-one (high; slightly pushing arrow into the gradient)
             {GradientNS::triangle_halfsz, (GradientNS::triangle_halfsz*2)}, 
             ImGuiDir_Up, 
-            ImGui::GetColorU32(ImVec4(*segment->color)), // required conversion, for some reason
-            ImGui::GetColorU32(outlinecolor)
+            ImGui::GetColorU32(fillcolor),
+            ImGui::GetColorU32(outlinecolor), // outline of the triangle, not the vertical box
+            1.f
         );
         
-        // these get drawn UNDER the arrows, even though the arrows are drawn first
-        // because imgui.render is called at the very end of the frameloop
-        viewOverlay.m_texture.draw(segment->vertical_outline);
     }
     
     viewOverlay.m_texture.display();

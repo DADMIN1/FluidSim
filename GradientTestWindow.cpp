@@ -395,6 +395,31 @@ void GradientEditor::UpdateColorControls(bool write=false, unsigned int stored_c
 void GradientWindow::DisplayEditorButtons()
 {
     static bool disableUpdatesFromSlider{false};
+    
+    if (toggleEditorLock) {
+        disableUpdatesFromSlider = !disableUpdatesFromSlider;
+        toggleEditorLock = false;
+    }
+    
+    {
+        const std::size_t count {Editor.segmentStack.size()};
+        ImGui::Text("# Points Remaining: "); ImGui::SameLine();
+        ImGui::TextColored((count==0? sf::Color::Red:sf::Color::Green), "%lu", count); ImGui::SameLine();
+        ImGui::Text("/ %d", GradientNS::segmentCap);
+    }
+    
+    ImGui::BeginDisabled(!Editor.seg_range.isValid);
+    if(ImGui::Button("L")) { Editor.SwitchSegment(false); heldSegmentWasChanged = true; } ImGui::SameLine();
+    if(ImGui::Button("R")) { Editor.SwitchSegment(true ); heldSegmentWasChanged = true; } ImGui::SameLine();
+    ImGui::EndDisabled();
+    
+    ImGui::Checkbox("Lock Selection", &Editor.preserveSelection);
+    ImGui::SameLine(); ImGui::HelpMarker(
+        "Normally, editor selection follows modifications made by Split/Join operations.\n"
+        "This option preserves the selection instead.\n"
+        "When disabled, the 'Join' operation will remove the selected point instead.\n"
+    ); ImGui::SameLine();
+    
     ImGui::Checkbox("Lock Editor", &disableUpdatesFromSlider);
     ImGui::SameLine(); ImGui::HelpMarker("Prevent color-editor from updating upon segment selection");
     

@@ -20,6 +20,7 @@ struct Keybind
         important,
         debug,
         interactions,
+        GradientEditor,
         shaders,
         enum_count, // encodes the 'size' of this enum list. Always last (obviously)
         // 'enum_count' is also used to indicate 'invalid' or 'default'
@@ -33,7 +34,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{24};
+    static constexpr auto numkeybinds{28};
     std::vector<Keybind> all;  // TODO: array instead?
     std::vector<std::vector<Keybind*>> sections; 
     
@@ -58,7 +59,7 @@ struct AllKeybinds
         KEY(F1, "print these keybinds");
         KEY(Q,  "Exits the program");
         KEY(F2, "open the gradient window")
-            -> extrainfo = "close it with ESC, Q, or F2 again";
+            -> extrainfo = "close it with Q or F2 again";
         KEY(Tilde, "open the side-panel")
             ->extrainfo = "(while open) switches focus between side-panel and main-window\n"
             "  - Left/Right: switch docking side of side-panel\n"
@@ -83,6 +84,14 @@ struct AllKeybinds
         KEY(Add, "increment/decrement: ~0.4-1.5% (+Shift: 4x-faster)")
             -> extrainfo = "+/- Keys control the last active slider in GUI";
         KEY(N, "print mouse position");
+        
+        current_section = Keybind::Section::GradientEditor;
+        KEY(Left, "change selection") -> name = "Left/Right Arrowkeys";
+        { KEY(Space, "lock selection"); } // TODO: prevent redefinition errors
+        KEY(L, "toggle color-editor lock")
+            -> extrainfo = "prevents color-editor from updating when selection changes";
+        
+        KEY(Escape, "deselect all points/segments") -> name = "ESC/R-Click";
         
         // Shaders //
         current_section = Keybind::Section::shaders;
@@ -142,7 +151,9 @@ std::string CreateSectionHeader(Keybind::Section S)
         case Keybind::Section::interactions:  section_name = "interactions"; break;
         case Keybind::Section::important:     section_name = "important";    break;
         case Keybind::Section::debug:         section_name = "debug";        break;
-        case Keybind::Section::shaders:       section_name = "shaders";      
+        case Keybind::Section::GradientEditor:section_name = "Gradient Editor"; goto fallthrough;
+        case Keybind::Section::shaders:       section_name = "shaders";
+        fallthrough:
             // TODO: convert section_names to uppercase
             auto remaining_length = dividerline.length() - section_name.length();
             assert((remaining_length > 8) && "Section name is too long");

@@ -70,6 +70,20 @@ void GradientWindow::ToggleEnabled()
 }
 
 
+void GradientWindow::DeselectAll()
+{
+    Editor.ReleaseHeld();
+    Editor.seg_hovered = Editor.segments.end();
+    Editor.isDraggingSegment = false;
+    Editor.seg_range.isValid = false;
+    for (auto& segment: Editor.segments) {
+        segment->isSelected = false;
+        segment->hitbox.setFillColor(sf::Color::Transparent);
+    }
+    return;
+}
+
+
 void GradientWindow::EventLoop()
 {
     sf::Event gw_event;
@@ -86,7 +100,6 @@ void GradientWindow::EventLoop()
             case sf::Event::KeyPressed:
             {
                 switch (gw_event.key.code) {
-                    case sf::Keyboard::Key::Escape:
                     case sf::Keyboard::Key::Q:
                     case sf::Keyboard::F2:
                         isEnabled = false;
@@ -96,6 +109,48 @@ void GradientWindow::EventLoop()
                     /* case sf::Keyboard::F2:
                         ToggleEnabled();
                     break; */
+                    
+                    case sf::Keyboard::Key::Escape:
+                        DeselectAll();
+                    break;
+                    
+                    case sf::Keyboard::Key::L:
+                        toggleEditorLock = true;
+                    break;
+                    
+                    case sf::Keyboard::Key::Space:
+                        Editor.preserveSelection = !Editor.preserveSelection;
+                    break;
+                    
+                    case sf::Keyboard::Left: 
+                        Editor.SwitchSegment(false);
+                        if(Editor.seg_range.isValid) heldSegmentWasChanged = true;
+                    break;
+                    
+                    case sf::Keyboard::Right: 
+                        Editor.SwitchSegment(true);
+                        if(Editor.seg_range.isValid) heldSegmentWasChanged = true;
+                    break;
+                    
+                    case sf::Keyboard::Up:
+                        Editor.SplitSegment(true);
+                        if(Editor.seg_range.isValid) heldSegmentWasChanged = true;
+                    break;
+                    
+                    case sf::Keyboard::Down:
+                        Editor.SplitSegment(false);
+                        if(Editor.seg_range.isValid) heldSegmentWasChanged = true;
+                    break;
+                    
+                    case sf::Keyboard::Insert:
+                        Editor.JoinSegment(true);
+                        if(Editor.seg_range.isValid) heldSegmentWasChanged = true;
+                    break;
+                    
+                    case sf::Keyboard::Delete:
+                        Editor.JoinSegment(false);
+                        if(Editor.seg_range.isValid) heldSegmentWasChanged = true;
+                    break;
                     
                     default: break;
                 }
@@ -127,11 +182,13 @@ void GradientWindow::EventLoop()
                 
                 if(gw_event.mouseButton.button == sf::Mouse::Button::Left)
                 {
+                    if(Editor.seg_hovered == Editor.segments.end()) break;
                     GradientEditor::Segment* hovered_seg{*Editor.seg_hovered};
                     if(hovered_seg->CheckHitbox(mousePosition))
                     {
                         static GradientEditor::Segment* last_selected {nullptr};
                         if(last_selected) { last_selected->isSelected = false; }
+                        if(Editor.seg_range.isValid) { (**Editor.seg_range.m_iter).isSelected = false; }
                         last_selected = hovered_seg;
                         
                         hovered_seg->isSelected = true;
@@ -144,15 +201,7 @@ void GradientWindow::EventLoop()
                     hovered_seg->hitbox.setFillColor(sf::Color::Transparent);
                 }
                 else if(gw_event.mouseButton.button == sf::Mouse::Button::Right)
-                { // deselect all points/segments
-                    Editor.ReleaseHeld();
-                    Editor.isDraggingSegment = false;
-                    Editor.seg_range.isValid = false;
-                    for (auto& segment: Editor.segments) {
-                        segment->isSelected = false;
-                        segment->hitbox.setFillColor(sf::Color::Transparent);
-                    }
-                }
+                { DeselectAll(); }
             }
             break;
             

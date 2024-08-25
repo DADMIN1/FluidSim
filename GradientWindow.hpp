@@ -5,6 +5,7 @@
 
 #include <array>
 #include <list>  // GradientEditor::segments
+#include <stack> // GradientEditor::segmentStack
 
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/RenderTexture.hpp>
@@ -63,9 +64,6 @@ struct GradientView: sf::Drawable
 };
 
 
-// TODO: refactor draggable-interaction
-// TODO:    logic for splitting / joining segments
-// TODO: controls for splitting / joining segments
 
 class GradientEditor
 {
@@ -98,7 +96,7 @@ class GradientEditor
         
         Segment(int pIndex = nextindex++): index{pIndex},
           color_index{ (nextindex*GradientNS::segmentLength) - (GradientNS::segmentLength/2) },
-          color{nullptr}, vertical_outline{sf::RectangleShape({2.0f, GradientNS::bandHeight})}
+          color{nullptr}, vertical_outline{sf::RectangleShape({2.0f, GradientNS::bandHeight-2})}
         { 
             sf::Color outlineColor {sf::Color::Black};
             if (index < 0) { color_index=0; }
@@ -111,7 +109,7 @@ class GradientEditor
                   vertical_outline.setFillColor(sf::Color::Transparent);
                   vertical_outline.setOutlineColor(outlineColor);
                   vertical_outline.setOutlineThickness(1.f);
-                  vertical_outline.setPosition(Xposition()-1.f, 0.f); // -1 because rectangle's-position is aligned to left edge
+                  vertical_outline.setPosition(Xposition()-1.f, 1.f); // -1 because rectangle's-position is aligned to left edge
                   // don't set Y-position (always 0 relative to viewOverlay's rendertexture)
                   // hitbox covering only the triangle
                   //hitbox = sf::RectangleShape{{GradientNS::triangle_halfsz*2, GradientNS::triangle_halfsz*2}};
@@ -128,20 +126,20 @@ class GradientEditor
         }
     };
     
+    using SegIterT = std::list<Segment*>::iterator;
     std::array<Segment, GradientNS::segmentCap> segstore;
     std::list<Segment*> segments;
     Segment* seg_held;
-    std::list<Segment*>::iterator seg_hovered;
+    SegIterT seg_hovered;
     bool isDraggingSegment{false};
     
     // holds a slice of the gradient bounded by segments left and right of held
     struct SegmentRange
     {
-        using SegIterT = std::list<Segment*>::iterator;
-        SegIterT m_iter;
+        SegIterT m_iter, prevIter, nextIter;
         int colorindex_init, colorindex_held, colorindex_prev, colorindex_next;
         bool isValid{false};
-        bool wasModified{false};
+        bool wasModified{false}; // indicates that texture should be redrawn (triggered by interpolation)
         
         // restrict the current point to that range (disallow overlapping hitboxes)
         // or swap iterators every time you pass another point
@@ -153,7 +151,7 @@ class GradientEditor
         explicit SegmentRange() = default;
         
         // iter must be checked to not equal segments.end BEFORE calling this constructor
-        explicit SegmentRange(SegIterT iter): m_iter{iter}, 
+        explicit SegmentRange(SegIterT iter): m_iter{iter}, prevIter{iter}, nextIter{iter},
             colorindex_init{(**iter).color_index}, 
             colorindex_held{(**iter).color_index}
         { 
@@ -164,20 +162,16 @@ class GradientEditor
                 case Segment::Held: return; //invalid
                 case Segment::Head:
                     colorindex_prev = colorindex_init;
-                    colorindex_next = (**++iter).color_index;
+                    colorindex_next = (**++nextIter).color_index;
                 break;
                 case Segment::Tail:
                     colorindex_next = colorindex_init;
-                    colorindex_prev = (**--iter).color_index;
+                    colorindex_prev = (**--prevIter).color_index;
                 break;
                 
                 default:
-                {
-                    SegIterT previter{iter}, nextiter{++iter};
-                    previter = --previter;
-                    colorindex_prev = (**previter).color_index;
-                    colorindex_next = (**nextiter).color_index;
-                }
+                    colorindex_prev = (**--prevIter).color_index;
+                    colorindex_next = (**++nextIter).color_index;
                 break;
             }
             isValid = true;
@@ -189,15 +183,24 @@ class GradientEditor
     void ReleaseHeld();
     void HandleMousemove(const sf::Vector2f mousePosition); // updates seg_hovered, potentially moves seg_held
     
-    // isolates the colors inside the segments left/right 
+    // segment operations //
+    std::deque<Segment*> segmentStack{}; // holds removed/unused segment-points, roughly ordered by index
+    void StackPush(Segment* const);  // stores a (removed) segment-point in segmentStack
+    SegIterT StackPull(const SegIterT insertAt, bool rightSide); // re-inserts a removed point
+    bool preserveSelection {false}; // prevents selection from moving to new point on Split/Join operations
+    void SwitchSegment(bool right); // selects left/right segment-point
+    void SplitSegment(bool right); // subdivides current segment, shrinks to new endpoints
+    void JoinSegment(bool right); // removes current segment-point, expands to new endpoints
+    
+    // range operations //
     auto GetRangeIndecies(const SegmentRange&) const;
-    auto GetRangeContents(const SegmentRange&, const Gradient_T&) const;
+    auto GetRangeContents(const SegmentRange&, const Gradient_T&) const; // isolates the colors inside the segments left/right 
     auto GetRangeContentsMutable(const SegmentRange&, Gradient_T&) const; // allows directly modifying gradient through returned ranges
     void InterpolateCurrentSegment();  // GradientView.cpp
     void UpdateColorControls(bool write, unsigned int stored_color_index, bool lookupDefault); // GradientTestWindow.cpp
     
     GradientEditor(): m_gradient{}, viewCurrent{m_gradient, true}, viewWorking{m_gradient, true}, viewOverlay{m_gradient, true},
-      segstore{}, segments{ new Segment{Segment::Head}, new Segment{Segment::Tail} }, seg_held{ new Segment{Segment::Held} }, seg_hovered{segments.begin()}
+      segstore{}, segments{ new Segment{Segment::Head}, new Segment{Segment::Tail} }, seg_held{ new Segment{Segment::Held} }, seg_hovered{segments.end()}
     {
         viewOverlay.m_texture.clear(sf::Color::Transparent);
         viewWorking.m_sprite.move(0, GradientNS::bandHeight+1);
@@ -213,7 +216,7 @@ class GradientEditor
         #endif
         
         seg_held->color = &m_gradient.gradientdata[0];
-        for(Segment* seg : segments) { seg->color = &m_gradient.gradientdata[seg->color_index]; }
+        for(Segment* seg : segments) { seg->color = &m_gradient.gradientdata[seg->color_index]; seg->vertical_outline.setOutlineColor(*seg->color); }
         for(Segment& segr: segstore) { segr.color = &m_gradient.gradientdata[segr.color_index]; }
         auto insertpoint = ++segments.cbegin();
         for(int S{GradientNS::segmentCap-1}; S >= 0; --S) { //looping backwards to match iterator order with (array) indecies
@@ -240,6 +243,7 @@ class GradientWindow: sf::RenderWindow
     int stored_xposition{0}; // matching mainwindow's x-position  // TODO: try storing a ref to the window position instead? (probably a bad idea)
     sf::Clock clock{}; // imgui-sfml 'Update()' requires deltatime
     bool heldSegmentWasChanged{false}; // indicates that color-controls need to re-check the segment-color
+    bool toggleEditorLock{false}; // indicates that color-editor should be locked (simply for ease of keybinding)
     
     bool Initialize(int xposition);
     void Create(); // calls sf::RenderWindow.create(...) with some arguments
@@ -255,6 +259,7 @@ class GradientWindow: sf::RenderWindow
     public:
     friend int main(int argc, char** argv);
     void ToggleEnabled();
+    void DeselectAll(); // deselect all points/segments and invalidate hover
     void EventLoop(); // Window event-processing
     void FrameLoop(); // performs a single round of clear/draw/display and event-processing
     
