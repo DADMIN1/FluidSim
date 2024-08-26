@@ -59,8 +59,7 @@ class Fluid
         void ApplySpeedcap();
     };
     // calculates diffusion-force between particles within the same cell
-    sf::Vector2f CalcLocalForce(const Particle& lh, const Particle& rh) const;
-    // unfortunately, it can't be static because it uses 'fdensity'
+    static sf::Vector2f CalcLocalForce(const Particle& lh, const Particle& rh, float fdensity);
     
     sf::RenderTexture particle_texture;
     std::vector<Particle> particles;
@@ -74,6 +73,25 @@ class Fluid
     
     bool Initialize();
     void UpdatePositions();
+    // overload for ranges
+    void UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd, bool hasGravity, bool hasXGravity);
+    // static version
+    static void UpdatePositions(std::vector<Particle>::iterator sliceStart, std::vector<Particle>::iterator sliceEnd,
+        sf::Vector2f gravityForces, float viscosityMultiplier, float bounceDampeningFactor);
+    
+    // feed to UpdatePositions (static-version)
+    struct CertainConstants {
+        const sf::Vector2f gravityForces;
+        const float viscosityMultiplier;
+        const float bounceDampeningFactor;
+        
+        CertainConstants(bool hasGravity, bool hasXGravity, float gravity, float xgravity, float viscosity, float bounceDampening, float timestepRatio):
+         gravityForces{sf::Vector2f{ (hasXGravity? xgravity:0.f), (hasGravity? gravity:0.f) } * timestepRatio}, 
+         viscosityMultiplier{(1.0f-viscosity*timestepRatio)},
+         bounceDampeningFactor{ (1.0f-bounceDampening)*timestepRatio }
+        { ; }
+    };
+    
     
     void Freeze() // sets all velocities to 0
     {
@@ -94,8 +112,6 @@ class Fluid
         particle_texture.display();
     }
     
-    // multithreaded version
-    void UpdatePositions(const std::vector<Particle>::iterator sliceStart, const std::vector<Particle>::iterator sliceEnd, bool hasGravity, bool hasXGravity);
     void Reset();
 };
 

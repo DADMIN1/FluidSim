@@ -105,6 +105,9 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
     constexpr float turbulence_offset = { 50.f / float(NUMROWS+NUMCOLUMNS)};
     const float rng = (turbulence_offset+normalizedRNG())*(turbulence_offset+normalizedRNG());
     
+    // required minimum cell-density before momentum transfers become active
+    constexpr float thresholdDensityMomentumTransfer {2.f};
+    
     // 'auto&&' is definitely correct here; ~100 FPS difference (300->400)
     for (auto&& [cellID, delta]: cellmap)
     {
@@ -113,24 +116,30 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
         // updating densities
         cell.density += delta.density;
         
-        // this should probably be reverted
-        // float smoothingdivisor = 1.0f + float(delta.particlesAdded.size() - delta.particlesRemoved.size());
-        float smoothingdivisor = float(delta.particlesAdded.size() + delta.particlesRemoved.size());
-        sf::Vector2f momentumSmoothing = { delta.velocities*momentumTransfer / smoothingdivisor };
-        if (fluid.isTurbulent) cell.momentum += momentumSmoothing * rng;
-        
-        // transferring momentum from new particles to cell
-        for (const int particleID: delta.particlesAdded)
-        {
-            Fluid::Particle& particle = fluid.particles.at(particleID);
-            if (fluid.isTurbulent) particle.velocity += momentumSmoothing * rng;
-            const sf::Vector2f momentumDelta = particle.velocity * momentumTransfer;
-            particle.velocity -= momentumDelta;
-            cell.momentum += momentumDelta;
-            //cell.momentum -= momentumSmoothing;
+        if (cell.density < thresholdDensityMomentumTransfer) { // skip the momentum-related code if cell is too empty
+            for (int particleID: delta.particlesAdded) {
+                fluid.particles[particleID].cellID = cellID;
+            }
+        } else {
+            // this should probably be reverted
+            // float smoothingdivisor = 1.0f + float(delta.particlesAdded.size() - delta.particlesRemoved.size());
+            float smoothingdivisor = float(delta.particlesAdded.size() + delta.particlesRemoved.size());
+            sf::Vector2f momentumSmoothing = { delta.velocities*momentumTransfer / smoothingdivisor };
+            if (fluid.isTurbulent) cell.momentum += momentumSmoothing * rng;
             
-            //Cell& oldCell = diffusionField.cells[particle.cellID];
-            particle.cellID = cellID;
+            // transferring momentum from new particles to cell
+            for (const int particleID: delta.particlesAdded)
+            {
+                Fluid::Particle& particle = fluid.particles.at(particleID);
+                if (fluid.isTurbulent) particle.velocity += momentumSmoothing * rng;
+                const sf::Vector2f momentumDelta = particle.velocity * momentumTransfer;
+                particle.velocity -= momentumDelta;
+                cell.momentum += momentumDelta;
+                //cell.momentum -= momentumSmoothing;
+                
+                //Cell& oldCell = diffusionField.cells[particle.cellID];
+                particle.cellID = cellID;
+            }
         }
         
         /* if (fluid.isTurbulent) {
@@ -170,6 +179,12 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
             pmemptycounter += 1;
             #endif
             
+            // disabling this prevents 'zipping' behind the mouse, and gives a minor performance improvement
+            //#define PRESERVE_EMPTYCELL_MOMENTUM
+            #ifndef PRESERVE_EMPTYCELL_MOMENTUM
+            diffusionField.cells[cellID].momentum = {0.0, 0.0};
+            particleMap.erase(cellID);
+            #else
             // only erase if it's empty and has negligable momentum
             // TODO: collect stats on this to find a good minimum
             constexpr float small_enough = 0.001;
@@ -184,6 +199,7 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
              // stored momentum would otherwise not decrease for empty cells
             cell.momentum -= cell.momentum*momentumDistribution;
             // we don't erase the cell because we want to keep decreasing the momentum
+            #endif
         }
     }
     
@@ -258,7 +274,7 @@ void Simulation::LocalDiffusion(const IDset_T& particleset)
         // notice the iteration in the loop condition (it can't be initialized with 'iterTop+1')
         for (auto iterBottom{iterTop}; ++iterBottom != particleset.end();) {
             const Fluid::Particle& particleBottom = fluid.particles.at(*iterBottom);
-            const sf::Vector2f localforce = fluid.CalcLocalForce(particleTop, particleBottom);
+            const sf::Vector2f localforce = Fluid::CalcLocalForce(particleTop, particleBottom, fluid.fdensity);
             
             *iterVecTop    += localforce;
             *iterVecBottom -= localforce; // the other particle experiences forces in the opposite direction
@@ -283,7 +299,7 @@ void Simulation::NonLocalDiffusion(const IDset_T& originset, const IDset_T& adja
         for (const auto adjacentUUID: adjacentset)
         {
             Fluid::Particle& adjacentParticle = fluid.particles.at(adjacentUUID);
-            const sf::Vector2f localforce = fluid.CalcLocalForce(particle, adjacentParticle);
+            const sf::Vector2f localforce = Fluid::CalcLocalForce(particle, adjacentParticle, fluid.fdensity);
             
             particle.velocity += localforce;
             adjacentParticle.velocity -= localforce; // the other particle experiences forces in the opposite direction
@@ -362,33 +378,35 @@ void Simulation::Update()
 {
     if (isPaused) { return; }
     
-    std::array<std::future<DeltaMap>, THREAD_COUNT> threads;
-    auto particles_slices = DivideContainer(fluid.particles);
-    for (std::size_t index{0}; index < threads.size(); ++index) {
-        auto slice = particles_slices[index];
-        auto lambda = [this, slice](){ 
-            fluid.UpdatePositions(slice.first, slice.second, hasGravity, hasXGravity);
-            return FindCellTransitions(slice);
-        };
-        threads[index] = std::async(std::launch::async, lambda);
+    // TODO: figure out how to merge changes from multiple copies
+    //static std::array<std::vector<Fluid::Particle>, THREAD_COUNT> particles_copy;
+    
+    //Fluid::CertainConstants fluidConstants (hasGravity, hasXGravity, fluid.gravity, fluid.xgravity, fluid.viscosity, fluid.bounceDampening, timestepRatio);
+    // sf::Vector2f, float, float
+    const auto&& [gravityForces, viscosityMultiplier, bounceDampeningFactor] = Fluid::CertainConstants (
+        hasGravity, hasXGravity, fluid.gravity, fluid.xgravity, fluid.viscosity, fluid.bounceDampening, timestepRatio
+    );
+    
+    std::array<std::future<void>, THREAD_COUNT> threads;
+    for (std::size_t index{0}; auto&& slice: DivideContainer(fluid.particles)) {
+        threads[index] = std::async(std::launch::async, 
+        [this, gravityForces, viscosityMultiplier, bounceDampeningFactor] (auto&& sliced) { 
+            //fluid.UpdatePositions(sliced.first, sliced.second, hasGravity, hasXGravity);
+            Fluid::UpdatePositions(sliced.first, sliced.second, gravityForces, viscosityMultiplier, bounceDampeningFactor);
+            HandleTransitions(FindCellTransitions(sliced).cellmap);
+            //UpdateParticles(sliced); // TODO: rewrite this to take a slice
+        }, slice);
+        ++index;
     };
     
-    DeltaMap transitions{};
-    for (auto& handle: threads) {
-        transitions.Combine(handle.get()); // extracts/moves elements with new keys
-    }
-    
-    // TODO: rewrite HandleTransitions to handle multithreading better
-    std::array<std::future<void>, THREAD_COUNT> transition_threads;
-    auto transition_slices = DivideContainer(transitions.cellmap);
-    for (std::size_t index{0}; index < transition_threads.size(); ++index) {
-        auto slice = transition_slices[index];
-        auto lambda = [this, slice]() { 
-            HandleTransitions({slice.first, slice.second});
-        };
-        transition_threads[index] = std::async(std::launch::async, lambda);
-    };
-    for (auto& handle: transition_threads) { handle.wait(); }
+    bool isComplete{false};
+    do { isComplete = true;
+        for (auto& future: threads) {
+            if(!future.valid()) isComplete = false;
+            //future.wait_for(std::chrono::duration);
+            else future.get();
+        }
+    } while (!isComplete);
     
     UpdateParticles();
     

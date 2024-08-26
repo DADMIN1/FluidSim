@@ -145,12 +145,20 @@ float Fluid::Particle::Distance(const Particle& lh, const Particle& rh)
 }
 
 
+// MSVC really doesn't believe that cmath functions( std::sqrt/cos) are constexpr (they are since C++23)
+//#define PLZ_STOPCOMPLAINING_MSCPP
+#ifdef PLZ_STOPCOMPLAINING_MSCPP
+  #define CONSTEXPR const
+#else
+  #define CONSTEXPR constexpr
+#endif
+
 // calculates diffusion-force between particles within the same cell
-sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Particle& rh) const
+sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Particle& rh, float fdensity)
 {
     // the distance between two opposite corners of a cell (pythagorean theorem)
-    constexpr float intracellDistMax{std::sqrt(SPATIAL_RESOLUTION*SPATIAL_RESOLUTION*2)};
-    constexpr float maxdist = intracellDistMax*(radialdist_limit+1);
+    CONSTEXPR float intracellDistMax{std::sqrt(SPATIAL_RESOLUTION*SPATIAL_RESOLUTION*2)};
+    CONSTEXPR float maxdist = intracellDistMax*(radialdist_limit+1);
     
     const auto [diffx, diffy] = lh.getPosition() - rh.getPosition();
     const float totalDistance = std::sqrt((diffx*diffx) + (diffy*diffy));
@@ -160,7 +168,7 @@ sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Parti
     const float normalized = (totalDistance/maxdist) * (M_PI/2);
     const float cosine_cubed = std::cos(normalized)*std::cos(normalized)*std::cos(normalized);
     //const float cosine_squared = std::cos(normalized)*std::cos(normalized);
-    const float magnitude = cosine_cubed * fdensity;
+    const float magnitude = /*cosine_squared*/ cosine_cubed * fdensity;
     
     // TODO: division by zero here if diffx AND diffy both equal zero
     const float denominator = (std::abs(diffx) + std::abs(diffy));
@@ -168,6 +176,8 @@ sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Parti
     
     return directionalRatio*magnitude*timestepRatio;
 }
+
+#undef CONSTEXPR
 
 
 void Fluid::UpdatePositions()
@@ -262,3 +272,37 @@ void Fluid::UpdatePositions(const std::vector<Particle>::iterator sliceStart, co
     return;
 }
 
+
+// static version
+void Fluid::UpdatePositions(
+    std::vector<Particle>::iterator sliceStart, std::vector<Particle>::iterator sliceEnd,
+    sf::Vector2f gravityForces, float viscosityMultiplier, float bounceDampening)
+{
+    for (std::vector<Particle>::iterator iter{sliceStart}; iter!=sliceEnd; ++iter)
+    {
+        Particle& particle = *iter;
+        sf::Vector2f nextPosition { particle.getPosition() + (particle.velocity+=gravityForces) };
+        
+        // handling reflections
+        particle.velocity = sf::Vector2f {
+          ((nextPosition.x < 0.f) || (nextPosition.x > BOXWIDTH ))?
+          -particle.velocity.x*bounceDampening: particle.velocity.x,
+          ((nextPosition.y < 0.f) || (nextPosition.y > BOXHEIGHT))?
+          -particle.velocity.y*bounceDampening: particle.velocity.y,
+        };
+        
+        nextPosition = sf::Vector2f {
+          {(nextPosition.x < 0.f)? -nextPosition.x :
+          ((nextPosition.x > BOXWIDTH)? 
+          (BOXWIDTH -(DEFAULTRADIUS*2.f)): nextPosition.x)},
+          {(nextPosition.y < 0.f)? -nextPosition.y :
+          ((nextPosition.y > BOXHEIGHT)? 
+          (BOXHEIGHT-(DEFAULTRADIUS*2.f)): nextPosition.y)},
+        };
+        
+        particle.velocity *= viscosityMultiplier; particle.ApplySpeedcap();
+        particle.setPosition(nextPosition);
+    }
+    
+    return;
+}
