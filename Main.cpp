@@ -20,7 +20,8 @@ float timestepMultiplier{1.0f};
 
 
 extern void EmbedMacroTest();  // MacroTest.cpp
-extern void PrintKeybinds();   // Keybinds.cpp
+extern void PrintKeybinds(bool printAllSections=false);  // Keybinds.cpp
+// printAllSections: only print keybinds for the main window if disabled
 
 // MacroTest.cpp
 extern void ModuloTest();
@@ -190,7 +191,7 @@ int main(int argc, char** argv)
             break;
             
             case sf::Keyboard::F1:
-                PrintKeybinds();
+                PrintKeybinds(true);
             break;
              
              /* Toggling window-visibility screws with the FPS calc in MainGUI (NumWindowsOpen), because it still counts as open.

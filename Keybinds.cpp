@@ -18,8 +18,8 @@ struct Keybind
     enum Section {
         unspecified,
         important,
-        debug,
         interactions,
+        debug,
         GradientEditor,
         shaders,
         enum_count, // encodes the 'size' of this enum list. Always last (obviously)
@@ -56,7 +56,7 @@ struct AllKeybinds
         // reserving 'numkeybinds' for each section is really overkill, but it could make sense if section-enums are rewritten as bitflags
         
         current_section = Keybind::Section::important;
-        KEY(F1, "print these keybinds");
+        KEY(F1, "print all keybinds");
         KEY(Q,  "Exits the program");
         KEY(F2, "open the gradient window")
             -> extrainfo = "close it with Q or F2 again";
@@ -148,8 +148,8 @@ std::string CreateSectionHeader(Keybind::Section S)
     {
         default:                              section_name = "invalid";      break;
         case Keybind::Section::unspecified:   section_name = "unspecified";  break;
-        case Keybind::Section::interactions:  section_name = "interactions"; break;
         case Keybind::Section::important:     section_name = "important";    break;
+        case Keybind::Section::interactions:  section_name = "interactions"; break;
         case Keybind::Section::debug:         section_name = "debug";        break;
         case Keybind::Section::GradientEditor:section_name = "Gradient Editor"; goto fallthrough;
         case Keybind::Section::shaders:       section_name = "shaders";
@@ -174,7 +174,8 @@ std::string CreateSectionHeader(Keybind::Section S)
 }
 
 
-void PrintKeybinds()
+// printAllSections: only print keybinds for the main window if disabled
+void PrintKeybinds(bool printAllSections)
 {
     std::cout << "\n\n";
     std::cout << "------------------------------------\n";
@@ -201,6 +202,19 @@ void PrintKeybinds()
     for (const Keybind& kb: Keybinds.all)
     {
         if (kb.section != previous_section) {
+            if (!printAllSections)
+            {
+                switch (kb.section)
+                {
+                    case Keybind::Section::important:      break; //printed
+                    case Keybind::Section::interactions:   break;
+                    case Keybind::Section::GradientEditor: continue; //skipped
+                    case Keybind::Section::unspecified:    continue;
+                    case Keybind::Section::shaders:        continue;
+                    case Keybind::Section::debug:          continue;
+                    default:                               continue;
+                }
+            }
             if (previous_section != Keybind::Section::enum_count)
             std::cout << CreateSectionHeader(kb.section) << '\n';
             previous_section = kb.section;
