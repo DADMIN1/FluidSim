@@ -88,7 +88,7 @@ class Fluid
         CertainConstants(bool hasGravity, bool hasXGravity, float gravity, float xgravity, float viscosity, float bounceDampening, float timestepRatio):
          gravityForces{sf::Vector2f{ (hasXGravity? xgravity:0.f), (hasGravity? gravity:0.f) } * timestepRatio}, 
          viscosityMultiplier{(1.0f-viscosity*timestepRatio)},
-         bounceDampeningFactor{ (1.0f-bounceDampening)*timestepRatio }
+         bounceDampeningFactor{1.0f-bounceDampening}
         { ; }
     };
     

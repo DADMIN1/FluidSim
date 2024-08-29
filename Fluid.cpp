@@ -146,7 +146,7 @@ float Fluid::Particle::Distance(const Particle& lh, const Particle& rh)
 
 
 // MSVC really doesn't believe that cmath functions( std::sqrt/cos) are constexpr (they are since C++23)
-//#define PLZ_STOPCOMPLAINING_MSCPP
+#define PLZ_STOPCOMPLAINING_MSCPP
 #ifdef PLZ_STOPCOMPLAINING_MSCPP
   #define CONSTEXPR const
 #else
@@ -162,13 +162,12 @@ sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Parti
     
     const auto [diffx, diffy] = lh.getPosition() - rh.getPosition();
     const float totalDistance = std::sqrt((diffx*diffx) + (diffy*diffy));
-    if (totalDistance == 0) [[unlikely]] { ++exactOverlapCounter; return {0,0}; }  // TODO: should return random direction, ideally
+    if(totalDistance == 0.f) [[unlikely]] { ++exactOverlapCounter; return -lh.velocity*timestepRatio*fdensity; }  // TODO: should return random direction, ideally
     
     // mapping to output range of: 0 to PI/2 (cosine hits zero at PI/2)
-    const float normalized = (totalDistance/maxdist) * (M_PI/2);
+    const float normalized = (totalDistance/maxdist) * (M_PI/2.f);
     const float cosine_cubed = std::cos(normalized)*std::cos(normalized)*std::cos(normalized);
-    //const float cosine_squared = std::cos(normalized)*std::cos(normalized);
-    const float magnitude = /*cosine_squared*/ cosine_cubed * fdensity;
+    const float magnitude = cosine_cubed * fdensity;
     
     // TODO: division by zero here if diffx AND diffy both equal zero
     const float denominator = (std::abs(diffx) + std::abs(diffy));
@@ -178,6 +177,11 @@ sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Parti
 }
 
 #undef CONSTEXPR
+
+
+// particle positions still use top-left corner, so the non-zero boundary needs adjustment
+#define ADJ_BOXHEIGHT (BOXHEIGHT-DEFAULTRADIUS)
+#define ADJ_BOXWIDTH  ( BOXWIDTH-DEFAULTRADIUS)
 
 
 void Fluid::UpdatePositions()
@@ -195,8 +199,8 @@ void Fluid::UpdatePositions()
         //  keeping all particles within bounding box
         // we must not allow position == limit in this function;
         // otherwise, when we look up the related cell, it'll index past the end of the cellmatrix
-        if (nextPosition.y > BOXHEIGHT) {
-            nextPosition.y = BOXHEIGHT-DEFAULTRADIUS;
+        if (nextPosition.y > ADJ_BOXHEIGHT) {
+            nextPosition.y = BOXHEIGHT -(DEFAULTRADIUS*2.f);
             particle.velocity.y *= (-1.0 + bounceDampening);
         }
         else if (nextPosition.y < 0) {
@@ -204,8 +208,8 @@ void Fluid::UpdatePositions()
             particle.velocity.y *= (-1.0 + bounceDampening);
         }
         
-        if (nextPosition.x > BOXWIDTH) {
-            nextPosition.x = BOXWIDTH-DEFAULTRADIUS;
+        if (nextPosition.x > ADJ_BOXWIDTH) {
+            nextPosition.x = BOXWIDTH - (DEFAULTRADIUS*2.f);
             particle.velocity.x *= (-1.0 + bounceDampening);
         }
         else if (nextPosition.x < 0) {
@@ -245,8 +249,8 @@ void Fluid::UpdatePositions(const std::vector<Particle>::iterator sliceStart, co
         //  keeping all particles within bounding box
         // we must not allow position == limit in this function;
         // otherwise, when we look up the related cell, it'll index past the end of the cellmatrix
-        if (nextPosition.y > BOXHEIGHT) {
-            nextPosition.y = BOXHEIGHT-DEFAULTRADIUS;
+        if (nextPosition.y > ADJ_BOXHEIGHT) {
+            nextPosition.y = BOXHEIGHT -(DEFAULTRADIUS*2.f);
             particle.velocity.y *= (-1.0 + bounceDampening);
         }
         else if (nextPosition.y < 0) {
@@ -254,8 +258,8 @@ void Fluid::UpdatePositions(const std::vector<Particle>::iterator sliceStart, co
             particle.velocity.y *= (-1.0 + bounceDampening);
         }
         
-        if (nextPosition.x > BOXWIDTH) {
-            nextPosition.x = BOXWIDTH-DEFAULTRADIUS;
+        if (nextPosition.x > ADJ_BOXWIDTH) {
+            nextPosition.x = BOXWIDTH - (DEFAULTRADIUS*2.f);
             particle.velocity.x *= (-1.0 + bounceDampening);
         }
         else if (nextPosition.x < 0) {
@@ -285,19 +289,19 @@ void Fluid::UpdatePositions(
         
         // handling reflections
         particle.velocity = sf::Vector2f {
-          ((nextPosition.x < 0.f) || (nextPosition.x > BOXWIDTH ))?
-          -particle.velocity.x*bounceDampening: particle.velocity.x,
-          ((nextPosition.y < 0.f) || (nextPosition.y > BOXHEIGHT))?
-          -particle.velocity.y*bounceDampening: particle.velocity.y,
+          ((nextPosition.x < 0.f) || (nextPosition.x > ADJ_BOXWIDTH ))?
+          -(particle.velocity.x*bounceDampening) : particle.velocity.x,
+          ((nextPosition.y < 0.f) || (nextPosition.y > ADJ_BOXHEIGHT))?
+          -(particle.velocity.y*bounceDampening) : particle.velocity.y,
         };
         
         nextPosition = sf::Vector2f {
           {(nextPosition.x < 0.f)? -nextPosition.x :
-          ((nextPosition.x > BOXWIDTH)? 
-          (BOXWIDTH -(DEFAULTRADIUS*2.f)): nextPosition.x)},
+          ((nextPosition.x > ADJ_BOXWIDTH)? 
+          (BOXWIDTH - (DEFAULTRADIUS*2.f)): nextPosition.x)},
           {(nextPosition.y < 0.f)? -nextPosition.y :
-          ((nextPosition.y > BOXHEIGHT)? 
-          (BOXHEIGHT-(DEFAULTRADIUS*2.f)): nextPosition.y)},
+          ((nextPosition.y > ADJ_BOXHEIGHT)? 
+          (BOXHEIGHT -(DEFAULTRADIUS*2.f)): nextPosition.y)},
         };
         
         particle.velocity *= viscosityMultiplier; particle.ApplySpeedcap();

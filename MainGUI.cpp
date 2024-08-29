@@ -230,8 +230,11 @@ void MainGUI::AdjustActiveSlider(sf::Keyboard::Key plus_minus)
     constexpr float one_over_64  = 1.f/64.f;
     constexpr float one_over_255 = 1.f/255.f;
     float value = *slider.heldvar;
-    float valueDelta = std::abs(value) * one_over_64;
-    if (valueDelta < one_over_255) valueDelta = one_over_255;
+    float valueDelta = std::abs(slider.max-slider.min)*one_over_255*one_over_64 + std::abs(value/slider.max)*one_over_64;
+    if (valueDelta < 0.000001f) valueDelta = 0.000001f;
+    else if (valueDelta < slider.stepsizeMin) valueDelta = slider.stepsizeMin;
+    else if (valueDelta > slider.stepsizeMax) valueDelta = slider.stepsizeMax;
+    
     const bool isShiftPressed {sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)};
     if (isShiftPressed) valueDelta *= 4.f;
     
@@ -476,8 +479,12 @@ float MainGUI::DrawFluidParams(float next_height)
     #define PRECISION() "6"
     min = -0.5f; max = 0.5f;
     MAKESLIDER(viscosity);
+    slider_viscosity.stepsizeMin = 0.00025f;
+    slider_viscosity.stepsizeMax = 0.005f;
     min = 0.001f; // fdensity should not go below zero
     MAKESLIDER(fdensity);
+    slider_fdensity.stepsizeMin = 0.000001f;
+    slider_fdensity.stepsizeMax = 0.001f;
     
     #undef  PRECISION
     #define PRECISION() "2"

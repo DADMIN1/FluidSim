@@ -35,6 +35,8 @@ struct Slider
     void (*Callback)() = [](){ return; }; // triggered on interaction
     const float min{0.0f};
     const float max{1.0f};
+    float stepsizeMin{0.005f};
+    float stepsizeMax{0.025f};
     const int sliderflags;
     
     constexpr static int defaultflags =

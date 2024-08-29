@@ -375,7 +375,7 @@ void GradientEditor::UpdateColorControls(bool write=false, unsigned int stored_c
         const sf::Color& colorRef = lookupDefault? 
             m_gradient.LookupDefault(seg_range.colorindex_held):
             m_gradient.Lookup(seg_range.colorindex_held);
-        const ImVec4 newcolor = ImGui::ColorConvertU32ToFloat4(IM_COL32(colorRef.r, colorRef.g, colorRef.b, 0xFF));
+        const ImVec4 newcolor = ImGui::ColorConvertU32ToFloat4(IM_COL32(colorRef.r, colorRef.g, colorRef.b, colorRef.a));
         stored[0]=newcolor.x; stored[1]=newcolor.y; stored[2]=newcolor.z; stored[3]=newcolor.w;
     }
     return;
@@ -478,6 +478,7 @@ void GradientWindow::DisplayEditorButtons()
     if(ImGui::Button("Reset-All")) {
         Editor.m_gradient.Reset();
         Editor.viewWorking.RedrawTexture(true);
+        Editor.seg_range.wasModified = true;  // need to sync Master-Gradient
     }
     
     return;

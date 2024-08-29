@@ -381,7 +381,6 @@ void Simulation::Update()
     // TODO: figure out how to merge changes from multiple copies
     //static std::array<std::vector<Fluid::Particle>, THREAD_COUNT> particles_copy;
     
-    //Fluid::CertainConstants fluidConstants (hasGravity, hasXGravity, fluid.gravity, fluid.xgravity, fluid.viscosity, fluid.bounceDampening, timestepRatio);
     // sf::Vector2f, float, float
     const auto&& [gravityForces, viscosityMultiplier, bounceDampeningFactor] = Fluid::CertainConstants (
         hasGravity, hasXGravity, fluid.gravity, fluid.xgravity, fluid.viscosity, fluid.bounceDampening, timestepRatio
@@ -391,7 +390,6 @@ void Simulation::Update()
     for (std::size_t index{0}; auto&& slice: DivideContainer(fluid.particles)) {
         threads[index] = std::async(std::launch::async, 
         [this, gravityForces, viscosityMultiplier, bounceDampeningFactor] (auto&& sliced) { 
-            //fluid.UpdatePositions(sliced.first, sliced.second, hasGravity, hasXGravity);
             Fluid::UpdatePositions(sliced.first, sliced.second, gravityForces, viscosityMultiplier, bounceDampeningFactor);
             HandleTransitions(FindCellTransitions(sliced).cellmap);
             //UpdateParticles(sliced); // TODO: rewrite this to take a slice
@@ -401,10 +399,14 @@ void Simulation::Update()
     
     bool isComplete{false};
     do { isComplete = true;
-        for (auto& future: threads) {
-            if(!future.valid()) isComplete = false;
-            //future.wait_for(std::chrono::duration);
-            else future.get();
+        for (const auto& future: threads) {
+            if(!future.valid()) { isComplete = false; continue; }
+            switch(future.wait_for(std::chrono::milliseconds(0))) // just checking the status
+            {
+                case std::future_status::ready: continue;
+                case std::future_status::timeout:
+                default: isComplete = false; break;
+            }
         }
     } while (!isComplete);
     
