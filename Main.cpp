@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cassert>
+#include <format>
 
 //#include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>  // defines sf::Event
@@ -46,22 +47,49 @@ bool ToggleGridDisplay() { shouldDrawGrid = !shouldDrawGrid; return shouldDrawGr
 // TODO: overlay displaying stats for hovered cell/particles
 
 
+void PrintProgramConfiguration()
+{
+    #define PRINT(a) std::cout << std::format( #a ": {}\n", a );
+    #define PRINTTWO(a, b) std::cout << std::format( #a ": {}  " #b ": {}\n", a, b);
+    
+    //std::cout << "\n--Program Configuration--\n";
+    std::cout << '\n';
+    PRINTTWO(NUMCOLUMNS, NUMROWS);
+    PRINTTWO(BOXWIDTH, BOXHEIGHT);
+    PRINT(SPATIAL_RESOLUTION);
+    PRINT(DIFFUSION_RADIUS);
+    
+    std::cout << "max indecies: " 
+        << Cell::maxIX << ", " 
+        << Cell::maxIY << '\n';
+
+    std::cout << '\n';
+    PRINT(usingVsync);
+    PRINT(framerateCap);
+    
+    return;
+    #undef PRINT
+    #undef PRINTTWO
+}
+
+
 int main(int argc, char** argv)
 {
-    std::cout << "FLUIDSIM\n";
+    std::cout << "~FLUIDSIM~\n";
     //assert(false && "asserts are active!");
+    
+    assert(IMGUI_CHECKVERSION() && "ImGui version-check failed!");
+    std::cout << "using imgui v" << IMGUI_VERSION << '\n';
     
     for (int C{0}; C < argc; ++C) {
         std::string arg {argv[C]};
         std::cout << "C: " << C << " \t arg: " << arg << '\n';
     }
     
+    PrintProgramConfiguration();
+    
     // ValarrayExample();
     // ValarrayTest();
-    
-    std::cout << "max indecies: " 
-        << Cell::maxIX << ", " 
-        << Cell::maxIY << '\n';
     
     //EmbedMacroTest();
     //ModuloTest();
@@ -108,9 +136,6 @@ int main(int argc, char** argv)
         std::cerr << "ragequitting because empty shader didn't load.\n";
         return 2;
     }
-    
-    assert(IMGUI_CHECKVERSION() && "ImGui version-check failed!");
-    std::cout << "using imgui v" << IMGUI_VERSION << '\n';
     
     MainGUI mainGUI{};
     if (mainGUI.initErrorFlag) {

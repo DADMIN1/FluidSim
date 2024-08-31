@@ -25,7 +25,7 @@ std::size_t NegativeMerge(std::unordered_set<unsigned int>& source, const std::u
 
 bool Simulation::Initialize()
 {
-    std::cout << "\n\nInitializing Simulation!\n";
+    std::cout << "Initializing Simulation!\n";
     if (!diffusionField.Initialize()) { std::cerr << "diffusionField initialization failed!\n"; return false; }
     if (!fluid.Initialize()) { std::cerr << "fluid initialization failed!\n"; return false; }
     
