@@ -109,6 +109,7 @@ class Simulation
     bool hasXGravity {false};
     bool useTransparency {false};  // slow-moving particles are more transparent
     bool isPaused{false};
+    bool useOldmethod{true};  // changes 'Update' method
     friend int main(int argc, char** argv); // only so that the turbulence render block can check 'isPaused'
     
     // TODO: scale these based on density
@@ -124,13 +125,15 @@ class Simulation
     void LocalDiffusion(const IDset_T& particleset); // diffusion within a single cell
     void NonLocalDiffusion(const IDset_T& originset, const IDset_T& adjacentset); // diffusion across cells
     IDset_T BuildAdjacentSet(const std::size_t cellID /* , const IDset_T& excluded */);
+    void Update_NewMethod(); // faster but does not timescale properly
+    void Update_OldMethod(); // better in general (especially for turbulence-mode), but slow
     
     friend class MainGUI;
     friend struct SimulParameters; // MainGUI
     
     public:
     bool Initialize();
-    void Update();
+    void Update() { if(useOldmethod) Update_OldMethod(); else Update_NewMethod(); return; }
     void Step(); // TODO: implement this
     
     // mouse needs to access this pointer to lookup cell (given an X/Y coord)
@@ -146,9 +149,13 @@ class Simulation
     bool ToggleTransparency() { useTransparency = !useTransparency; return useTransparency; }
     bool ToggleTurbulence() { 
         fluid.isTurbulent = !fluid.isTurbulent;
-        fluid.viscosity = (fluid.isTurbulent? -1.f : 1.f) * abs(fluid.viscosity); 
+        fluid.viscosity = (fluid.isTurbulent? -1.f : 1.f) * abs(fluid.viscosity);
+        static bool lastMethod { true };
+        if (fluid.isTurbulent) { lastMethod = useOldmethod; useOldmethod = true; }
+        else { useOldmethod = lastMethod; }
         return fluid.isTurbulent; 
     }
+    bool ToggleUpdateMethod() { useOldmethod = !useOldmethod; return useOldmethod; }
     
     void Freeze() // sets all velocities to 0
     {

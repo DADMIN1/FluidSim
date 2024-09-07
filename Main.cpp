@@ -264,6 +264,10 @@ int main(int argc, char** argv)
                 std::cout << "Fluid is: " << (simulation.ToggleTurbulence()? "Turbulent":"not turbulent") << '\n';
             break;
             
+            case sf::Keyboard::M:
+                std::cout << "Using " << (simulation.ToggleUpdateMethod()? "Old":"New") << " update method" << '\n';
+            break;
+            
             case sf::Keyboard::Y:
                 std::cout << "transparency " << (simulation.ToggleTransparency()? "enabled":"disabled") << '\n';
             break;

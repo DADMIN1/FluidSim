@@ -34,7 +34,7 @@ struct Keybind
 
 struct AllKeybinds
 {
-    static constexpr auto numkeybinds{28};
+    static constexpr auto numkeybinds{29};
     std::vector<Keybind> all;  // TODO: array instead?
     std::vector<std::vector<Keybind*>> sections; 
     
@@ -77,6 +77,9 @@ struct AllKeybinds
         KEY(C, "toggle cell-grid display");
         KEY(T, "toggle turbulence-mode")
             -> extrainfo = "modifies physics calculations to encourage perpetual motion";
+        KEY(M, "toggle between Old / New update methods")
+            -> extrainfo = "Old method is better overall (especially for turbulence-mode)\n"
+            "  New method is faster but not technically correct (physics don't timescale)\n";
         KEY(Y, "toggle particle transparency");
         KEY(U, "toggle particle-scaling direction (positive/negative)");
         current_section = Keybind::Section::unspecified;

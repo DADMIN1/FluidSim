@@ -374,7 +374,8 @@ void Simulation::UpdateParticles()
 }
 
 
-void Simulation::Update()
+// cleaner and faster refactor, but not technically correct (physics are affected by timescale and FPS, race-conditions on momentum handling)
+void Simulation::Update_NewMethod()
 {
     if (isPaused) { return; }
     
@@ -409,6 +410,45 @@ void Simulation::Update()
             }
         }
     } while (!isComplete);
+    
+    UpdateParticles();
+    
+    return;
+}
+
+
+// Timescales properly, much better in general (especially for turbulence-mode), but slow
+void Simulation::Update_OldMethod()
+{
+    if (isPaused) { return; }
+    
+    std::array<std::future<DeltaMap>, THREAD_COUNT> threads;
+    auto particles_slices = DivideContainer(fluid.particles);
+    for (std::size_t index{0}; index < threads.size(); ++index) {
+        auto slice = particles_slices[index];
+        auto lambda = [this, slice](){ 
+            fluid.UpdatePositions(slice.first, slice.second, hasGravity, hasXGravity);
+            return FindCellTransitions(slice);
+        };
+        threads[index] = std::async(std::launch::async, lambda);
+    };
+    
+    DeltaMap transitions{};
+    for (auto& handle: threads) {
+        transitions.Combine(handle.get()); // extracts/moves elements with new keys
+    }
+    
+    // TODO: rewrite HandleTransitions to handle multithreading better
+    std::array<std::future<void>, THREAD_COUNT> transition_threads;
+    auto transition_slices = DivideContainer(transitions.cellmap);
+    for (std::size_t index{0}; index < transition_threads.size(); ++index) {
+        auto slice = transition_slices[index];
+        auto lambda = [this, slice]() { 
+            HandleTransitions({slice.first, slice.second});
+        };
+        transition_threads[index] = std::async(std::launch::async, lambda);
+    };
+    for (auto& handle: transition_threads) { handle.wait(); }
     
     UpdateParticles();
     

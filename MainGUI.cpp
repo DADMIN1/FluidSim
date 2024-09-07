@@ -502,6 +502,10 @@ float MainGUI::DrawFluidParams(float next_height)
     ImGui::SeparatorText("Gradient Speed-Thresholds");
     MAKESLIDERNAMED(Min, &Fluid::gradient_thresholdLow ); max = 75.f;
     MAKESLIDERNAMED(Max, &Fluid::gradient_thresholdHigh);
+    slider_Min.stepsizeMin = 0.25f;
+    slider_Min.stepsizeMax = 2.5f;
+    slider_Max.stepsizeMin = 0.25f;
+    slider_Max.stepsizeMax = 2.5f;
     
     #undef PREFIX
     #undef PSTRUCT
@@ -620,6 +624,8 @@ float MainGUI::DrawMouseParams(float next_height)
     
     static bool shouldDrawGrid_old;
     DEFSLIDER(Strength, &MouseParams->strength);
+    slider_Strength.stepsizeMin = 1.0f;
+    slider_Strength.stepsizeMax = 2.5f;
     if(slider_Strength) {
         slider_Strength.Activate();
         shouldDrawGrid = true;
