@@ -65,7 +65,7 @@ IMGUI_SOURCES += $(wildcard ${IMGUI_DIR}/sfml/*.cpp)
 OBJECTFILE_DIR_IMGUI = build/objects_imgui
 OBJFILES_IMGUI := $(patsubst ${IMGUI_DIR}/%.cpp,$(OBJECTFILE_DIR_IMGUI)/%.o, $(IMGUI_SOURCES))
 DEPFILES_IMGUI := $(OBJFILES_IMGUI:.o=.d)
-IMGUI_LDFLAGS := -lglfw -lGL
+IMGUI_LDFLAGS := -lglfw -lGL -lvulkan
 
 INCLUDE_FLAGS := -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(IMGUI_DIR)/sfml
 
@@ -130,7 +130,8 @@ $(OBJECTFILE_DIR_IMGUI)/%.o: $(IMGUI_DIR)/%.cpp | ${SUBDIRS}
 # the name MUST be in the form "lib_.so"; otherwise the compiler won't find it with the '-l' flag
 libimgui.so: ${IMGUI_SOURCES} ${OBJFILES_IMGUI} | ${SUBDIRS}
 	$(CXX) -fpic -shared ${CXXFLAGS} ${OBJFILES_IMGUI} ${WARNFLAGS} ${LDFLAGS} ${IMGUI_LDFLAGS} -o $@
-
+# TODO: need a debug-version of library (otherwise debugger cannot step into it or set breakpoints)
+# 	speaking of which, need to utilize the files under imgui/debugger
 
 # the formatting/output options for 'time' are: '--portability' and '--verbose'; either is fine ('portability' preferred)
 # not specifying either causes 'time' to print some garbage when running from a makefile (but not from normal terminal?!)
@@ -149,6 +150,7 @@ run: ${target_executable}
 debug: fluidsym_dbg
 
 
+# TODO: doesn't clean the folders for debug build
 .PHONY: clean
 clean:
 	@-rm --verbose fluidsym 2> /dev/null || true
