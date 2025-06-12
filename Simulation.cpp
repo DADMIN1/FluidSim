@@ -11,6 +11,23 @@
 long long pmemptycounter{0};  // counts how many times particleMap was empty
 #endif
 
+
+DiffusionField diffusionField{};
+Fluid fluid{};
+UUID_Map_T particleMap{}; // mapping cellIDs to particleIDs
+std::mutex write_mutex;
+std::random_device RNG; // TODO: savestates
+
+float normalizedRNG() {
+    static float last{0.0f};
+    float rng = RNG() / RNG.max();
+    bool sign {rng > last};
+    if(!sign) rng *= -last; // * -2?
+    last += last*rng;
+    return (sign? rng : -rng);
+    //TODO: figure out how to get 3 rings again
+}
+
 // helper function because sets don't have an inverse-merge
 std::size_t NegativeMerge(std::unordered_set<unsigned int>& source, const std::unordered_set<unsigned int>& toRemove)
 {
@@ -30,9 +47,10 @@ bool Simulation::Initialize()
     if (!fluid.Initialize()) { std::cerr << "fluid initialization failed!\n"; return false; }
     
     // finding/setting the initial cell for each Particle
-    for (Fluid::Particle& particle: fluid.particles)
+    for (Fluid::Particle& particle: particles)
     {
-        const auto& [x, y] = particle.getPosition();
+        const sf::CircleShape& circle = circles[particle.UUID];
+        const auto& [x, y] = circle.getPosition();
         const unsigned int xi = x / SPATIAL_RESOLUTION;
         const unsigned int yi = y / SPATIAL_RESOLUTION;
         assert((xi <= Cell::maxIX) && (yi <= Cell::maxIY) && "out-of-bounds index");
@@ -50,11 +68,12 @@ TransitionList Simulation::FindCellTransitions() const
 {
     TransitionList transitions;
     
-    for (const Fluid::Particle& particle: fluid.particles) {
+    for (const Fluid::Particle& particle: particles) {
         const auto& oldcell = diffusionField.cells.at(particle.cellID);
-        if (oldcell.getGlobalBounds().contains(particle.getPosition())) continue;
+        const sf::CircleShape& circle = circles[particle.UUID];
+        if (oldcell.getGlobalBounds().contains(circle.getPosition())) continue;
         else {
-            const auto& [x, y] = particle.getPosition();
+            const auto& [x, y] = circle.getPosition();
             const unsigned int xi = x / SPATIAL_RESOLUTION;
             const unsigned int yi = y / SPATIAL_RESOLUTION;
             assert((xi <= Cell::maxIX) && (yi <= Cell::maxIY) && "out-of-bounds index");
@@ -72,9 +91,10 @@ DeltaMap Simulation::FindCellTransitions(const auto& particles_slice) const
     for (auto iter{particles_slice.first}; iter < particles_slice.second; ++iter) {
         const Fluid::Particle& particle = *iter;
         const Cell& oldcell = diffusionField.cells.at(particle.cellID);
-        if (oldcell.getGlobalBounds().contains(particle.getPosition())) continue;
+        sf::CircleShape& circle = circles[particle.UUID];
+        if (oldcell.getGlobalBounds().contains(circle.getPosition())) continue;
         else {
-            const auto& [x, y] = particle.getPosition();
+            const auto& [x, y] = circle.getPosition();
             unsigned int xi = x / SPATIAL_RESOLUTION;
             unsigned int yi = y / SPATIAL_RESOLUTION;
             // TODO: actually fix this instead of workaround
@@ -101,12 +121,12 @@ DeltaMap Simulation::FindCellTransitions(const auto& particles_slice) const
 // note: cellmap gets eaten by the '.merge' call
 void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap)
 {
-    std::lock_guard<std::mutex> pmGuard(write_mutex);
     constexpr float turbulence_offset = { 50.f / float(NUMROWS+NUMCOLUMNS)};
     const float rng = (turbulence_offset+normalizedRNG())*(turbulence_offset+normalizedRNG());
     
     // required minimum cell-density before momentum transfers become active
     constexpr float thresholdDensityMomentumTransfer {2.f};
+    std::lock_guard<std::mutex> pmGuard(write_mutex);
     
     // 'auto&&' is definitely correct here; ~100 FPS difference (300->400)
     for (auto&& [cellID, delta]: cellmap)
@@ -118,7 +138,7 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
         
         if (cell.density < thresholdDensityMomentumTransfer) { // skip the momentum-related code if cell is too empty
             for (int particleID: delta.particlesAdded) {
-                fluid.particles[particleID].cellID = cellID;
+                particles[particleID].cellID = cellID;
             }
         } else {
             // this should probably be reverted
@@ -130,7 +150,7 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
             // transferring momentum from new particles to cell
             for (const int particleID: delta.particlesAdded)
             {
-                Fluid::Particle& particle = fluid.particles.at(particleID);
+                Fluid::Particle& particle = particles.at(particleID);
                 if (fluid.isTurbulent) particle.velocity += momentumSmoothing * rng;
                 const sf::Vector2f momentumDelta = particle.velocity * momentumTransfer;
                 particle.velocity -= momentumDelta;
@@ -146,7 +166,7 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
             // applying momentumSmoothing to leaving particles
             for (const int particleID: delta.particlesRemoved)
             {
-                Fluid::Particle& particle = fluid.particles.at(particleID);
+                Fluid::Particle& particle = particles.at(particleID);
                 particle.velocity += momentumSmoothing * rng;
                 //cell.momentum -= momentumSmoothing*momentumDistribution;
                 //Cell& newCell = diffusionField.cells[cellID];
@@ -156,7 +176,7 @@ void Simulation::HandleTransitions(std::map<unsigned int, CellDelta_T>&& cellmap
         // transferring momentum to cell and updating particle's cellID
         /* for (const int particleID: delta.particlesAdded) 
         {
-            Fluid::Particle& particle = fluid.particles.at(particleID);
+            Fluid::Particle& particle = particles.at(particleID);
             Cell& oldCell = diffusionField.cells[particle.cellID];
             particle.cellID = cellID;
             const sf::Vector2f momentumDelta = particle.velocity * momentumTransfer;
@@ -267,13 +287,13 @@ void Simulation::LocalDiffusion(const IDset_T& particleset)
     std::vector<sf::Vector2f>::iterator iterVecTop{localForces.begin()};
     for (auto iterTop{particleset.begin()}; iterTop != particleset.end(); ++iterTop)
     {
-        Fluid::Particle& particleTop = fluid.particles.at(*iterTop);
+        Fluid::Particle& particleTop = particles.at(*iterTop);
         std::vector<sf::Vector2f>::iterator iterVecBottom{iterVecTop};
         ++iterVecBottom;
         
         // notice the iteration in the loop condition (it can't be initialized with 'iterTop+1')
         for (auto iterBottom{iterTop}; ++iterBottom != particleset.end();) {
-            const Fluid::Particle& particleBottom = fluid.particles.at(*iterBottom);
+            const Fluid::Particle& particleBottom = particles.at(*iterBottom);
             const sf::Vector2f localforce = Fluid::CalcLocalForce(particleTop, particleBottom, fluid.fdensity);
             
             *iterVecTop    += localforce;
@@ -295,10 +315,10 @@ void Simulation::NonLocalDiffusion(const IDset_T& originset, const IDset_T& adja
     if (adjacentset.empty()) { return; }
     for (const auto UUID : originset)
     {
-        Fluid::Particle& particle = fluid.particles.at(UUID);
+        Fluid::Particle& particle = particles.at(UUID);
         for (const auto adjacentUUID: adjacentset)
         {
-            Fluid::Particle& adjacentParticle = fluid.particles.at(adjacentUUID);
+            Fluid::Particle& adjacentParticle = particles.at(adjacentUUID);
             const sf::Vector2f localforce = Fluid::CalcLocalForce(particle, adjacentParticle, fluid.fdensity);
             
             particle.velocity += localforce;
@@ -340,7 +360,7 @@ void Simulation::UpdateParticles()
             
             // distributing momentum and applying diffusionVec
             for (unsigned int particleID: particleset) {
-                Fluid::Particle& particle = fluid.particles.at(particleID);
+                Fluid::Particle& particle = particles.at(particleID);
                 particle.velocity += cell.diffusionVec + momentumPerParticle;
             }
             // unfortunately, we have to handle diffusionVec and momentum in a seperate loop;
@@ -388,7 +408,7 @@ void Simulation::Update_NewMethod()
     );
     
     std::array<std::future<void>, THREAD_COUNT> threads;
-    for (std::size_t index{0}; auto&& slice: DivideContainer(fluid.particles)) {
+    for (std::size_t index{0}; auto&& slice: DivideContainer(particles)) {
         threads[index] = std::async(std::launch::async, 
         [this, gravityForces, viscosityMultiplier, bounceDampeningFactor] (auto&& sliced) { 
             Fluid::UpdatePositions(sliced.first, sliced.second, gravityForces, viscosityMultiplier, bounceDampeningFactor);
@@ -423,7 +443,7 @@ void Simulation::Update_OldMethod()
     if (isPaused) { return; }
     
     std::array<std::future<DeltaMap>, THREAD_COUNT> threads;
-    auto particles_slices = DivideContainer(fluid.particles);
+    auto particles_slices = DivideContainer(particles);
     for (std::size_t index{0}; index < threads.size(); ++index) {
         auto slice = particles_slices[index];
         auto lambda = [this, slice](){ 

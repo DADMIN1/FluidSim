@@ -30,7 +30,8 @@ class ThreadManager
 
 // overload for containers that don't have '+' for their iterators
 // (required for DivideContainer start/end)
-auto operator+(auto map_iter, auto offset) {
+template<typename T> requires std::input_iterator<T>
+T operator+(T map_iter, auto offset) {
     while (offset > 0) { ++map_iter; --offset; }
     return map_iter;
 }

@@ -25,7 +25,7 @@ ifeq (debug, $(filter debug, $(MAKECMDGOALS)))
 DEBUGFLAG = true
 target_executable = fluidsym_dbg
 OBJECTFILE_DIR = build/objects_dbg
-CXXFLAGS += -g -Og
+CXXFLAGS += -g3 -Og
 # '-g' is preferrable to '-ggdb'?? '-g3' or '-ggdb3' for extra info (like macro definitions). Default level is 2
 else
 DEBUGFLAG = false
@@ -35,11 +35,25 @@ CXXFLAGS += -O3
 endif
 
 CXXFLAGS += -march=native -mtune=native
-LTOFLAGS := -flto=auto -fuse-linker-plugin -fno-fat-lto-objects
+LTOFLAGS := -flto=auto -fuse-linker-plugin -ffat-lto-objects #-fno-fat-lto-objects
 # '-fno-fat-lto-objects': fat-LTO object-files have both the intermediate language and object code,
 # which makes them usable for normal, non-LTO linking. Disabling it improves compile times and file sizes
-# '-ffat-lto-objects' is the flag to enable it (which is default)
+# '-ffat-lto-objects' is the flag to enable it (which is default)  <- wrong. Specifying this DOES have an effect; it's disabled when left unspecified
+# fat-LTO object-files are required for objdump to display anything useful.
 CXXFLAGS += ${LTOFLAGS}
+
+# fat-LTO object-files are required for objdump to display anything useful.
+# no noticeable difference between '-g3' and 'ggdb3', or between 'g2'/'g3'?
+
+# objdump --demangle --visualize-jumps=color --disassembler-color=terminal --source --syms build/objects/Fluid.o
+# objdump --demangle --no-recursion-limit --disassembler-color=extended-color --visualize-jumps=extended-color --line-numbers --source --show-all-symbols build/objects_dbg/Fluid.o
+# objdump --demangle --no-recursion-limit --line-numbers --source --show-all-symbols build/objects_dbg/Fluid.o
+# objdump --demangle --no-recursion-limit --disassembler-color=extended-color --visualize-jumps=extended-color --line-numbers --source --source-comment='#[\033[01;32m] ' build/objects_dbg/Simulation.o
+# objdump --demangle --no-recursion-limit --line-numbers --disassembler-color=extended-color --visualize-jumps=extended-color --source build/objects_dbg/Simulation.o
+# objdump --demangle="gnu-v3" --no-recurse-limit --wide --disassembler-color=extended-color --visualize-jumps=extended-color --line-numbers --file-offsets --source-comment --prefix="# @" --prefix-strip=3 --source --show-all-symbols build/objects_dbg/Simulation.o
+# -Mintel64 -Matt
+
+# readelf, nm
 
 #CXXFLAGS += -fsanitize=address  # super slow
 # -fstack-check -fstack-protector
@@ -72,11 +86,17 @@ INCLUDE_FLAGS := -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(IMGUI_DIR)/sfml
 
 PROFILING_DIR := profiling
 PROFILING_BUILD_DIR := build/profiling
-PROFILING_FLAGS := -fprofile-dir=${PROFILING_DIR} -fprofile-note=${PROFILING_DIR}
+PROFILING_OPTINFO_DIR := ${PROFILING_BUILD_DIR}/optinfo
+PROFILING_GCDA_DIR := ${PROFILING_DIR}/gcda
+PROFILING_FLAGS := -pg -fprofile-arcs -fprofile-dir=${PROFILING_GCDA_DIR} #-fprofile-note=${PROFILING_DIR} -ftest-coverage #-fprofile-abs-path
+PROFILING_EXE := ${PROFILING_DIR}/fluidsym_prof
+# -ftest-coverage
 
+GMON_OUT_PREFIX := profiling/asdf
+# export GMON_OUT_PREFIX=profiling/asdf;
 
 # build directories
-SUBDIRS := build/objects build/objects_dbg ${PROFILING_BUILD_DIR} ${PROFILING_DIR}
+SUBDIRS := build/objects build/objects_dbg ${PROFILING_BUILD_DIR} ${PROFILING_DIR} ${PROFILING_OPTINFO_DIR} ${PROFILING_GCDA_DIR}
 SUBDIRS += build/objects_imgui build/objects_imgui/backends build/objects_imgui/sfml
 .PHONY: subdirs
 subdirs: $(SUBDIRS)
@@ -86,21 +106,41 @@ $(SUBDIRS):
 
 
 # this does the same thing as the normal recipe for .cpp->.o files, except it also dumps the optimization-info
-${PROFILING_DIR}/%.optinfo: %.cpp | ${SUBDIRS}
-	$(CXX) $(CXXFLAGS) -MMD -c $< -o $(patsubst %.cpp,$(OBJECTFILE_DIR)/%.o, $<) ${INCLUDE_FLAGS} ${WARNFLAGS} -fopt-info-all=$@
+${PROFILING_OPTINFO_DIR}/%.optinfo: %.cpp | ${SUBDIRS}
+	$(CXX) $(CXXFLAGS) -MMD -c $< -o $(patsubst %.cpp,$(PROFILING_BUILD_DIR)/%.o, $<) ${PROFILING_FLAGS} ${INCLUDE_FLAGS} ${WARNFLAGS} -fopt-info-all=$@
 	@echo "dumped optimization info to: $@ \n"
 
 # -fopt-info  # dumps optimization
 # -fopt-info-[option]=[filename]  # all dumps are concatenated into filename, otherwise it just prints on stderr
 # -fsave-optimization-record
-FOPTDUMPS := $(patsubst %.cpp,$(PROFILING_DIR)/%.optinfo, $(CODEFILES))
+FOPTDUMPS := $(patsubst %.cpp,$(PROFILING_OPTINFO_DIR)/%.optinfo, $(CODEFILES))
 
 # dumps optimization info for all files
 .PHONY: foptdump
 foptdump: ${FOPTDUMPS}
-	@echo "finished writing optimization info for: $? \n"
+	@echo "finished writing optimization info to: $? \n"
 # '$?' means all dependencies that needed updating
 
+#PROFILING_DATAFILE: ${FOPTDUMPS}
+# -fauto-profile=${PROFILING_DATAFILE}
+# perf record -e br_inst_retired:near_taken -b -o perf.data -- your_program
+# create_gcov --binary=your_program.unstripped --profile=perf.data --gcov=profile.afdo
+
+# TODO: need to rebuild imgui with profiling?
+# build EXE for profiling. this EXE must still be executed from the project root
+${PROFILING_EXE}: ${FOPTDUMPS} libimgui.so | ${SUBDIRS}
+	${CXX} -L${PROJECT_DIR} ${CXXFLAGS} ${PROFILING_BUILD_DIR}/*.o ${PROFILING_FLAGS} ${WARNFLAGS} -o $@ -limgui ${LDFLAGS} -Wl,-rpath,${PROJECT_DIR}
+
+# GMON_OUT_PREFIX affects output file location, if set. Otherwise, running it creates 'gmon.out' in project root.
+.PHONY: prof
+prof: ${PROFILING_EXE}
+#	export GMON_OUT_PREFIX=profiling/gmon; ./${PROFILING_EXE}
+#   gprof --demangle ${PROFILING_EXE} profiling/gmon.*
+
+# 'gmon.out' contains function-call graphs; for use with 'gprof'
+# .gcda are ??? data about object file
+# .gcno are 'notes' about source/code mapping, for line-numbers and block/scope info (only if 'ftest-coverage' is used)
+# profile-guided-optimization requires a '.afdo' file; created by perf
 
 .DEFAULT_GOAL := ${target_executable}
 ${target_executable}: ${OBJFILES} libimgui.so | ${SUBDIRS}
@@ -172,10 +212,15 @@ reallyclean: clean
 	@-rm --verbose libimgui.so 2> /dev/null || true
 	@-rm --verbose ${OBJFILES_IMGUI} 2> /dev/null || true
 	@-rm --verbose ${DEPFILES_IMGUI} 2> /dev/null || true
+	@-rm --verbose ${FOPTDUMPS} 2> /dev/null || true
+	@-rm --verbose ${PROFILING_BUILD_DIR}/*.o 2> /dev/null || true
+	@-rm --verbose ${PROFILING_BUILD_DIR}/*.d 2> /dev/null || true
+	@-rm --verbose ${PROFILING_BUILD_DIR}/*.gcno 2> /dev/null || true
 
 
 # this has to be at the end of the file?
 -include $(DEPFILES)
 -include $(DEPFILES_IMGUI)
+-include $(PROFILING_BUILD_DIR)/*.d
 # Include the .d makefiles. The '-' at the front suppresses the errors of missing depfiles.
 # Initially, all the '.d' files will be missing, and we don't want those errors to show up.

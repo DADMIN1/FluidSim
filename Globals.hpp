@@ -3,7 +3,7 @@
 
 
 constexpr int NUMCOLUMNS{64}, NUMROWS{64}; // layout (and number) of particles spawned during init
-constexpr int BOXWIDTH{1000}, BOXHEIGHT{1000}; // internal resolution (default window resolution should match)
+constexpr int BOXWIDTH{1536}, BOXHEIGHT{1024}; // internal resolution (default window resolution should match)
 //constexpr float DEFAULTRADIUS {float(BOXWIDTH/NUMCOLUMNS) / 2.0f};
 constexpr float DEFAULTRADIUS {10.f}; // size of particles (sf::CircleShape)
 constexpr int DEFAULTPOINTCOUNT {16}; // number of points used to draw each circle (particles)

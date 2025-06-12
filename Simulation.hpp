@@ -88,23 +88,16 @@ struct DeltaMap
 };
 
 
+extern DiffusionField diffusionField;
+extern Fluid fluid;
+extern UUID_Map_T particleMap; // mapping cellIDs to particleIDs
+extern std::mutex write_mutex;
+extern std::random_device RNG; // TODO: savestates
+float normalizedRNG();
+
+
 class Simulation
 {
-    DiffusionField diffusionField{};
-    Fluid fluid{};
-    UUID_Map_T particleMap{}; // mapping cellIDs to particleIDs
-    std::mutex write_mutex;
-    std::random_device RNG; // TODO: savestates
-    float normalizedRNG() {
-        static float last{0.0f};
-        float rng = RNG() / RNG.max();
-        bool sign {rng > last};
-        if(!sign) rng *= -last; // * -2?
-        last += last*rng;
-        return (sign? rng : -rng);
-        //TODO: figure out how to get 3 rings again
-    }
-    
     bool hasGravity {false};
     bool hasXGravity {false};
     bool useTransparency {false};  // slow-moving particles are more transparent
@@ -170,9 +163,10 @@ class Simulation
         particleMap.clear();
         diffusionField.Reset();
         fluid.Reset(); // resets positions! (required for next loop)
-        for (Fluid::Particle& particle: fluid.particles)
+        for (Fluid::Particle& particle: particles)
         {
-            const auto& [x, y] = particle.getPosition();
+            const sf::CircleShape& circle = circles[particle.UUID];
+            const auto& [x, y] = circle.getPosition();
             const unsigned int xi = x / SPATIAL_RESOLUTION;
             const unsigned int yi = y / SPATIAL_RESOLUTION;
             Cell* cell = diffusionField.cellmatrix.at(xi).at(yi);

@@ -13,6 +13,11 @@
 #include <SFML/System/Time.hpp>
 
 
+std::vector<sf::CircleShape> circles = std::vector<sf::CircleShape>(NUMCOLUMNS*NUMROWS, sf::CircleShape(DEFAULTRADIUS, DEFAULTPOINTCOUNT));
+sf::RenderTexture particle_texture;
+std::vector<Fluid::Particle> particles;
+//std::vector<Particle> particles = std::vector<Particle>(NUMCOLUMNS*NUMROWS, Fluid::Particle(DEFAULTRADIUS, DEFAULTPOINTCOUNT));
+
 bool Fluid::isParticleScalingPositive = true;
 
 // counts how many times the speedcaps were broken
@@ -67,12 +72,13 @@ Gradient_T* Fluid::activeGradient{nullptr};
 
 void Fluid::Particle::UpdateColor(const bool useTransparency)
 {
+    sf::CircleShape& circle = circles[UUID];
     const float speed = std::abs(velocity.x) + std::abs(velocity.y);
     float inputRange = gradient_thresholdHigh-gradient_thresholdLow;
     unsigned int speedindex;
     const unsigned int baseAlpha = (useTransparency? 0xC0 : 0xFF);
     unsigned char alpha = baseAlpha;  // eventually converted to sf::Uint8 - which is unsigned char (not int)
-    if (speed <= gradient_thresholdLow) { speedindex = 0; setScale({1.0f, 1.0f}); }
+    if (speed <= gradient_thresholdLow) { speedindex = 0; circle.setScale({1.0f, 1.0f}); }
     else if (speed >= gradient_thresholdHigh) { speedindex = 1023; }  // size of gradient
     else {
         speedindex = (speed - gradient_thresholdLow) * (1023.f/inputRange);
@@ -84,10 +90,10 @@ void Fluid::Particle::UpdateColor(const bool useTransparency)
         float particleScaling = ((speed - gradient_thresholdLow)/inputRange);
         // faster particles grow
         float scale = 1.0f + ((Fluid::isParticleScalingPositive)? particleScaling : -particleScaling);
-        setScale({scale, scale});
+        circle.setScale({scale, scale});
     }
     const auto[r, g, b, a] = activeGradient->Lookup(speedindex);
-    setFillColor({r,g,b,alpha});
+    circle.setFillColor({r,g,b,alpha});
     return;
 }
 
@@ -111,7 +117,8 @@ bool Fluid::Initialize()
     for (int c{0}; c < NUMCOLUMNS; ++c) { 
         for (int r{0}; r < NUMROWS; ++r) {
             Particle& particle = particles.emplace_back(nextID++);
-            particle.setPosition((c*INITIALSPACINGX)+INITIALOFFSETX, (r*INITIALSPACINGY)+INITIALOFFSETY);
+            sf::CircleShape& circle = circles[particle.UUID];
+            circle.setPosition((c*INITIALSPACINGX)+INITIALOFFSETX, (r*INITIALSPACINGY)+INITIALOFFSETY);
             // the particles still need their Cell-related variables set
             // and the cells need to have their density increased
         }
@@ -127,20 +134,23 @@ void Fluid::Reset()
         particle.cellID = -1;
         particle.velocity = {0,0};
         if (++c >= NUMCOLUMNS) { c=0; ++r; }
-        particle.setPosition((c*INITIALSPACINGX)+INITIALOFFSETX, (r*INITIALSPACINGY)+INITIALOFFSETY);
+        sf::CircleShape& circle = circles[particle.UUID];
+        circle.setPosition((c*INITIALSPACINGX)+INITIALOFFSETX, (r*INITIALSPACINGY)+INITIALOFFSETY);
         // the particles still need their Cell-related variables set, and the cells need to have their density increased
     }
 }
 
 float Fluid::Particle::Distance(const Particle& rh) const
 {
-    auto [diffx, diffy] = this->getPosition() - rh.getPosition();
+    const sf::CircleShape& circle = circles[UUID];
+    auto [diffx, diffy] = circle.getPosition() - circles[rh.UUID].getPosition();
     return std::sqrt((diffx*diffx) + (diffy*diffy)); // pythagorean theorem
 }
 
 float Fluid::Particle::Distance(const Particle& lh, const Particle& rh)
 {
-    auto [diffx, diffy] = lh.getPosition() - rh.getPosition();
+    const sf::CircleShape& circle = circles[lh.UUID];
+    auto [diffx, diffy] = circle.getPosition() - circles[rh.UUID].getPosition();
     return std::sqrt((diffx*diffx) + (diffy*diffy));
 }
 
@@ -159,8 +169,10 @@ sf::Vector2f Fluid::CalcLocalForce(const Fluid::Particle& lh, const Fluid::Parti
     // the distance between two opposite corners of a cell (pythagorean theorem)
     CONSTEXPR float intracellDistMax{std::sqrt(SPATIAL_RESOLUTION*SPATIAL_RESOLUTION*2)};
     CONSTEXPR float maxdist = intracellDistMax*(radialdist_limit+1);
+    const auto& lhc = circles[lh.UUID];
+    const auto& rhc = circles[rh.UUID];
     
-    const auto [diffx, diffy] = lh.getPosition() - rh.getPosition();
+    const auto [diffx, diffy] = lhc.getPosition() - rhc.getPosition();
     const float totalDistance = std::sqrt((diffx*diffx) + (diffy*diffy));
     if(totalDistance == 0.f) [[unlikely]] { ++exactOverlapCounter; return -lh.velocity*timestepRatio*fdensity; }  // TODO: should return random direction, ideally
     
@@ -191,7 +203,8 @@ void Fluid::UpdatePositions()
         particle.ApplyViscosity(viscosity);
         particle.ApplySpeedcap();
         
-        sf::Vector2f nextPosition = particle.getPosition();
+        sf::CircleShape& circle = circles[particle.UUID];
+        sf::Vector2f nextPosition = circle.getPosition();
         nextPosition.x += particle.velocity.x * timestepRatio;
         nextPosition.y += particle.velocity.y * timestepRatio;
         
@@ -220,7 +233,7 @@ void Fluid::UpdatePositions()
         assert((nextPosition.x >= 0) && (nextPosition.y >= 0) && "negative nextPosition!");
         assert((nextPosition.x <= BOXWIDTH) && (nextPosition.y <= BOXHEIGHT) && "OOB nextPosition!");
         
-        particle.setPosition(nextPosition);
+        circle.setPosition(nextPosition);
     }
     
     return;
@@ -236,12 +249,13 @@ void Fluid::UpdatePositions(const std::vector<Particle>::iterator sliceStart, co
     for (std::vector<Particle>::iterator iter{sliceStart}; iter < sliceEnd; ++iter)
     {
         Particle& particle = *iter;
+        sf::CircleShape& circle = circles[particle.UUID];
         particle.ApplyViscosity(viscosity);
         particle.velocity.y +=  tgravity*timestepRatio; // inlining gravity calc here
         particle.velocity.x += txgravity*timestepRatio;
         particle.ApplySpeedcap();
         
-        sf::Vector2f nextPosition = particle.getPosition();
+        sf::Vector2f nextPosition = circle.getPosition();
         nextPosition.x += particle.velocity.x * timestepRatio;
         nextPosition.y += particle.velocity.y * timestepRatio;
         
@@ -270,7 +284,7 @@ void Fluid::UpdatePositions(const std::vector<Particle>::iterator sliceStart, co
         assert((nextPosition.x >= 0) && (nextPosition.y >= 0) && "negative nextPosition!");
         assert((nextPosition.x <= BOXWIDTH) && (nextPosition.y <= BOXHEIGHT) && "OOB nextPosition!");
         
-        particle.setPosition(nextPosition);
+        circle.setPosition(nextPosition);
     }
     
     return;
@@ -285,7 +299,8 @@ void Fluid::UpdatePositions(
     for (std::vector<Particle>::iterator iter{sliceStart}; iter!=sliceEnd; ++iter)
     {
         Particle& particle = *iter;
-        sf::Vector2f nextPosition { particle.getPosition() + (particle.velocity+=gravityForces) };
+        sf::CircleShape& circle = circles[particle.UUID];
+        sf::Vector2f nextPosition { circle.getPosition() + (particle.velocity+=gravityForces) };
         
         // handling reflections
         particle.velocity = sf::Vector2f {
@@ -305,8 +320,26 @@ void Fluid::UpdatePositions(
         };
         
         particle.velocity *= viscosityMultiplier; particle.ApplySpeedcap();
-        particle.setPosition(nextPosition);
+        circle.setPosition(nextPosition);
     }
     
     return;
+}
+
+void Fluid::Freeze() // sets all velocities to 0
+{
+    for (Particle& particle: particles) {
+        particle.velocity = {0,0};
+        particle.UpdateColor(false); // even if transparency is enabled, non-moving particles should be opaque
+    }
+}
+
+void Fluid::Redraw(const bool useTransparency, const bool shouldClear) 
+{
+    if(shouldClear) particle_texture.clear(sf::Color::Transparent);
+    for (Particle& particle: particles) {
+        particle.UpdateColor(useTransparency);
+        particle_texture.draw(circles[particle.UUID]);
+    }
+    particle_texture.display();
 }

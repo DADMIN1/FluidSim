@@ -38,7 +38,7 @@ struct GradientView: sf::Drawable
     sf::Sprite m_sprite;
     
     // implementing the SFML 'draw' function for this class
-    virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override 
+    void draw(sf::RenderTarget& target, sf::RenderStates states) const override 
     { target.draw(m_sprite, states); }
     
     void RedrawTexture(bool useOriginal=false) // parameter selects between 'LookupDefault' and 'Lookup'

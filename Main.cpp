@@ -73,6 +73,8 @@ void PrintProgramConfiguration()
 }
 
 
+#include "MacroPrintsz.hpp"
+
 int main(int argc, char** argv)
 {
     std::cout << "~FLUIDSIM~\n";
@@ -87,6 +89,26 @@ int main(int argc, char** argv)
     }
     
     PrintProgramConfiguration();
+    //TestCaches();
+    
+    // Diffusion.hpp
+    using CellMatrix = std::array<std::array<Cell*, Cell::arraySizeY>, Cell::arraySizeX>;
+    using CellArray = std::vector<Cell>;
+    
+    // Simulation.hpp
+    using UUID_Map_T = std::map<unsigned int, std::unordered_set<unsigned int>>;
+    using IDset_T = std::unordered_set<unsigned int>;
+    
+    //PrintTypeSizes<Fluid, Cell, Simulation>();
+    PrintTypeSizes<
+        Fluid, Fluid::Particle,
+        Simulation, CellMatrix, CellArray, Mouse_T, DiffusionField, ThreadManager,
+        LocalCells<0>, Cell, CellDelta_T, DeltaMap, DoubleCoord, CoordBase_T, Transition_T, UUID_Map_T, IDset_T,
+        MainGUI, MainGUI::SimulParameters, MainGUI::FluidParameters, MainGUI::MouseParameters,
+        sf::CircleShape, sf::RectangleShape, sf::RenderTexture, sf::RenderWindow
+    >();
+    
+    //return 0;
     
     // ValarrayExample();
     // ValarrayTest();
@@ -142,7 +164,7 @@ int main(int argc, char** argv)
         std::cerr << "mainGUI failed to init! exiting.\n";
         return 3;
     }
-    mainGUI.SetupFluidParameters(&simulation.fluid);
+    mainGUI.SetupFluidParameters(&fluid);
     mainGUI.SetupSimulParameters(&simulation);
     mainGUI.SetupMouseParameters(&mouse);
     mainGUI.Create();

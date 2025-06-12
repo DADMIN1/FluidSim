@@ -12,6 +12,9 @@
 #include "Globals.hpp"
 struct Gradient_T;
 
+extern std::vector<sf::CircleShape> circles;
+extern sf::RenderTexture particle_texture;
+
 
 class Fluid
 {
@@ -27,13 +30,15 @@ class Fluid
     friend class Simulation;
     friend class MainGUI;
     friend struct FluidParameters; //defined in MainGUI
+    friend int main(int, char**);
     
     static bool isParticleScalingPositive;
     static float gradient_thresholdLow;   // speed at which gradient begins to apply
     static float gradient_thresholdHigh;  // speed that caps out the gradient
     static Gradient_T* activeGradient;
     
-    class Particle : public sf::CircleShape
+    public:
+    class Particle
     {
         const unsigned int UUID;
         unsigned int cellID{0};
@@ -42,15 +47,16 @@ class Fluid
         friend class Fluid;
         friend class Simulation;
         friend class MainGUI;
+        friend int main(int, char**);
         
         public:
         void UpdateColor(const bool useTransparency);
         
-        Particle(const unsigned int ID, float radius=DEFAULTRADIUS, std::size_t pointcount=DEFAULTPOINTCOUNT) 
-        : Particle::CircleShape(radius, pointcount), UUID{ID}
+        Particle(const unsigned int ID /*, float radius=DEFAULTRADIUS, std::size_t pointcount=DEFAULTPOINTCOUNT*/) 
+        : /*Particle::CircleShape(radius, pointcount),*/ UUID{ID}
         {
-            const sf::Color defaultcolor (0x0888FFFF);
-            setFillColor(defaultcolor);
+            //const sf::Color defaultcolor (0x0888FFFF);
+            //setFillColor(defaultcolor);
         }
         
         float Distance(const Particle& rh) const; // unused
@@ -60,9 +66,6 @@ class Fluid
     };
     // calculates diffusion-force between particles within the same cell
     static sf::Vector2f CalcLocalForce(const Particle& lh, const Particle& rh, float fdensity);
-    
-    sf::RenderTexture particle_texture;
-    std::vector<Particle> particles;
     
     public:
     static void SetActiveGradient(Gradient_T* gptr) { activeGradient = gptr; }
@@ -92,30 +95,14 @@ class Fluid
         { ; }
     };
     
-    
-    void Freeze() // sets all velocities to 0
-    {
-        for (Particle& particle: particles) {
-            particle.velocity = {0,0};
-            particle.UpdateColor(false); // even if transparency is enabled, non-moving particles should be opaque
-        }
-    }
-    
+    void Freeze(); // sets all velocities to 0
     sf::Sprite GetSprite() { return sf::Sprite(particle_texture.getTexture()); }
-    void Redraw(const bool useTransparency, const bool shouldClear) 
-    {
-        if(shouldClear) particle_texture.clear(sf::Color::Transparent);
-        for (Particle& particle: particles) {
-            particle.UpdateColor(useTransparency);
-            particle_texture.draw(particle);
-        }
-        particle_texture.display();
-    }
-    
+    void Redraw(const bool useTransparency, const bool shouldClear);
     void Reset();
 };
 
 
+extern std::vector<Fluid::Particle> particles;
 void PrintSpeedcapInfo();
 
 
